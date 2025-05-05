@@ -1,0 +1,15 @@
+# public/robots.txt
+
+# Erlaube dem Facebook/WhatsApp Crawler explizit den Zugriff auf alles
+User-agent: facebookexternalhit
+Allow: /
+
+# Optional: Füge hier Regeln für andere Crawler hinzu
+# Beispiel: Blockiere alle anderen Crawler für den gesamten Inhalt (nicht empfohlen für Live-Seiten)
+# User-agent: *
+# Disallow: /
+
+# Beispiel: Erlaube allen anderen Crawlern alles (Standard, wenn keine anderen Regeln da sind)
+User-agent: *
+Allow: /
+
