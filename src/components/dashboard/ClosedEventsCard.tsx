@@ -1,7 +1,6 @@
-// src/components/dashboard/ClosedEventsCard.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Event as GroupEvent } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +15,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip'; // Tooltip importieren
+} from '@/components/ui/tooltip';
 import {
   CheckCircle2,
   ChevronsUpDown,
@@ -24,30 +23,49 @@ import {
   ArchiveRestore,
   Eye,
   EyeOff,
-} from 'lucide-react'; // Icons
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// ... (Props bleiben gleich)
 type ClosedEventsCardProps = {
   events: GroupEvent[];
 };
 
+const STORAGE_KEY = 'archivedEventIds';
+
 export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
-  const [isOpen, setIsOpen] = useState(true); // Standardmäßig offen
+  const [isOpen, setIsOpen] = useState(true);
   const [archivedEventIds, setArchivedEventIds] = useState<Set<number>>(
     new Set()
   );
   const [showArchived, setShowArchived] = useState(false);
 
-  // ... (handleToggleArchive bleibt gleich) ...
+  // Lade archivierte IDs aus dem LocalStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setArchivedEventIds(new Set(parsed));
+        }
+      } catch (e) {
+        console.warn('Fehler beim Parsen von archivierten IDs:', e);
+      }
+    }
+  }, []);
+
+  // Speichere bei Änderungen
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(Array.from(archivedEventIds))
+    );
+  }, [archivedEventIds]);
+
   const handleToggleArchive = (eventId: number) => {
     setArchivedEventIds((prev) => {
       const next = new Set(prev);
-      if (next.has(eventId)) {
-        next.delete(eventId);
-      } else {
-        next.add(eventId);
-      }
+      next.has(eventId) ? next.delete(eventId) : next.add(eventId);
       return next;
     });
   };
@@ -71,23 +89,12 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
   const hasAnyClosedEvents = allClosedEvents.length > 0;
 
   return (
-    // Wrap with TooltipProvider if not done globally
     <TooltipProvider delayDuration={100}>
-      <Collapsible
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        // Nur rendern, wenn es überhaupt abgeschlossene Events gibt? Optional.
-        // className={cn(!hasAnyClosedEvents && "hidden")}
-      >
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <Card className='shadow-sm border'>
           <CardHeader className='flex flex-row items-center justify-between space-y-0 pr-4 py-3'>
-            {' '}
-            {/* Padding angepasst */}
             <CardTitle className='flex items-center gap-2 text-lg font-semibold'>
-              {' '}
-              {/* Schrift angepasst */}
-              <CheckCircle2 className='w-5 h-5 text-green-600' />{' '}
-              {/* Icon farbig */}
+              <CheckCircle2 className='w-5 h-5 text-green-600' />
               Abgeschlossene Wetten
             </CardTitle>
             <div className='flex items-center gap-1'>
@@ -96,8 +103,8 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                   <TooltipTrigger asChild>
                     <Button
                       variant='ghost'
-                      size='icon' // Icon-Button für Konsistenz
-                      className='h-8 w-8' // Kleine Größe
+                      size='icon'
+                      className='h-8 w-8'
                       onClick={() => setShowArchived(!showArchived)}
                     >
                       {showArchived ? (
@@ -128,16 +135,13 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
 
           <CollapsibleContent>
             <CardContent className='pt-2 pb-4 px-4 space-y-4'>
-              {' '}
-              {/* Padding angepasst */}
-              {/* Verbesserter Empty State */}
               {!hasAnyClosedEvents && (
                 <div className='text-center py-10 text-muted-foreground text-sm'>
                   <CheckCircle2 className='mx-auto h-10 w-10 opacity-50 mb-3' />
                   <p>Es gibt noch keine abgeschlossenen Wetten.</p>
                 </div>
               )}
-              {/* Aktive abgeschlossene Wetten */}
+
               {activeClosedEvents.length === 0 &&
                 hasArchivedEvents &&
                 !showArchived && (
@@ -154,14 +158,13 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                     ).
                   </p>
                 )}
+
               {activeClosedEvents.length > 0 && (
                 <ul className='space-y-3 divide-y divide-border/50'>
-                  {' '}
-                  {/* Trennlinien + Abstand */}
                   {activeClosedEvents.map((event) => (
                     <li
                       key={event.id}
-                      className='flex items-start justify-between gap-3 pt-3 first:pt-0' // Abstand oben, außer erstes Element
+                      className='flex items-start justify-between gap-3 pt-3 first:pt-0'
                     >
                       <div className='space-y-1 flex-1'>
                         <div className='text-sm font-medium'>{event.title}</div>
@@ -172,7 +175,7 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                         )}
                         <Badge
                           variant='outline'
-                          className='text-xs font-normal' // Kleinere Badge
+                          className='text-xs font-normal'
                         >
                           Gewinner: {event.winning_option}
                         </Badge>
@@ -182,7 +185,7 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                           <Button
                             variant='ghost'
                             size='icon'
-                            className='h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground' // Kleinerer Button
+                            className='h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground'
                             onClick={() => handleToggleArchive(event.id)}
                           >
                             <Archive className='h-3.5 w-3.5' />
@@ -197,21 +200,19 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                   ))}
                 </ul>
               )}
-              {/* Archivierte geschlossene Wetten */}
+
               {hasArchivedEvents && showArchived && (
                 <div className='mt-5 pt-4 border-t'>
                   <h4 className='text-sm font-medium text-muted-foreground mb-3'>
                     Archiv ({archivedClosedEvents.length})
                   </h4>
                   <ul className='space-y-3 divide-y divide-border/50'>
-                    {' '}
-                    {/* Trennlinien + Abstand */}
                     {archivedClosedEvents.map((event) => (
                       <li
                         key={event.id}
                         className={cn(
                           'flex items-start justify-between gap-3 pt-3 first:pt-0',
-                          'opacity-70 hover:opacity-100 transition-opacity' // Style für Archiv
+                          'opacity-70 hover:opacity-100 transition-opacity'
                         )}
                       >
                         <div className='space-y-1 flex-1'>
@@ -225,7 +226,7 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                           )}
                           <Badge
                             variant='outline'
-                            className='text-xs font-normal' // Kleinere Badge
+                            className='text-xs font-normal'
                           >
                             Gewinner: {event.winning_option}
                           </Badge>
@@ -235,7 +236,7 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                             <Button
                               variant='ghost'
                               size='icon'
-                              className='h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground' // Kleinerer Button
+                              className='h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground'
                               onClick={() => handleToggleArchive(event.id)}
                             >
                               <ArchiveRestore className='h-3.5 w-3.5' />

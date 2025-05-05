@@ -79,7 +79,7 @@ export function AddEventDialog({
   const defaultTrigger = (
     <Button size='sm' variant='ghost' className='hover:bg-primary/90'>
       <PlusCircle className='mr-2 h-4 w-4' />
-      Neues Event
+      Neue Wette
     </Button>
   );
 

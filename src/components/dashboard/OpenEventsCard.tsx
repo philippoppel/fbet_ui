@@ -1,28 +1,17 @@
-// src/components/dashboard/OpenEventsCard.tsx
 'use client';
 
 import { useState } from 'react';
 import type { Event as GroupEvent, UserOut } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from '@/components/ui/dialog';
-import { Loader2, ListChecks, Edit, ChevronsUpDown } from 'lucide-react'; // Icons
+  Loader2,
+  ListChecks,
+  Edit,
+  ChevronsUpDown,
+  CheckCircle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Collapsible,
@@ -30,7 +19,6 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 
-// ... (Props bleiben gleich)
 type OpenEventsCardProps = {
   events: GroupEvent[];
   user: UserOut;
@@ -69,18 +57,14 @@ export function OpenEventsCard({
       )
     : [];
 
-  const [isOpen, setIsOpen] = useState(true); // Standardmäßig offen
+  const [isOpen, setIsOpen] = useState(true);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className='shadow-sm border'>
         <CardHeader className='flex flex-row items-center justify-between space-y-0 pr-4 py-3'>
-          {' '}
-          {/* Padding angepasst */}
           <CardTitle className='flex items-center gap-2 text-lg font-semibold'>
-            {' '}
-            {/* Schrift angepasst */}
-            <ListChecks className='w-5 h-5 text-primary' /> {/* Icon farbig */}
+            <ListChecks className='w-5 h-5 text-primary' />
             Offene Wetten
           </CardTitle>
           <CollapsibleTrigger asChild>
@@ -92,14 +76,10 @@ export function OpenEventsCard({
         </CardHeader>
         <CollapsibleContent>
           <CardContent className='pt-2 pb-4 px-4'>
-            {' '}
-            {/* Padding angepasst */}
-            {/* Verbesserter Empty State */}
             {openEvents.length === 0 ? (
               <div className='text-center py-10 text-muted-foreground text-sm'>
                 <ListChecks className='mx-auto h-10 w-10 opacity-50 mb-3' />
                 <p>Aktuell sind keine Wetten offen.</p>
-                {/* Optional: CTA wenn Admin */}
                 {isAdmin && (
                   <p className='mt-1'>
                     Du kannst im Gruppen-Header ein neues Event erstellen.
@@ -108,10 +88,7 @@ export function OpenEventsCard({
               </div>
             ) : (
               <ul className='space-y-5'>
-                {' '}
-                {/* Mehr Abstand zwischen Events */}
                 {openEvents.map((event) => {
-                  // ... (Mapping Logik bleibt gleich) ...
                   if (
                     !event ||
                     typeof event.id !== 'number' ||
@@ -120,16 +97,16 @@ export function OpenEventsCard({
                     console.warn('Überspringe ungültiges Event:', event);
                     return null;
                   }
+
                   const tipSubmitting = isSubmittingTip[event.id] ?? false;
                   const resultSetting = isSettingResult[event.id] ?? false;
+                  const userTip = selectedTips[event.id];
 
                   return (
                     <li
                       key={event.id}
-                      // Leichter Hintergrund/Border zur Abgrenzung
                       className='rounded-lg border bg-card p-4 space-y-4 shadow-sm'
                     >
-                      {/* Event Info - Mehr Hierarchie */}
                       <div>
                         <h3 className='font-semibold text-base'>
                           {event.title ?? 'Unbenanntes Event'}
@@ -144,48 +121,54 @@ export function OpenEventsCard({
                         </p>
                       </div>
 
-                      {/* Tipp-Bereich - Visuell gruppiert */}
+                      {/* Tipp-Bereich */}
                       <div className='bg-muted/50 rounded-md p-3 space-y-3'>
                         <div className='flex flex-wrap items-center gap-2 sm:gap-3'>
                           <span className='text-sm font-medium text-muted-foreground mr-2'>
                             Dein Tipp:
                           </span>
                           {event.options.map((option) => {
-                            const isSelected =
-                              selectedTips[event.id] === option;
+                            const isSelected = userTip === option;
                             return (
                               <Button
                                 key={option}
                                 size='sm'
                                 variant={isSelected ? 'default' : 'outline'}
                                 className={cn(
-                                  'transition-all text-xs sm:text-sm', // Kleinere Schrift auf xs?
+                                  'transition-all text-xs sm:text-sm',
                                   isSelected
-                                    ? 'ring-2 ring-primary ring-offset-background ring-offset-1 hover:bg-primary/90' // Ring angepasst
+                                    ? 'ring-2 ring-primary ring-offset-background ring-offset-1 hover:bg-primary/90'
                                     : 'hover:border-primary hover:text-primary'
                                 )}
                                 onClick={() => onSelectTip(event.id, option)}
-                                disabled={tipSubmitting}
+                                disabled={!!userTip || tipSubmitting}
                               >
                                 {option}
                               </Button>
                             );
                           })}
                         </div>
-                        {/* Tipp abgeben Button rechts */}
+
                         <div className='flex justify-end pt-1'>
-                          <Button
-                            size='sm'
-                            variant='secondary'
-                            onClick={() => onSubmitTip(event.id)}
-                            disabled={!selectedTips[event.id] || tipSubmitting}
-                            className='hover:bg-secondary/90'
-                          >
-                            {tipSubmitting && (
-                              <Loader2 className='h-4 w-4 animate-spin mr-2' />
-                            )}
-                            {tipSubmitting ? 'Sende...' : 'Tipp abgeben'}
-                          </Button>
+                          {userTip && !tipSubmitting ? (
+                            <div className='flex items-center gap-1 text-sm text-green-600 font-medium'>
+                              <CheckCircle className='w-4 h-4' />
+                              Tipp abgegeben: {userTip}
+                            </div>
+                          ) : (
+                            <Button
+                              size='sm'
+                              variant='secondary'
+                              onClick={() => onSubmitTip(event.id)}
+                              disabled={!userTip || tipSubmitting}
+                              className='hover:bg-secondary/90'
+                            >
+                              {tipSubmitting && (
+                                <Loader2 className='h-4 w-4 animate-spin mr-2' />
+                              )}
+                              {tipSubmitting ? 'Sende...' : 'Tipp abgeben'}
+                            </Button>
+                          )}
                         </div>
                       </div>
 
@@ -195,7 +178,7 @@ export function OpenEventsCard({
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button
-                                variant='outline' // Weniger prominent als Tipp abgeben
+                                variant='outline'
                                 size='sm'
                                 disabled={resultSetting}
                                 className='gap-1.5 text-muted-foreground hover:text-foreground hover:border-foreground/50'
@@ -206,9 +189,49 @@ export function OpenEventsCard({
                                   : 'Ergebnis eintragen'}
                               </Button>
                             </DialogTrigger>
-                            {/* Dialog Content bleibt gleich */}
                             <DialogContent className='sm:max-w-[425px]'>
-                              {/* ... */}
+                              {/* Admin-Dialog-Inhalt kommt hier rein */}
+                              <div className='space-y-4'>
+                                <h3 className='font-semibold'>
+                                  Ergebnis für: {event.title}
+                                </h3>
+                                <div className='space-y-2'>
+                                  {event.options.map((option) => (
+                                    <Button
+                                      key={option}
+                                      variant={
+                                        resultInputs[event.id] === option
+                                          ? 'default'
+                                          : 'outline'
+                                      }
+                                      size='sm'
+                                      className='w-full justify-start'
+                                      onClick={() =>
+                                        onResultInputChange(event.id, option)
+                                      }
+                                    >
+                                      {option}
+                                    </Button>
+                                  ))}
+                                </div>
+                                <Button
+                                  onClick={() =>
+                                    onSetResult(event.id, event.options)
+                                  }
+                                  disabled={
+                                    !resultInputs[event.id] || resultSetting
+                                  }
+                                >
+                                  {resultSetting ? (
+                                    <>
+                                      <Loader2 className='h-4 w-4 animate-spin mr-2' />
+                                      Speichere...
+                                    </>
+                                  ) : (
+                                    'Ergebnis speichern'
+                                  )}
+                                </Button>
+                              </div>
                             </DialogContent>
                           </Dialog>
                         </div>

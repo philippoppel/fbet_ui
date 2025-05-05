@@ -67,9 +67,7 @@ export function GroupSidebar({
             )}
           >
             <Users className='w-5 h-5 text-muted-foreground flex-shrink-0' />
-            <CardTitle className='text-lg font-semibold tracking-tight truncate'>
-              Meine Gruppen
-            </CardTitle>
+            <CardTitle className='text-lg font-semibold tracking-tight truncate'></CardTitle>
           </div>
 
           {/* Actions Container - Only Create Button & Collapse Button when NOT collapsed */}

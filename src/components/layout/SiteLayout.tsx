@@ -13,9 +13,6 @@ export function SiteLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      {/* Rendere den Header und übergebe User-Infos und Logout-Funktion */}
-      <AppHeader user={user} onLogout={logout} />
-
       {/* Das <main>-Tag umschließt den eigentlichen Seiteninhalt (children) */}
       {/* flex-grow sorgt dafür, dass dieser Bereich den verfügbaren Platz ausfüllt */}
       <main className='flex-grow'>{children}</main>
