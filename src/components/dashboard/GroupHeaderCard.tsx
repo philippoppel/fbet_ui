@@ -1,7 +1,6 @@
-// src/components/dashboard/GroupHeaderCard.tsx
 'use client';
 
-import { useState } from 'react'; // useEffect nicht mehr hier benötigt für Share-Check
+import { useState } from 'react';
 import {
   Card,
   CardHeader,
@@ -9,20 +8,17 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-// --- Dropdown entfernt ---
 import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
-import { InviteDialog } from '@/components/dashboard/InviteDialog'; // <--- NEU: Import InviteDialog
+import { InviteDialog } from '@/components/dashboard/InviteDialog';
 import type { Group, MixedEvent } from '@/lib/types';
 import type { UseFormReturn } from 'react-hook-form';
 import type { AddEventFormData } from '@/hooks/useGroupInteractions';
-import { Share2, PlusCircle } from 'lucide-react'; // Copy nicht mehr hier benötigt
-// import { toast } from 'sonner'; // Toasts sind jetzt im InviteDialog
+import { Share2, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type GroupHeaderCardProps = {
   group: Group;
   combinedEvents: MixedEvent[];
-  // Event Dialog Props
   addEventForm: UseFormReturn<AddEventFormData>;
   onAddEventSubmit: (data: AddEventFormData) => void;
   isAddEventDialogOpen: boolean;
@@ -37,17 +33,12 @@ export function GroupHeaderCard({
   isAddEventDialogOpen,
   onSetAddEventDialogOpen,
 }: GroupHeaderCardProps) {
-  // State für den neuen Invite-Dialog
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
 
-  // --- Logik für Kopieren/Teilen wurde in InviteDialog verschoben ---
-
   return (
-    // Das Fragment umschließt jetzt BEIDE Elemente korrekt
     <>
       <Card className='shadow-md'>
         <CardHeader className='flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 flex-wrap'>
-          {/* Gruppeninfo */}
           <div className='flex-1 min-w-[200px]'>
             <CardTitle className='text-2xl font-bold'>{group.name}</CardTitle>
             {group.description && (
@@ -62,11 +53,9 @@ export function GroupHeaderCard({
             )}
           </div>
 
-          {/* Aktionsbuttons */}
           <div className='flex flex-col sm:flex-row gap-2 flex-shrink-0 items-start sm:items-center'>
-            {/* Button zum Öffnen des Invite-Dialogs */}
             <Button
-              variant='outline'
+              variant='ghost'
               size='sm'
               onClick={() => setIsInviteDialogOpen(true)}
               disabled={!group.invite_token}
@@ -76,7 +65,6 @@ export function GroupHeaderCard({
               Freunde einladen
             </Button>
 
-            {/* Dialog zum Event hinzufügen */}
             <AddEventDialog
               groupName={group.name}
               open={isAddEventDialogOpen}
@@ -85,7 +73,7 @@ export function GroupHeaderCard({
               suggestions={combinedEvents}
               onSubmit={onAddEventSubmit}
               triggerProps={{
-                variant: 'outline',
+                variant: 'ghost',
                 size: 'sm',
                 children: (
                   <>
@@ -96,15 +84,14 @@ export function GroupHeaderCard({
             />
           </div>
         </CardHeader>
-      </Card>{' '}
-      {/* Ende des Card Elements */}
-      {/* Der Invite-Dialog steht direkt NACH der Card, aber INNERHALB des Fragments */}
+      </Card>
+
       <InviteDialog
         open={isInviteDialogOpen}
         setOpen={setIsInviteDialogOpen}
         groupName={group.name}
         inviteToken={group.invite_token}
       />
-    </> // Ende des Fragments
-  ); // Ende des return Statements
+    </>
+  );
 }

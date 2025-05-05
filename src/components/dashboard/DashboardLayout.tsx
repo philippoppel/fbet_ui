@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sheet';
 
 // Icons
-import { Menu, ShieldPlus, Users, LogIn } from 'lucide-react'; // Import necessary icons
+import { Menu, ShieldPlus, Users, LogIn, PlusCircle } from 'lucide-react'; // Import necessary icons
 
 // Dashboard Specific Components
 import { GroupSidebar } from '@/components/dashboard/GroupSidebar';
@@ -106,9 +106,9 @@ export function DashboardLayout({
               <div className='p-4 border-t mt-auto bg-background'>
                 {' '}
                 {/* Wichtig: mt-auto und bg-background */}
-                <Button size='sm' className='w-full gap-1.5' asChild>
+                <Button size='sm' variant='ghost' asChild>
                   <Link href='/groups/create'>
-                    <ShieldPlus className='w-4 h-4' /> Gruppe erstellen
+                    <PlusCircle className='w-4 h-4' /> Gruppe erstellen
                   </Link>
                 </Button>
                 {/* Optionaler "Beitreten"-Button im Footer */}
