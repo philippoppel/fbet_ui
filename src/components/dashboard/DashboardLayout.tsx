@@ -111,15 +111,6 @@ export function DashboardLayout({
                     <PlusCircle className='w-4 h-4' /> Gruppe erstellen
                   </Link>
                 </Button>
-                {/* Optionaler "Beitreten"-Button im Footer */}
-                {/* <Button
-variant='outline'
-size='sm'
-className='w-full mt-2 gap-1.5'
-onClick={() => toast.info('Beitreten über geteilte Links.')}
->
-<LogIn className='w-4 h-4' /> Beitreten (Info)
-</Button> */}
               </div>
             </SheetContent>
           </Sheet>
