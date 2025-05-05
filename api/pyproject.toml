@@ -1,0 +1,54 @@
+# pyproject.toml
+
+# --- Standard Projekt Metadaten (PEP 621) ---
+[project]
+name = "fbet"
+version = "0.1.0"
+description = "Meine fantastische fbet App" # Fügen Sie eine Beschreibung hinzu
+authors = [
+    {name = "Philipp Oppel", email = "philipp.oppel@rise-world.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+# Nur HIER die Abhängigkeiten definieren:
+dependencies = [
+    "beautifulsoup4==4.13.4",
+    "fastapi==0.115.12",
+    "icalendar==6.1.3",
+    "itsdangerous==2.2.0",
+    "pydantic[email]>=2.11.4,<3.0.0",
+    "python-dotenv==1.1.0",
+    "python-jose==3.4.0", # Prüfen Sie evtl., ob 3.3.0 reicht, falls 3.4.0 Probleme macht
+    "requests==2.32.3",
+    "sqlalchemy==2.0.40",
+    "python-multipart>=0.0.20,<0.0.21",  # Standard-Format
+    "passlib[bcrypt]>=1.7.4,<2.0.0",    # Standard-Format
+]
+
+# --- Poetry spezifische Konfiguration ---
+[tool.poetry]
+# Metadaten wie name, version, description werden von [project] gelesen
+# readme = "README.md" # Optional hier, wenn schon in [project]
+packages = []
+package-mode = false
+
+# KEIN [tool.poetry.dependencies] BLOCK MEHR HIER!
+
+# --- Entwicklungs-Abhängigkeiten ---
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+httpx = "^0.28.1"
+mypy = "^1.15.0"
+pytest = "^8.3.5" # Oder "^8.2.2"
+pytest-mock = "^3.14.0"
+ruff = "^0.11.7" # Oder "^0.4.0"
+
+# --- Pytest Konfiguration ---
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+# --- Build System Konfiguration ---
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
