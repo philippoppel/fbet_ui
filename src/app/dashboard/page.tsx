@@ -1,32 +1,28 @@
-// src/app/dashboard/page.tsx (oder wo immer deine Seite liegt)
+// src/app/dashboard/page.tsx
 'use client';
 
-import { useEffect, useState, Suspense } from 'react'; // Suspense ggf. nicht mehr direkt hier benötigt
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { toast } from 'sonner'; // Immer noch für Infos gebraucht?
+// import { toast } from 'sonner'; // Nicht verwendet
 
 // Context & Hooks
 import { useAuth } from '@/context/AuthContext';
-import { useDashboardData } from '@/hooks/useDashboardData';
+import { useDashboardData } from '@/hooks/useDashboardData'; // Annahme: Hook gibt selectedGroupId zurück
 import { useGroupInteractions } from '@/hooks/useGroupInteractions';
 
 // UI Components
 import { Button } from '@/components/ui/button';
-import { Loader2, LogIn } from 'lucide-react'; // Icons für Lade-/Fehlerzustand
+import { Loader2, LogIn } from 'lucide-react';
 
-// Dashboard Specific Components (Jetzt hauptsächlich Layout und Inhaltskomponenten)
+// Dashboard Specific Components
 import { GroupDetailsSection } from '@/components/dashboard/GroupDetailsSection';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { NoGroupsCard } from '@/components/dashboard/NoGroupsCard';
-import { FullscreenCenter } from '@/components/dashboard/FullscreenCenter';
-
-// Hilfskomponenten (können in eigene Dateien ausgelagert werden)
-// function FullscreenCenter({ children }: { children: React.ReactNode }) { ... }
-// function NoGroupsCard() { ... }
+import { FullscreenCenter } from '@/components/dashboard/FullscreenCenter'; // Annahme: existiert
 
 /* =================================================================
-––– Haupt-Dashboard-Komponente –––
+––– Haupt-Dashboard-Seite –––
 ================================================================= */
 export default function DashboardPage() {
   const router = useRouter();
@@ -35,8 +31,8 @@ export default function DashboardPage() {
   // Data fetching hook
   const {
     myGroups,
-    combinedEvents, // Wird ggf. nur noch an GroupDetailsSection -> SelectedGroupView durchgereicht
-    selectedGroupId,
+    combinedEvents,
+    selectedGroupId, // Kommt jetzt vom Hook
     selectedGroupDetails,
     selectedGroupEvents,
     selectedGroupHighscore,
@@ -44,7 +40,7 @@ export default function DashboardPage() {
     loadingInitial,
     isGroupDataLoading,
     errors,
-    handleSelectGroup, // Wird an Layout für Desktop Sidebar übergeben
+    handleSelectGroup,
     refreshSelectedGroupData,
   } = useDashboardData();
 
@@ -52,11 +48,11 @@ export default function DashboardPage() {
   const interactions = useGroupInteractions({
     token,
     selectedGroupId,
-    selectedGroupEvents, // Bleibt wichtig für Context im Hook
+    selectedGroupEvents,
     refreshGroupData: refreshSelectedGroupData,
   });
 
-  // State nur noch für Desktop Sidebar Collapse (Sheet State ist jetzt in DashboardLayout)
+  // State für Desktop Sidebar Collapse
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
     useState(false);
 
@@ -72,17 +68,14 @@ export default function DashboardPage() {
     setIsDesktopSidebarCollapsed((prev) => !prev);
   };
 
-  // Handler für Mobile Gruppenauswahl (schließt das Sheet)
-  // Dieser wird an DashboardLayout -> Sheet -> GroupSidebar weitergegeben
-  // Der Sheet-Schließmechanismus ist nun in DashboardLayout gekapselt
+  // Handler für Mobile Gruppenauswahl
   const handleSelectGroupMobile = (groupId: number) => {
-    handleSelectGroup(groupId); // Ruft den normalen Auswahlhandler aus useDashboardData auf
-    // Das Schließen des Sheets wird jetzt in DashboardLayout gehandhabt
+    handleSelectGroup(groupId);
+    // Schließen des Sheets wird im Layout gehandhabt
   };
 
   // --- Loading und Auth-Checks ---
-  if (isAuthLoading || (loadingInitial && !user)) {
-    // Zeige Loader, bis Auth-Status klar ist oder initiale Daten (bei eingeloggtem User) geladen sind
+  if (isAuthLoading || (loadingInitial && !user && token)) {
     return (
       <FullscreenCenter>
         <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
@@ -91,8 +84,8 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
-    // Zeige Login-Aufforderung, wenn nicht eingeloggt (nachdem Auth-Check fertig ist)
+  if (!user && !token) {
+    // Definitiv nicht eingeloggt
     return (
       <FullscreenCenter>
         <div className='text-center'>
@@ -107,40 +100,59 @@ export default function DashboardPage() {
     );
   }
 
+  // Wenn User da ist, aber initiale Daten (Gruppen etc.) noch laden
+  if (loadingInitial) {
+    return (
+      <FullscreenCenter>
+        <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+        <span className='ml-3 text-lg'>Gruppen werden geladen…</span>
+      </FullscreenCenter>
+    );
+  }
+
   // --- Render Logik ---
-  const hasGroups = myGroups.length > 0;
+  const hasGroups = myGroups && myGroups.length > 0;
 
   return (
     <DashboardLayout
+      // Daten für Sidebars
       myGroups={myGroups}
       selectedGroupId={selectedGroupId}
       selectedGroupHighscore={selectedGroupHighscore}
       selectedGroupMembers={selectedGroupMembers}
-      isGroupDataLoading={isGroupDataLoading} // Für Highscore-Karte
-      groupDataError={errors.groupData} // Für Highscore-Karte Fehlerbehandlung
-      loadingInitial={loadingInitial} // Für GroupSidebar Ladezustand
-      errors={errors} // Für GroupSidebar Fehler & Highscore Fehler
+      isGroupDataLoading={isGroupDataLoading} // Für rechte Sidebar Loading
+      // groupDataError={errors.groupData} // <-- DIESE ZEILE Entfernen (redundant)
+      loadingInitial={loadingInitial} // <-- FEHLENDE EIGENSCHAFT HINZUFÜGEN
+      errors={errors} // <-- FEHLENDE EIGENSCHAFT HINZUFÜGEN (enthält groups & groupData Fehler)
+      // Sidebar-Steuerung und Handler
       isDesktopSidebarCollapsed={isDesktopSidebarCollapsed}
       onToggleCollapse={toggleDesktopSidebar}
-      onSelectGroup={handleSelectGroup} // Für Desktop
-      onSelectGroupMobile={handleSelectGroupMobile} // Für Mobile (Layout kümmert sich ums Sheet schließen)
+      onSelectGroup={handleSelectGroup}
+      onSelectGroupMobile={handleSelectGroupMobile}
     >
       {/* Inhalt für die mittlere Spalte */}
-      {!hasGroups ? (
+      {errors.groups ? ( // Hier wird der Gruppen-Ladefehler behandelt!
+        <div className='p-4 text-center text-destructive'>
+          Fehler beim Laden der Gruppen: {errors.groups}
+        </div>
+      ) : !hasGroups ? (
         // Wenn keine Gruppen da sind, zeige die NoGroupsCard
         <NoGroupsCard />
       ) : (
         // Wenn Gruppen da sind, zeige die GroupDetailsSection
-        <GroupDetailsSection
-          selectedGroupId={selectedGroupId}
-          selectedGroupDetails={selectedGroupDetails}
-          selectedGroupEvents={selectedGroupEvents}
-          combinedEvents={combinedEvents} // Durchreichen
-          user={user} // User Info übergeben
-          isGroupDataLoading={isGroupDataLoading} // Für Loading/Error/Content Anzeige
-          groupDataError={errors.groupData} // Für Loading/Error/Content Anzeige
-          interactions={interactions} // Alle Interaktions-Callbacks gebündelt
-        />
+        user && ( // Expliziter Check für TypeScript
+          <GroupDetailsSection
+            key={selectedGroupId} // Key für Reset bei Gruppenwechsel
+            selectedGroupId={selectedGroupId}
+            selectedGroupDetails={selectedGroupDetails}
+            selectedGroupEvents={selectedGroupEvents}
+            combinedEvents={combinedEvents} // Durchreichen
+            user={user} // User Info übergeben (jetzt sicher nicht null für TS)
+            isGroupDataLoading={isGroupDataLoading} // Für Loading/Error/Content Anzeige
+            groupDataError={errors.groupData} // Für Loading/Error/Content Anzeige
+            interactions={interactions} // Alle Interaktions-Callbacks gebündelt
+          />
+        )
       )}
     </DashboardLayout>
   );

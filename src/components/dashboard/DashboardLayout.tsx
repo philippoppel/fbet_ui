@@ -46,7 +46,6 @@ export function DashboardLayout({
   selectedGroupHighscore,
   selectedGroupMembers,
   isGroupDataLoading,
-  groupDataError,
   loadingInitial,
   errors,
   isDesktopSidebarCollapsed,
