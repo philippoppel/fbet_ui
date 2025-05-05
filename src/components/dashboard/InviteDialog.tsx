@@ -9,7 +9,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose, // Hinzugefügt für eventuellen Schließen-Button
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -158,7 +157,7 @@ export function InviteDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className='sm:max-w-md space-y-4'>
         <DialogHeader>
-          <DialogTitle>Freunde zu "{groupName}" einladen</DialogTitle>
+          <DialogTitle>Freunde zu &#34;{groupName}&#34; einladen</DialogTitle>
           <DialogDescription>
             Teile diesen Link, damit Freunde deiner Tipprunde beitreten können.
             Er ist für eine begrenzte Zeit gültig.

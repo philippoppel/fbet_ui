@@ -19,14 +19,12 @@ import type {
   MixedEvent,
   Event as GroupEvent,
   HighscoreEntry,
-  UserOut,
 } from '@/lib/types';
 
 // Definiere den Rückgabetyp des Hooks
 export interface UseDashboardDataReturn {
   myGroups: Group[];
   combinedEvents: MixedEvent[];
-  selectedGroupId: number | null;
   selectedGroupDetails: Group | null;
   selectedGroupEvents: GroupEvent[];
   selectedGroupHighscore: HighscoreEntry[];
@@ -154,17 +152,6 @@ export function useDashboardData(): UseDashboardDataReturn {
               results[3].reason instanceof Error
                 ? results[3].reason.message
                 : firstErrorMessage;
-          groupDataErrorOccurred = true;
-        }
-
-        // Wenn irgendein Ladevorgang fehlschlug, werfe den gesammelten Fehler
-        if (groupDataErrorOccurred) {
-          // Versuche, spezifischere API-Fehlerdetails zu extrahieren
-          const firstRejected = results.find((r) => r.status === 'rejected');
-          if (firstRejected && firstRejected.reason instanceof ApiError) {
-            throw firstRejected.reason; // Wirf den ApiError weiter
-          }
-          throw new Error(firstErrorMessage); // Wirf allgemeinen Fehler
         }
       } catch (err: any) {
         console.error('Error loading selected group data (catch block):', err);
@@ -336,7 +323,6 @@ export function useDashboardData(): UseDashboardDataReturn {
   return {
     myGroups,
     combinedEvents,
-    selectedGroupId,
     selectedGroupDetails,
     selectedGroupEvents,
     selectedGroupHighscore,
