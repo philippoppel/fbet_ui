@@ -21,7 +21,12 @@ import type {
   HighscoreEntry,
   UserOut,
   UserTipSelection,
-} from '@/app/lib/types'; // Stelle sicher, dass PromiseFulfilledResult und PromiseRejectedResult hier ggf. verfügbar sind oder importiere sie direkt aus TypeScript/ES-Libs
+} from '@/app/lib/types';
+
+interface LoadGroupDataOptions {
+  showLoadingSpinner?: boolean;
+  keepExistingDetailsWhileRefreshingSubData?: boolean;
+}
 
 export interface UseDashboardDataReturn {
   myGroups: Group[];
@@ -47,7 +52,7 @@ export interface UseDashboardDataReturn {
   handleSelectGroup: (groupId: number) => void;
   refreshSelectedGroupData: (
     groupId: number,
-    showLoadingSpinner?: boolean
+    options?: LoadGroupDataOptions
   ) => Promise<void>;
   updateUserTipState: (eventId: number, selectedOption: string) => void;
   loadCombinedEvents: () => Promise<void>;
@@ -63,7 +68,7 @@ export function useDashboardData(): UseDashboardDataReturn {
   const [errors, setErrors] = useState<UseDashboardDataReturn['errors']>({});
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [selectedGroupDetails, setSelectedGroupDetails] =
-    useState<Group | null>(null);
+    useState<Group | null>(null); // Dieser State wird gelesen, ist aber keine direkte dep von loadSelectedGroupData useCallback mehr
   const [selectedGroupEvents, setSelectedGroupEvents] = useState<GroupEvent[]>(
     []
   );
@@ -90,10 +95,15 @@ export function useDashboardData(): UseDashboardDataReturn {
   );
 
   const loadSelectedGroupData = useCallback(
-    async (groupId: number, showLoadingSpinner = true) => {
+    async (groupId: number, options?: LoadGroupDataOptions) => {
+      const {
+        showLoadingSpinner = true,
+        keepExistingDetailsWhileRefreshingSubData = false,
+      } = options || {};
+
       if (!token) {
         setErrors((prev) => ({ ...prev, groupData: 'Nicht eingeloggt.' }));
-        setIsGroupDataLoading(false);
+        if (showLoadingSpinner) setIsGroupDataLoading(false);
         setSelectedGroupDetails(null);
         setSelectedGroupEvents([]);
         setSelectedGroupHighscore([]);
@@ -109,63 +119,78 @@ export function useDashboardData(): UseDashboardDataReturn {
         userTips: undefined,
       }));
 
-      setSelectedGroupDetails(null);
+      // Wichtig: Lesen des aktuellen selectedGroupDetails States hier, nicht über useCallback Dependency
+      const currentGroupDetailsState = selectedGroupDetails;
+      let shouldFetchDetails = true;
+
+      if (
+        keepExistingDetailsWhileRefreshingSubData &&
+        currentGroupDetailsState &&
+        currentGroupDetailsState.id === groupId
+      ) {
+        shouldFetchDetails = false;
+      } else {
+        setSelectedGroupDetails(null); // Details zurücksetzen, wenn sie neu geladen werden oder Gruppe wechselt
+      }
+
       setSelectedGroupEvents([]);
       setSelectedGroupHighscore([]);
       setSelectedGroupMembers([]);
       setUserSubmittedTips({});
 
-      let fetchErrorOccurredGeneral = false;
+      const promisesToFetch = [];
+      if (shouldFetchDetails) {
+        promisesToFetch.push(getGroupDetails(token, groupId));
+      } else {
+        promisesToFetch.push(Promise.resolve(currentGroupDetailsState)); // Bereits vorhandene Details verwenden
+      }
+      promisesToFetch.push(getGroupEvents(token, groupId));
+      promisesToFetch.push(getGroupHighscore(token, groupId));
+      promisesToFetch.push(getGroupMembers(token, groupId));
+      promisesToFetch.push(getMyTipsForGroup(token, groupId));
+
+      let fetchErrorOccurredForCoreData = false;
 
       try {
-        const results = await Promise.allSettled([
-          getGroupDetails(token, groupId),
-          getGroupEvents(token, groupId),
-          getGroupHighscore(token, groupId),
-          getGroupMembers(token, groupId),
-          getMyTipsForGroup(token, groupId),
-        ]);
+        const results = await Promise.allSettled(promisesToFetch);
 
-        // Ergebnis für getGroupDetails
         const groupDetailsResult = results[0];
         if (groupDetailsResult.status === 'fulfilled') {
-          setSelectedGroupDetails(groupDetailsResult.value);
-        } else {
+          setSelectedGroupDetails(groupDetailsResult.value as Group | null);
+        } else if (shouldFetchDetails) {
           console.error('Failed Detail Load:', groupDetailsResult.reason);
-          fetchErrorOccurredGeneral = true;
+          fetchErrorOccurredForCoreData = true;
         }
 
-        // Ergebnis für getGroupEvents
         const groupEventsResult = results[1];
         if (groupEventsResult.status === 'fulfilled') {
-          setSelectedGroupEvents(groupEventsResult.value);
+          setSelectedGroupEvents(groupEventsResult.value as GroupEvent[]);
         } else {
           console.error('Failed Event Load:', groupEventsResult.reason);
-          fetchErrorOccurredGeneral = true;
+          fetchErrorOccurredForCoreData = true;
         }
 
-        // Ergebnis für getGroupHighscore
         const groupHighscoreResult = results[2];
         if (groupHighscoreResult.status === 'fulfilled') {
-          setSelectedGroupHighscore(groupHighscoreResult.value);
+          setSelectedGroupHighscore(
+            groupHighscoreResult.value as HighscoreEntry[]
+          );
         } else {
           console.error('Failed Highscore Load:', groupHighscoreResult.reason);
-          fetchErrorOccurredGeneral = true;
+          fetchErrorOccurredForCoreData = true;
         }
 
-        // Ergebnis für getGroupMembers
         const groupMembersResult = results[3];
         if (groupMembersResult.status === 'fulfilled') {
-          setSelectedGroupMembers(groupMembersResult.value);
+          setSelectedGroupMembers(groupMembersResult.value as UserOut[]);
         } else {
           console.error('Failed Members Load:', groupMembersResult.reason);
-          fetchErrorOccurredGeneral = true;
+          fetchErrorOccurredForCoreData = true;
         }
 
-        // Ergebnis für getMyTipsForGroup
-        const userTipsResult = results[4]; // Typ: PromiseSettledResult<UserTipSelection[]>
+        const userTipsResult = results[4];
         if (userTipsResult.status === 'fulfilled') {
-          const tipsArray: UserTipSelection[] = userTipsResult.value ?? [];
+          const tipsArray = (userTipsResult.value as UserTipSelection[]) ?? [];
           const tipsRecord: Record<number, string> = {};
           tipsArray.forEach((tip) => {
             if (
@@ -178,47 +203,44 @@ export function useDashboardData(): UseDashboardDataReturn {
           });
           setUserSubmittedTips(tipsRecord);
         } else {
-          // Hier ist userTipsResult sicher vom Typ PromiseRejectedResult
-          // Expliziter Cast, um TypeScript zu helfen, falls die automatische Verengung fehlschlägt
-          const rejectedResult = userTipsResult as PromiseRejectedResult;
-          console.error('Failed User Tips Load:', rejectedResult.reason);
+          // status === 'rejected'
+          console.error('Failed User Tips Load:', userTipsResult.reason);
           setErrors((prev) => ({
             ...prev,
             userTips:
-              (rejectedResult.reason as Error)?.message ||
+              (userTipsResult.reason as Error)?.message ||
               'Gespeicherte Tipps konnten nicht geladen werden.',
           }));
         }
 
-        if (fetchErrorOccurredGeneral) {
-          const firstRejectedGeneral = results
-            .slice(0, 4) // Nur die ersten vier Promises (ohne UserTips) für allgemeine Gruppenfehler
-            .find((r): r is PromiseRejectedResult => r.status === 'rejected'); // Type guard
+        if (fetchErrorOccurredForCoreData) {
+          const firstCoreRejected = (shouldFetchDetails ? [results[0]] : [])
+            .concat([results[1], results[2], results[3]])
+            .find((r) => r.status === 'rejected');
 
           let errorMessage =
             'Teile der Gruppendaten konnten nicht geladen werden.';
-          if (firstRejectedGeneral) {
-            // Sicherstellen, dass firstRejectedGeneral existiert
-            const reason = firstRejectedGeneral.reason;
+          if (firstCoreRejected && firstCoreRejected.status === 'rejected') {
+            const reason = firstCoreRejected.reason;
             if (reason instanceof ApiError) {
               errorMessage = `${reason.status}: ${reason.detail || reason.message || 'API Fehler'}`;
             } else if (reason instanceof Error) {
               errorMessage = reason.message;
             } else {
-              errorMessage = 'Unbekannter Fehler beim Laden der Gruppendaten.';
+              errorMessage = 'Unbekannter Fehler beim Laden der Kerndaten.';
             }
           }
           setErrors((prev) => ({ ...prev, groupData: errorMessage }));
         }
       } catch (err: any) {
-        console.error('Unexpected error in loadSelectedGroupData:', err);
-        let message = 'Unerwarteter Fehler beim Laden der Gruppendaten.';
-        if (err instanceof ApiError) {
-          message = `${err.status}: ${err.detail || err.message || 'API Fehler'}`;
-        } else if (err instanceof Error) {
-          message = err.message;
-        }
-        setErrors((prev) => ({ ...prev, groupData: message }));
+        console.error(
+          'Unexpected error in loadSelectedGroupData wrapper:',
+          err
+        );
+        setErrors((prev) => ({
+          ...prev,
+          groupData: 'Unerwarteter Systemfehler.',
+        }));
         setSelectedGroupDetails(null);
         setSelectedGroupEvents([]);
         setSelectedGroupHighscore([]);
@@ -228,7 +250,9 @@ export function useDashboardData(): UseDashboardDataReturn {
         if (showLoadingSpinner) setIsGroupDataLoading(false);
       }
     },
-    [token]
+    [token] // WICHTIG: `selectedGroupDetails` wurde aus den Abhängigkeiten entfernt!
+    // Die Funktion greift über `currentGroupDetailsState` auf den jeweils aktuellen Wert zu.
+    // Dadurch ändert sich die Referenz von `loadSelectedGroupData` nur noch, wenn sich `token` ändert.
   );
 
   useEffect(() => {
@@ -239,23 +263,12 @@ export function useDashboardData(): UseDashboardDataReturn {
         setMyGroups([]);
         setSelectedGroupId(null);
         setSelectedGroupDetails(null);
-        setSelectedGroupEvents([]);
-        setSelectedGroupHighscore([]);
-        setSelectedGroupMembers([]);
-        setUserSubmittedTips({});
         return;
       }
       setLoadingInitial(true);
-      setErrors((prev) => ({
-        ...prev,
-        groups: undefined,
-        ufc: undefined,
-        boxing: undefined,
-        general: undefined,
-      }));
-      let fetchedGroups: Group[] = [];
+      setErrors((prev) => ({ ...prev, groups: undefined }));
       try {
-        fetchedGroups = await getMyGroups(token);
+        const fetchedGroups = await getMyGroups(token);
         const uniqueGroups = Array.from(
           new Map(fetchedGroups.map((g) => [g.id, g])).values()
         );
@@ -277,25 +290,28 @@ export function useDashboardData(): UseDashboardDataReturn {
       }
     };
     loadInitialDashboardData();
-  }, [token, user, isAuthLoading]);
+  }, [token, user, isAuthLoading, selectedGroupId]); // selectedGroupId hinzugefügt, falls es extern gesetzt werden könnte und eine Neuauswahl triggern soll
 
   useEffect(() => {
     if (selectedGroupId !== null && token) {
-      loadSelectedGroupData(selectedGroupId, true);
+      loadSelectedGroupData(selectedGroupId, {
+        showLoadingSpinner: true,
+        keepExistingDetailsWhileRefreshingSubData: false,
+      });
     } else if (selectedGroupId === null) {
       setSelectedGroupDetails(null);
       setSelectedGroupEvents([]);
       setSelectedGroupHighscore([]);
       setSelectedGroupMembers([]);
       setUserSubmittedTips({});
-      setIsGroupDataLoading(false);
+      if (isGroupDataLoading) setIsGroupDataLoading(false);
       setErrors((prev) => ({
         ...prev,
         groupData: undefined,
         userTips: undefined,
       }));
     }
-  }, [selectedGroupId, token, loadSelectedGroupData]);
+  }, [selectedGroupId, token, loadSelectedGroupData]); // `loadSelectedGroupData` ist jetzt stabiler.
 
   const handleSelectGroup = useCallback(
     (groupId: number) => {
@@ -326,34 +342,29 @@ export function useDashboardData(): UseDashboardDataReturn {
         getUfcSchedule(),
         getBoxingSchedule(),
       ]);
-      if (ufcResult.status === 'fulfilled') {
-        setUfcEvents(ufcResult.value);
-      } else {
+      if (ufcResult.status === 'fulfilled') setUfcEvents(ufcResult.value);
+      else {
         console.error('UFC Load Failed:', ufcResult.reason);
         setErrors((p) => ({
           ...p,
           ufc: (ufcResult.reason as Error)?.message || 'UFC Ladefehler',
         }));
       }
-      if (boxingResult.status === 'fulfilled') {
+      if (boxingResult.status === 'fulfilled')
         setBoxingEvents(boxingResult.value);
-      } else {
+      else {
         console.error('Boxing Load Failed:', boxingResult.reason);
         setErrors((p) => ({
           ...p,
           boxing: (boxingResult.reason as Error)?.message || 'Box Ladefehler',
         }));
       }
-      if (
-        ufcResult.status === 'rejected' ||
-        boxingResult.status === 'rejected'
-      ) {
+      if (ufcResult.status === 'rejected' || boxingResult.status === 'rejected')
         setErrors((p) => ({
           ...p,
           combinedEvents:
             'Teile der externen Events konnten nicht geladen werden.',
         }));
-      }
     } catch (eventError: any) {
       console.error('Error loading external events:', eventError);
       setErrors((p) => ({
