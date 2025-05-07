@@ -37,8 +37,20 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <meta name='apple-mobile-web-app-capable' content='yes' />
+        <meta name='apple-mobile-web-app-status-bar-style' content='default' />
         <meta name='apple-mobile-web-app-title' content='Fbet' />
         <meta name='application-name' content='Fbet' />
+        <meta
+          name='theme-color'
+          content='#ffffff'
+          media='(prefers-color-scheme: light)'
+        />
+        <meta
+          name='theme-color'
+          content='#000000'
+          media='(prefers-color-scheme: dark)'
+        />
         <link
           rel='icon'
           type='image/png'
