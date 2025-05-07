@@ -1,0 +1,98 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"    // Für NeonDB
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  email          String   @unique
+  name           String?
+  hashedPassword String   @map("hashed_password")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  createdGroups    Group[]           @relation("GroupCreator")
+  createdEvents    Event[]           @relation("EventCreator")
+  groupMemberships GroupMembership[]
+  tips             Tip[]
+
+  @@map("users")
+}
+
+model Group {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  inviteToken String?  @unique @map("invite_token")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdById Int  @map("created_by_id")
+  creator     User @relation("GroupCreator", fields: [createdById], references: [id])
+
+  memberships GroupMembership[]
+  events      Event[]
+
+  @@map("groups")
+}
+
+model GroupMembership {
+  id       Int      @id @default(autoincrement())
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  userId  Int  @map("user_id")
+  user    User @relation(fields: [userId], references: [id])
+
+  groupId Int  @map("group_id")
+  group   Group @relation(fields: [groupId], references: [id])
+
+  @@unique([userId, groupId], name: "uq_user_group")
+  @@map("group_memberships")
+}
+
+model Event {
+  id             Int      @id @default(autoincrement())
+  title          String
+  description    String?
+  question       String
+  options        Json
+  winningOption  String?  @map("winning_option")
+  eventDateTime  DateTime? @map("event_datetime")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  groupId        Int    @map("group_id")
+  group          Group  @relation(fields: [groupId], references: [id])
+
+  createdById    Int    @map("created_by_id")
+  creator        User   @relation("EventCreator", fields: [createdById], references: [id])
+
+  tips           Tip[]
+
+  @@map("events")
+}
+
+model Tip {
+  id             Int      @id @default(autoincrement())
+  selectedOption String   @map("selected_option")
+  points         Int?     // <--- HINZUGEFÜGTES FELD (z.B. als optionaler Integer)
+  // Alternativ: Int @default(0) wenn jeder Tipp standardmäßig 0 Punkte hat
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  eventId Int   @map("event_id")
+  event   Event @relation(fields: [eventId], references: [id])
+
+  userId  Int   @map("user_id")
+  user    User  @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId], name: "unique_tip_per_user_per_event")
+  @@map("tips")
+}

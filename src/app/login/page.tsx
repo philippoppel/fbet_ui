@@ -9,8 +9,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
+import { useAuth } from '@/app/context/AuthContext';
+import { Button } from '@/app/components/ui/button';
 import {
   Card,
   CardContent,
@@ -18,8 +18,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+} from '@/app/components/ui/card';
+import { Input } from '@/app/components/ui/input';
 import {
   Form,
   FormControl,
@@ -27,7 +27,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
+} from '@/app/components/ui/form';
 import { Loader2 } from 'lucide-react'; // Für Ladeanzeige
 
 const formSchema = z.object({

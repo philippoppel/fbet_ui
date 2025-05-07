@@ -1,26 +1,28 @@
-// src/app/layout.tsx
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
+import { Fira_Code } from 'next/font/google';
 import './globals.css';
 
-import { AuthProvider } from '@/context/AuthContext';
-import { ThemeProvider } from '@/components/ThemeProvider';
-import { Toaster } from '@/components/ui/sonner';
-import { SiteLayout } from '@/components/layout/SiteLayout';
+import { AuthProvider } from '@/app/context/AuthContext';
+import { ThemeProvider } from '@/app/components/ThemeProvider';
+import { Toaster } from '@/app/components/ui/sonner';
+import { SiteLayout } from '@/app/components/layout/SiteLayout';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const inter = Inter({
   subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
 });
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+
+const firaCode = Fira_Code({
   subsets: ['latin'],
+  variable: '--font-mono',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
   title: 'FBET',
   description: 'Wetten mit Freunden',
-  // Icons können hier bleiben, oder wie unten im head platziert werden
 };
 
 export default function RootLayout({
@@ -29,20 +31,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='de' suppressHydrationWarning>
-      {/* Hier beginnt der Head-Bereich */}
+    <html
+      lang='de'
+      className={`${inter.variable} ${firaCode.variable}`}
+      suppressHydrationWarning
+    >
       <head>
-        {/* ====> HIER DAS FEHLENDE TAG EINFÜGEN <==== */}
         <meta name='viewport' content='width=device-width, initial-scale=1' />
-        {/* Ggf. Favicon-Links hierher verschieben, wenn nicht in metadata */}
         <link rel='icon' href='/favicon.ico' sizes='any' />
-        <link rel='icon' href='/icon.svg' type='image/svg+xml' />
-        <link rel='apple-touch-icon' href='/apple-icon.png' />
-        {/* Weitere head-Elemente falls nötig */}
+        <link rel='apple-touch-icon' href='/apple-touch-icon.png' />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen`}
-      >
+      <body className='font-sans antialiased flex flex-col min-h-screen'>
         <ThemeProvider
           attribute='class'
           defaultTheme='system'
