@@ -1,5 +1,5 @@
 // src/app/hooks/useDashboardData.ts
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import {
   getUfcSchedule,
@@ -23,7 +23,7 @@ import type {
   UserTipSelection,
 } from '@/app/lib/types';
 
-interface LoadGroupDataOptions {
+export interface LoadGroupDataOptions {
   showLoadingSpinner?: boolean;
   keepExistingDetailsWhileRefreshingSubData?: boolean;
 }
@@ -94,16 +94,27 @@ export function useDashboardData(): UseDashboardDataReturn {
     []
   );
 
+  const groupDetailsRef = useRef<Group | null>(null);
+  useEffect(() => {
+    groupDetailsRef.current = selectedGroupDetails;
+  }, [selectedGroupDetails]);
+
   const loadSelectedGroupData = useCallback(
     async (groupId: number, options?: LoadGroupDataOptions) => {
       const {
-        showLoadingSpinner = true,
-        keepExistingDetailsWhileRefreshingSubData = false,
+        showLoadingSpinner = true, // Steuert, ob Ladeindikatoren (primär der globale) beeinflusst werden
+        keepExistingDetailsWhileRefreshingSubData = false, // Das "Flag" zur Steuerung des Verhaltens
       } = options || {};
 
+      // Annahme: `token`, `selectedGroupDetails` (der State), `setIsGroupDataLoading`, `setErrors`,
+      // `setSelectedGroupDetails`, `setSelectedGroupEvents`, `setSelectedGroupHighscore`,
+      // `setSelectedGroupMembers`, `setUserSubmittedTips` sind im Scope des useDashboardData Hooks definiert.
+
       if (!token) {
+        // `token` wird aus dem äußeren Scope des Hooks gelesen
         setErrors((prev) => ({ ...prev, groupData: 'Nicht eingeloggt.' }));
-        if (showLoadingSpinner) setIsGroupDataLoading(false);
+        setIsGroupDataLoading(false); // Sicherstellen, dass der globale Spinner aus ist
+        // Alle relevanten States zurücksetzen
         setSelectedGroupDetails(null);
         setSelectedGroupEvents([]);
         setSelectedGroupHighscore([]);
@@ -112,82 +123,128 @@ export function useDashboardData(): UseDashboardDataReturn {
         return;
       }
 
-      if (showLoadingSpinner) setIsGroupDataLoading(true);
+      // Globalen Ladeindikator `isGroupDataLoading` nur dann aktivieren,
+      // wenn es sich um ein komplettes Neuladen der Gruppe handelt (z.B. Gruppenwechsel).
+      // Bei einem Teil-Refresh (keepExistingDetailsWhileRefreshingSubData = true)
+      // wird der globale Lader nicht aktiviert, um das UI "ruhiger" zu halten.
+      if (!keepExistingDetailsWhileRefreshingSubData && showLoadingSpinner) {
+        setIsGroupDataLoading(true);
+      }
+
+      // Fehler für diese spezifische Ladeoperation zurücksetzen
       setErrors((prev) => ({
         ...prev,
         groupData: undefined,
         userTips: undefined,
       }));
 
-      // Wichtig: Lesen des aktuellen selectedGroupDetails States hier, nicht über useCallback Dependency
-      const currentGroupDetailsState = selectedGroupDetails;
+      // Lese den aktuellen Wert von selectedGroupDetails aus dem State des Hooks.
+      // Dies ist entscheidend, um die `useCallback`-Abhängigkeit von `selectedGroupDetails` zu vermeiden
+      // und so die Endlosschleife zu verhindern.
+      const currentGroupDetailsFromState = groupDetailsRef.current;
       let shouldFetchDetails = true;
+      let initialDetailsForPromise: Group | null = null;
 
       if (
         keepExistingDetailsWhileRefreshingSubData &&
-        currentGroupDetailsState &&
-        currentGroupDetailsState.id === groupId
+        currentGroupDetailsFromState &&
+        currentGroupDetailsFromState.id === groupId
       ) {
+        // Wenn Details beibehalten werden sollen und die aktuellen Details zur groupId passen,
+        // müssen sie nicht neu von der API geladen werden.
         shouldFetchDetails = false;
+        initialDetailsForPromise = currentGroupDetailsFromState; // Diese werden im Promise.resolve verwendet
       } else {
-        setSelectedGroupDetails(null); // Details zurücksetzen, wenn sie neu geladen werden oder Gruppe wechselt
+        // Wenn die Gruppe gewechselt hat oder Details explizit neu geladen werden sollen,
+        // werden die Details auf null gesetzt, bevor die API-Anfrage startet.
+        setSelectedGroupDetails(null);
       }
 
-      setSelectedGroupEvents([]);
-      setSelectedGroupHighscore([]);
-      setSelectedGroupMembers([]);
-      setUserSubmittedTips({});
+      // Die Listen-States (Events, Highscore etc.) werden nur dann sofort geleert,
+      // wenn `keepExistingDetailsWhileRefreshingSubData` false ist (also bei einem vollen Gruppenwechsel).
+      // Ist es true, bleiben die alten Listendaten sichtbar, bis die neuen Daten eintreffen,
+      // was ein "sanfteres" Update ermöglicht.
+      if (!keepExistingDetailsWhileRefreshingSubData) {
+        setSelectedGroupEvents([]);
+        setSelectedGroupHighscore([]);
+        setSelectedGroupMembers([]);
+        setUserSubmittedTips({});
+      }
 
-      const promisesToFetch = [];
+      const promisesToFetch: Promise<any>[] = [];
+
       if (shouldFetchDetails) {
         promisesToFetch.push(getGroupDetails(token, groupId));
       } else {
-        promisesToFetch.push(Promise.resolve(currentGroupDetailsState)); // Bereits vorhandene Details verwenden
+        // Verwende die bereits vorhandenen (und als passend befundenen) Details
+        promisesToFetch.push(Promise.resolve(initialDetailsForPromise));
       }
+      // Diese Daten werden bei jedem Refresh (voll oder partiell) neu angefordert,
+      // da sie sich typischerweise ändern können (z.B. neue Events, anderer Highscore).
       promisesToFetch.push(getGroupEvents(token, groupId));
       promisesToFetch.push(getGroupHighscore(token, groupId));
       promisesToFetch.push(getGroupMembers(token, groupId));
       promisesToFetch.push(getMyTipsForGroup(token, groupId));
 
-      let fetchErrorOccurredForCoreData = false;
+      let fetchErrorOccurredForCoreData = false; // Flag für Fehler in den kritischen Daten (Details, Events, Highscore, Members)
 
       try {
         const results = await Promise.allSettled(promisesToFetch);
 
+        // Ergebnis für GroupDetails (Index 0 im `results`-Array)
         const groupDetailsResult = results[0];
         if (groupDetailsResult.status === 'fulfilled') {
+          // Setze die Gruppendetails. Wenn `shouldFetchDetails` false war,
+          // ist `groupDetailsResult.value` der `initialDetailsForPromise`-Wert.
           setSelectedGroupDetails(groupDetailsResult.value as Group | null);
         } else if (shouldFetchDetails) {
-          console.error('Failed Detail Load:', groupDetailsResult.reason);
+          // Fehler ist nur relevant, wenn wir aktiv versucht haben, die Details neu zu laden.
+          console.error(
+            '[useDashboardData] Failed to load group details:',
+            groupDetailsResult.reason
+          );
           fetchErrorOccurredForCoreData = true;
         }
 
+        // Ergebnis für GroupEvents (Index 1)
         const groupEventsResult = results[1];
         if (groupEventsResult.status === 'fulfilled') {
           setSelectedGroupEvents(groupEventsResult.value as GroupEvent[]);
         } else {
-          console.error('Failed Event Load:', groupEventsResult.reason);
+          console.error(
+            '[useDashboardData] Failed to load group events:',
+            groupEventsResult.reason
+          );
           fetchErrorOccurredForCoreData = true;
         }
 
+        // Ergebnis für GroupHighscore (Index 2)
         const groupHighscoreResult = results[2];
         if (groupHighscoreResult.status === 'fulfilled') {
           setSelectedGroupHighscore(
             groupHighscoreResult.value as HighscoreEntry[]
           );
         } else {
-          console.error('Failed Highscore Load:', groupHighscoreResult.reason);
+          console.error(
+            '[useDashboardData] Failed to load group highscore:',
+            groupHighscoreResult.reason
+          );
           fetchErrorOccurredForCoreData = true;
         }
 
+        // Ergebnis für GroupMembers (Index 3)
         const groupMembersResult = results[3];
         if (groupMembersResult.status === 'fulfilled') {
           setSelectedGroupMembers(groupMembersResult.value as UserOut[]);
         } else {
-          console.error('Failed Members Load:', groupMembersResult.reason);
+          console.error(
+            '[useDashboardData] Failed to load group members:',
+            groupMembersResult.reason
+          );
           fetchErrorOccurredForCoreData = true;
         }
 
+        // Ergebnis für UserTips (Index 4)
         const userTipsResult = results[4];
         if (userTipsResult.status === 'fulfilled') {
           const tipsArray = (userTipsResult.value as UserTipSelection[]) ?? [];
@@ -204,7 +261,10 @@ export function useDashboardData(): UseDashboardDataReturn {
           setUserSubmittedTips(tipsRecord);
         } else {
           // status === 'rejected'
-          console.error('Failed User Tips Load:', userTipsResult.reason);
+          console.error(
+            '[useDashboardData] Failed to load user tips:',
+            userTipsResult.reason
+          );
           setErrors((prev) => ({
             ...prev,
             userTips:
@@ -213,46 +273,62 @@ export function useDashboardData(): UseDashboardDataReturn {
           }));
         }
 
+        // Setze einen allgemeinen groupData-Fehler, wenn einer der Kern-API-Aufrufe fehlgeschlagen ist.
         if (fetchErrorOccurredForCoreData) {
-          const firstCoreRejected = (shouldFetchDetails ? [results[0]] : [])
-            .concat([results[1], results[2], results[3]])
-            .find((r) => r.status === 'rejected');
+          const coreDataResultsToCheck = shouldFetchDetails
+            ? [results[0], results[1], results[2], results[3]] // Details, Events, Highscore, Members
+            : [results[1], results[2], results[3]]; // Events, Highscore, Members (wenn Details nicht gefetcht wurden)
+
+          const firstCoreRejected = coreDataResultsToCheck.find(
+            (r) => r.status === 'rejected'
+          );
 
           let errorMessage =
             'Teile der Gruppendaten konnten nicht geladen werden.';
           if (firstCoreRejected && firstCoreRejected.status === 'rejected') {
             const reason = firstCoreRejected.reason;
             if (reason instanceof ApiError) {
+              // Annahme: ApiError ist ein benutzerdefinierter Fehlertyp
               errorMessage = `${reason.status}: ${reason.detail || reason.message || 'API Fehler'}`;
             } else if (reason instanceof Error) {
               errorMessage = reason.message;
             } else {
-              errorMessage = 'Unbekannter Fehler beim Laden der Kerndaten.';
+              errorMessage =
+                'Unbekannter Fehler beim Laden der Kerndaten der Gruppe.';
             }
           }
           setErrors((prev) => ({ ...prev, groupData: errorMessage }));
         }
       } catch (err: any) {
+        // Dieser Catch-Block ist für unerwartete Fehler in der Promise.allSettled-Logik selbst
+        // oder andere synchrone Fehler innerhalb des try-Blocks.
         console.error(
-          'Unexpected error in loadSelectedGroupData wrapper:',
+          '[useDashboardData] Unexpected error in loadSelectedGroupData wrapper:',
           err
         );
         setErrors((prev) => ({
           ...prev,
-          groupData: 'Unerwarteter Systemfehler.',
+          groupData: 'Unerwarteter Systemfehler beim Laden der Gruppendaten.',
         }));
+        // Im Falle eines fundamentalen Fehlers werden sicherheitshalber alle States zurückgesetzt.
         setSelectedGroupDetails(null);
         setSelectedGroupEvents([]);
         setSelectedGroupHighscore([]);
         setSelectedGroupMembers([]);
         setUserSubmittedTips({});
       } finally {
-        if (showLoadingSpinner) setIsGroupDataLoading(false);
+        // Globalen Ladeindikator nur zurücksetzen, wenn er auch gesetzt wurde (also bei vollem Neuladen).
+        if (!keepExistingDetailsWhileRefreshingSubData && showLoadingSpinner) {
+          setIsGroupDataLoading(false);
+        }
+        // Hier könnten spezifische Ladeindikatoren für Teil-Refreshes zurückgesetzt werden, falls implementiert.
+        // z.B. if (keepExistingDetailsWhileRefreshingSubData) setIsRefreshingSubData(false);
       }
     },
-    [token] // WICHTIG: `selectedGroupDetails` wurde aus den Abhängigkeiten entfernt!
-    // Die Funktion greift über `currentGroupDetailsState` auf den jeweils aktuellen Wert zu.
-    // Dadurch ändert sich die Referenz von `loadSelectedGroupData` nur noch, wenn sich `token` ändert.
+    [token] // ENTSCHEIDEND: Nur `token` ist hier eine stabile Abhängigkeit für `useCallback`.
+    // `selectedGroupDetails` (der State-Wert) wird direkt innerhalb der Funktion gelesen,
+    // was verhindert, dass eine von dieser Funktion selbst verursachte Änderung von
+    // `selectedGroupDetails` die Referenz von `loadSelectedGroupData` ändert und eine Schleife auslöst.
   );
 
   useEffect(() => {
