@@ -1,3 +1,4 @@
+// src/app/api/groups/events/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromRequest } from '@/app/api/lib/auth';
 import { isUserMemberOfGroup } from '@/app/api/services/groupService';
@@ -5,19 +6,25 @@ import { getEventsForGroup } from '@/app/api/services/eventService';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   /* 1 — Auth & Param-Check */
   const user = await getCurrentUserFromRequest(req);
-  if (!user)
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  const id = Number(params.groupId);
-  if (!id) return NextResponse.json({ error: 'Bad group id' }, { status: 400 });
+  const { groupId } = await params;
+  const id = Number(groupId);
+  if (!id || isNaN(id)) {
+    return NextResponse.json({ error: 'Bad group id' }, { status: 400 });
+  }
 
   /* 2 — Berechtigung */
-  if (!(await isUserMemberOfGroup(user.id, id)))
+  const authorized = await isUserMemberOfGroup(user.id, id);
+  if (!authorized) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   /* 3 — Daten holen */
   try {

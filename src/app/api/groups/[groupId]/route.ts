@@ -1,20 +1,19 @@
 // src/app/api/groups/[groupId]/route.ts
 // DIESER CODE LÄDT JETZT GRUPPENDETAILS, NICHT EVENTS!
-import { NextRequest, NextResponse } from 'next/server';
 import {
   AuthenticatedUser,
   getCurrentUserFromRequest,
 } from '@/app/api/lib/auth';
 import { isUserMemberOfGroup } from '@/app/api/services/groupService';
 import { prisma } from '@/app/api/lib/prisma';
+import { NextRequest, NextResponse } from 'next/server';
 // Passe den Pfad zu deinem Prisma-Client und deinen Auth-Helfern an
 
-interface RouteContext {
-  params: { groupId: string };
-}
-
-export async function GET(req: NextRequest, { params }: RouteContext) {
-  const groupIdString = params.groupId;
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ groupId: string }> }
+) {
+  const { groupId: groupIdString } = await params;
   const groupId = parseInt(groupIdString, 10);
 
   // 1. Validierung der groupId

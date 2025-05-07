@@ -3,20 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as groupService from '../../../services/groupService';
 import { getCurrentUserFromRequest } from '../../../lib/auth';
 
-interface RouteContext {
-  params: {
-    groupId?: string;
-  };
-}
-
-export async function POST(req: NextRequest, context: RouteContext) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ groupId: string }> }
+) {
   try {
     const currentUser = await getCurrentUserFromRequest(req);
     if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const groupIdString = context.params.groupId;
+    const { groupId: groupIdString } = await params;
     if (!groupIdString) {
       return NextResponse.json(
         { error: 'Group ID is missing' },
@@ -37,8 +34,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
     );
 
     if (!updatedGroup) {
-      // Dies kann bedeuten, dass die Gruppe nicht gefunden wurde oder der User nicht berechtigt ist (abhängig von der Service-Logik)
-      // Die Service-Funktion wirft bereits einen Fehler bei fehlender Berechtigung.
       return NextResponse.json(
         { error: 'Group not found or failed to update token' },
         { status: 404 }

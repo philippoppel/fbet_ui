@@ -9,14 +9,16 @@ import { isUserMemberOfGroup } from '@/app/api/services/groupService';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
+  const { groupId } = await params;
+
   const user: AuthenticatedUser | null = await getCurrentUserFromRequest(req);
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const groupIdNum = Number(params.groupId);
+  const groupIdNum = Number(groupId);
   if (isNaN(groupIdNum) || groupIdNum <= 0) {
     return NextResponse.json({ error: 'Invalid group ID' }, { status: 400 });
   }
@@ -24,11 +26,7 @@ export async function GET(
   try {
     const isMember = await isUserMemberOfGroup(user.id, groupIdNum);
     if (!isMember) {
-      // Ggf. auch auf Group Creator prüfen
-      // const group = await prisma.group.findUnique({ where: { id: groupIdNum }, select: { createdById: true }});
-      // if (group?.createdById !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      // }
     }
   } catch (authError) {
     console.error('Authorization error in highscore route:', authError);
@@ -39,7 +37,7 @@ export async function GET(
   }
 
   try {
-    const highscore = await getHighscoreForGroup(groupIdNum); // Ruft die korrigierte Service-Funktion auf
+    const highscore = await getHighscoreForGroup(groupIdNum);
     return NextResponse.json(highscore);
   } catch (e) {
     console.error('Error in getHighscoreForGroup route:', e);

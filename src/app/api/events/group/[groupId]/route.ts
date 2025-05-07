@@ -11,18 +11,15 @@ interface UserPayload {
   // ... andere Felder im JWT Payload
 }
 
-interface RouteContext {
-  params: { groupId: string };
-}
-
 export async function GET(
   request: NextRequest,
-  { params }: RouteContext // RouteContext hier verwenden
+  { params }: { params: Promise<{ groupId: string }> } // In Next 15 ist params ein Promise
 ) {
-  const routeName = `/api/events/group/${params.groupId}`; // Für Logging
+  // Erst auflösen, dann benutzen
+  const { groupId: groupIdString } = await params;
+  const routeName = `/api/events/group/${groupIdString}`; // Für Logging
   console.log(`[ROUTE ${routeName}] GET request received.`);
 
-  const groupIdString = params.groupId;
   const groupId = parseInt(groupIdString, 10);
 
   // --- 1. Validierung der groupId ---
@@ -59,7 +56,7 @@ export async function GET(
     }
 
     const decodedToken = verifyJwt(token) as UserPayload | null;
-    if (!decodedToken || !decodedToken.sub) {
+    if (!decodedToken?.sub) {
       console.log(
         `[ROUTE ${routeName}] Auth failed: Invalid token payload. Returning 401.`
       );
@@ -80,7 +77,7 @@ export async function GET(
     }
 
     const user = await prisma.user.findUnique({ where: { id: currentUserId } });
-    if (!user || !user.isActive) {
+    if (!user?.isActive) {
       console.log(
         `[ROUTE ${routeName}] Auth failed: User ${currentUserId} not found or inactive. Returning 401.`
       );
@@ -144,7 +141,7 @@ export async function GET(
     console.log(
       `[ROUTE ${routeName}] Calling eventService.getEventsForGroup for groupId: ${groupId}.`
     );
-    // Rufe die modifizierte Service-Funktion auf, die 'awardedPoints' enthält
+    // Rufe die Service-Funktion auf, die 'awardedPoints' enthält
     const eventsWithPoints = await getEventsForGroup(groupId);
 
     // DEBUG LOG: Was wird an den Client gesendet?
