@@ -1,32 +1,30 @@
-// tailwind.config.js
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: ['class'], // Wichtig, da du .dark in globals.css verwendest
+  darkMode: ['class'],
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}', // Falls du noch /pages hast
-    './components/**/*.{js,ts,jsx,tsx,mdx}', // Falls du /components hast
-    './src/**/*.{js,ts,jsx,tsx,mdx}', // Wichtig für dein /src Verzeichnis
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     container: {
-      // Konfiguration für die 'container' Klasse in DashboardLayout
       center: true,
-      padding: '1rem', // Standard-Padding für Container (kannst du anpassen)
+      padding: '1rem',
       screens: {
-        // Breakpoints - diese sind entscheidend!
         sm: '640px',
         md: '768px',
-        lg: '1024px', // Standard Tailwind LG Breakpoint
+        lg: '1024px',
         xl: '1280px',
         '2xl': '1536px',
       },
     },
     extend: {
-      // Hier kannst du die Farben etc. aus deinem globals.css als
-      // Tailwind-Klassen verfügbar machen, wenn du möchtest, z.B.:
+      fontFamily: {
+        sans: ['var(--font-sans)', 'sans-serif'],
+        mono: ['var(--font-mono)', 'monospace'],
+      },
       colors: {
-        border: 'hsl(var(--border))', // Beispiel für Shadcn/ui Konvention
+        border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
@@ -41,7 +39,6 @@ module.exports = {
         },
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
-          // foreground: 'hsl(var(--destructive-foreground))', // Falls definiert
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
@@ -59,25 +56,13 @@ module.exports = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // Füge hier ggf. deine Sidebar- und Chart-Farben hinzu, wenn
-        // du sie als Tailwind-Klassen nutzen willst (z.B. bg-sidebar)
       },
       borderRadius: {
-        // Damit Tailwind deinen Radius kennt
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
-      fontFamily: {
-        // Damit Tailwind deine Schriftarten kennt
-        sans: ['var(--font-geist-sans)'],
-        mono: ['var(--font-geist-mono)'],
-      },
-      // Hier können weitere Erweiterungen rein (Keyframes, etc.)
     },
   },
-  plugins: [
-    require('tailwindcss-animate'), // Falls du Animationen (wie von Shadcn/ui) nutzt
-    require('@tailwindcss/typography'), // Optional, für Prosa-Styling
-  ],
+  plugins: [require('tailwindcss-animate'), require('@tailwindcss/typography')],
 };

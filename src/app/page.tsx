@@ -4,12 +4,16 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getUfcSchedule, getBoxingSchedule, ApiError } from '@/lib/api';
-import type { UfcEventItem, BoxingScheduleItem, MixedEvent } from '@/lib/types';
-import { Button } from '@/components/ui/button';
+import { getUfcSchedule, getBoxingSchedule, ApiError } from '@/app/lib/api';
+import type {
+  UfcEventItem,
+  BoxingScheduleItem,
+  MixedEvent,
+} from '@/app/lib/types';
 import { toast } from 'sonner';
 import { BarChartBig, LogIn, UserPlus } from 'lucide-react';
-import { EventListPublic } from '@/components/dashboard/EventListPublic'; // Icons für Header/Buttons
+import { EventListPublic } from '@/app/components/dashboard/EventListPublic';
+import { Button } from '@/app/components/ui/button'; // Icons für Header/Buttons
 
 export default function LandingPage() {
   const router = useRouter();

@@ -1,3 +1,4 @@
+// src/app/dashboard/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -5,48 +6,57 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 import { Loader2, LogIn } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/app/components/ui/button';
 
-import { useAuth } from '@/context/AuthContext';
-import { useDashboardData } from '@/hooks/useDashboardData';
-import { useGroupInteractions } from '@/hooks/useGroupInteractions';
+import { useAuth } from '@/app/context/AuthContext';
+import { useDashboardData } from '@/app/hooks/useDashboardData';
+import { useGroupInteractions } from '@/app/hooks/useGroupInteractions';
 
-import { AppHeader } from '@/components/layout/AppHeader';
-import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { GroupDetailsSection } from '@/components/dashboard/GroupDetailsSection';
-import { NoGroupsCard } from '@/components/dashboard/NoGroupsCard';
-import { FullscreenCenter } from '@/components/dashboard/FullscreenCenter';
+import { AppHeader } from '@/app/components/layout/AppHeader';
+import { DashboardLayout } from '@/app/components/dashboard/DashboardLayout';
+import { GroupDetailsSection } from '@/app/components/dashboard/GroupDetailsSection';
+import { NoGroupsCard } from '@/app/components/dashboard/NoGroupsCard';
+import { FullscreenCenter } from '@/app/components/dashboard/FullscreenCenter';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, token, isLoading: isAuthLoading } = useAuth();
+  const {
+    user,
+    token,
+    isLoading: isAuthLoading,
+    logout: actualLogoutFunction,
+  } = useAuth();
 
-  // Daten-Fetching
+  // Hole alle Daten und Funktionen aus useDashboardData
   const {
     myGroups,
-    combinedEvents,
     selectedGroupId,
     selectedGroupDetails,
     selectedGroupEvents,
     selectedGroupHighscore,
     selectedGroupMembers,
+    userSubmittedTips, // Der State mit den gespeicherten Tipps
     loadingInitial,
     isGroupDataLoading,
     errors,
     handleSelectGroup,
-    refreshSelectedGroupData,
+    refreshSelectedGroupData, // Wird für andere Interaktionen gebraucht
+    updateUserTipState, // <<--- Die neue Funktion für Tipp-Updates
   } = useDashboardData();
 
+  // Initialisiere useGroupInteractions und übergebe die notwendigen Funktionen
   const interactions = useGroupInteractions({
     token,
     selectedGroupId,
     selectedGroupEvents,
-    refreshGroupData: refreshSelectedGroupData,
+    refreshGroupData: refreshSelectedGroupData, // Für Event-Erstellung/Ergebnis
+    updateUserTipState: updateUserTipState, // <<--- Für Tipp-Updates
   });
 
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
     useState(false);
 
+  // Effekt für die Weiterleitung, falls nicht eingeloggt (unverändert)
   useEffect(() => {
     if (!isAuthLoading && !user && !token) {
       router.replace('/login');
@@ -57,17 +67,16 @@ export default function DashboardPage() {
     setIsDesktopSidebarCollapsed((prev) => !prev);
   };
 
-  // --- Loading & Auth Handling ---
-  if (isAuthLoading || (loadingInitial && !user && token)) {
+  // --- Loading & Auth Handling (unverändert) ---
+  if (isAuthLoading) {
     return (
       <FullscreenCenter>
         <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-        <span className='ml-3 text-lg'>Dashboard wird geladen…</span>
+        <span className='ml-3 text-lg'>Authentifizierung wird geprüft…</span>
       </FullscreenCenter>
     );
   }
-
-  if (!user && !token) {
+  if (!user || !token) {
     return (
       <FullscreenCenter>
         <div className='text-center'>
@@ -81,17 +90,26 @@ export default function DashboardPage() {
       </FullscreenCenter>
     );
   }
+  if (loadingInitial) {
+    return (
+      <FullscreenCenter>
+        <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+        <span className='ml-3 text-lg'>Dashboard wird geladen…</span>
+      </FullscreenCenter>
+    );
+  }
 
   const hasGroups = myGroups && myGroups.length > 0;
+
+  const handleLogout = () => {
+    actualLogoutFunction();
+  };
 
   return (
     <>
       <AppHeader
         user={user}
-        onLogout={() => {
-          // Optional: logout-Funktion einbauen
-          console.log('Logout clicked');
-        }}
+        onLogout={handleLogout}
         myGroups={myGroups}
         selectedGroupId={selectedGroupId}
         onSelectGroup={handleSelectGroup}
@@ -117,19 +135,17 @@ export default function DashboardPage() {
         ) : !hasGroups ? (
           <NoGroupsCard />
         ) : (
-          user && (
-            <GroupDetailsSection
-              key={selectedGroupId}
-              selectedGroupId={selectedGroupId}
-              selectedGroupDetails={selectedGroupDetails}
-              selectedGroupEvents={selectedGroupEvents}
-              combinedEvents={combinedEvents}
-              user={user}
-              isGroupDataLoading={isGroupDataLoading}
-              groupDataError={errors.groupData}
-              interactions={interactions}
-            />
-          )
+          <GroupDetailsSection
+            key={selectedGroupId}
+            selectedGroupId={selectedGroupId}
+            selectedGroupDetails={selectedGroupDetails}
+            selectedGroupEvents={selectedGroupEvents}
+            userSubmittedTips={userSubmittedTips} // <<--- Wird weitergegeben
+            user={user}
+            isGroupDataLoading={isGroupDataLoading}
+            groupDataError={errors.groupData}
+            interactions={interactions} // Enthält jetzt updateUserTipState indirekt
+          />
         )}
       </DashboardLayout>
     </>
