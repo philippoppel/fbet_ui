@@ -99,9 +99,11 @@ export interface TipCreate {
   selected_option: string;
 }
 
-export interface TipOut extends TipCreate {
+export interface TipOut {
   id: number;
-  user_id: number;
+  eventId: number;
+  selectedOption: string;
+  userId: number;
 }
 
 export interface MixedEvent {

@@ -1,13 +1,13 @@
 // src/hooks/useGroupInteractions.ts
-// Refactored – correct option typing so **partial refresh** actually works.
-// After creating an event or setting a result we now call refreshGroupData
-// with an options object that keeps existing lists visible. No UI flash.
+// Refresht nach *jedem* erfolgreichen Vorgang automatisch die Gruppendaten
+// (soft refresh = Lists & Details bleiben sichtbar ▸ entspannteres UI).
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
+
 import {
   submitTip,
   setEventResult,
@@ -35,7 +35,7 @@ const addEventFormSchema = z.object({
 export type AddEventFormData = z.infer<typeof addEventFormSchema>;
 
 /* -------------------------------------------------------------------------- */
-/*                             Hook – Input / API                              */
+/*                             Hook – Input / API                             */
 /* -------------------------------------------------------------------------- */
 
 interface UseGroupInteractionsProps {
@@ -43,13 +43,13 @@ interface UseGroupInteractionsProps {
   selectedGroupId: number | null;
   selectedGroupEvents: GroupEvent[];
   /**
-   * Reloads group data. Pass LoadGroupDataOptions to do a *soft* refresh.
+   * Lädt die Gruppendaten neu. Übergib LoadGroupDataOptions für „soft“-Refresh.
    */
   refreshGroupData: (
     groupId: number,
     options?: LoadGroupDataOptions
   ) => Promise<void>;
-  /** Optimistically updates userSubmittedTips in useDashboardData */
+  /** Optimistisches Updaten von userSubmittedTips in useDashboardData */
   updateUserTipState: (eventId: number, selectedOption: string) => void;
 }
 
@@ -74,7 +74,7 @@ export interface UseGroupInteractionsReturn {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 The Hook                                   */
+/*                                   Hook                                     */
 /* -------------------------------------------------------------------------- */
 
 export function useGroupInteractions({
@@ -95,7 +95,7 @@ export function useGroupInteractions({
   >({});
   const [isAddEventDialogOpen, setIsAddEventDialogOpen] = useState(false);
 
-  /* ----------------------- React-Hook-Form for new event ----------------------- */
+  /* ----------------------- React-Hook-Form für neues Event ----------------------- */
   const addEventForm = useForm<AddEventFormData>({
     resolver: zodResolver(addEventFormSchema),
     defaultValues: {
@@ -107,7 +107,7 @@ export function useGroupInteractions({
   });
 
   /* -------------------------------------------------------------------------- */
-  /*                               Tip handling                                */
+  /*                               Tipp-Handling                                */
   /* -------------------------------------------------------------------------- */
 
   const handleOptionSelect = (eventId: number, option: string) => {
@@ -122,116 +122,147 @@ export function useGroupInteractions({
     });
   };
 
-  const handleSubmitTip = async (eventId: number) => {
-    const selectedOption = selectedTips[eventId];
-    if (!selectedOption || !token || !selectedGroupId) return;
+  const handleSubmitTip = useCallback(
+    async (eventId: number) => {
+      const selectedOption = selectedTips[eventId];
+      if (!selectedOption || !token || !selectedGroupId) return;
 
-    setIsSubmittingTip((p) => ({ ...p, [eventId]: true }));
-    try {
-      const savedTip = await submitTip(token, {
-        event_id: eventId,
-        selected_option: selectedOption,
-      });
+      setIsSubmittingTip((p) => ({ ...p, [eventId]: true }));
+      try {
+        const savedTip = await submitTip(token, {
+          event_id: eventId,
+          selected_option: selectedOption,
+        });
 
-      const eventTitle =
-        selectedGroupEvents.find((e) => e.id === eventId)?.title ||
-        'dieses Event';
-      toast.success('Tipp gespeichert!', {
-        description: `Dein Tipp "${savedTip.selected_option}" für "${eventTitle}" wurde gespeichert.`,
-      });
+        const eventTitle =
+          selectedGroupEvents.find((e) => e.id === eventId)?.title ??
+          'dieses Event';
 
-      handleClearSelectedTip(eventId);
-      updateUserTipState(savedTip.event_id, savedTip.selected_option);
-    } catch (err) {
-      let msg = 'Dein Tipp konnte nicht gespeichert werden.';
-      if (err instanceof ApiError)
-        msg = `${err.status}: ${err.detail || err.message}`;
-      else if (err instanceof Error) msg = err.message;
-      toast.error('Fehler beim Tippen', { description: msg });
-    } finally {
-      setIsSubmittingTip((p) => ({ ...p, [eventId]: false }));
-    }
-  };
+        toast.success('Tipp gespeichert!', {
+          description: `Dein Tipp „${savedTip.selectedOption}“ für „${eventTitle}“ wurde gespeichert.`,
+        });
+
+        handleClearSelectedTip(eventId);
+        updateUserTipState(savedTip.eventId, savedTip.selectedOption);
+
+        // ► Soft refresh: Listen bleiben sichtbar, Daten aber aktuell
+        await refreshGroupData(selectedGroupId, {
+          keepExistingDetailsWhileRefreshingSubData: true,
+        });
+      } catch (err) {
+        let msg = 'Dein Tipp konnte nicht gespeichert werden.';
+        if (err instanceof ApiError)
+          msg = `${err.status}: ${err.detail || err.message}`;
+        else if (err instanceof Error) msg = err.message;
+        toast.error('Fehler beim Tippen', { description: msg });
+      } finally {
+        setIsSubmittingTip((p) => ({ ...p, [eventId]: false }));
+      }
+    },
+    [
+      token,
+      selectedGroupId,
+      selectedTips,
+      selectedGroupEvents,
+      refreshGroupData,
+      updateUserTipState,
+    ]
+  );
 
   /* -------------------------------------------------------------------------- */
-  /*                          Admin – set event result                          */
+  /*                          Admin – Ergebnis setzen                           */
   /* -------------------------------------------------------------------------- */
 
   const handleResultInputChange = (eventId: number, value: string) => {
     setResultInputs((p) => ({ ...p, [eventId]: value }));
   };
 
-  const handleSetResult = async (eventId: number, winningOption: string) => {
-    if (!winningOption || !token || !selectedGroupId) return;
+  const handleSetResult = useCallback(
+    async (eventId: number, winningOption: string) => {
+      if (!winningOption || !token || !selectedGroupId) return;
 
-    setIsSettingResult((p) => ({ ...p, [eventId]: true }));
-    try {
-      await setEventResult(token, {
-        event_id: eventId,
-        winning_option: winningOption,
-      });
-      toast.success('Ergebnis erfolgreich gespeichert!');
-      setResultInputs((p) => {
-        const n = { ...p };
-        delete n[eventId];
-        return n;
-      });
-      await refreshGroupData(selectedGroupId);
-    } catch (err) {
-      let msg = 'Das Ergebnis konnte nicht gespeichert werden.';
-      if (err instanceof ApiError)
-        msg = `${err.status}: ${err.detail || err.message}`;
-      else if (err instanceof Error) msg = err.message;
-      toast.error('Fehler Ergebnis', { description: msg });
-    } finally {
-      setIsSettingResult((p) => ({ ...p, [eventId]: false }));
-    }
-  };
+      setIsSettingResult((p) => ({ ...p, [eventId]: true }));
+      try {
+        await setEventResult(token, {
+          event_id: eventId,
+          winning_option: winningOption,
+        });
+        toast.success('Ergebnis erfolgreich gespeichert!');
 
-  /* -------------------------------------------------------------------------- */
-  /*                               Add new event                                */
-  /* -------------------------------------------------------------------------- */
+        setResultInputs((p) => {
+          const n = { ...p };
+          delete n[eventId];
+          return n;
+        });
 
-  const handleAddEventSubmit = async (values: AddEventFormData) => {
-    if (!token || !selectedGroupId) return;
-
-    const optionsArray = values.options
-      .split('\n')
-      .map((o) => o.trim())
-      .filter(Boolean);
-    if (optionsArray.length < 2) {
-      addEventForm.setError('options', {
-        type: 'manual',
-        message: 'Min. 2 gültige Optionen.',
-      });
-      return;
-    }
-
-    const eventData: EventCreate = {
-      title: values.title,
-      description: values.description || null,
-      group_id: selectedGroupId,
-      question: values.question,
-      options: optionsArray,
-    };
-
-    try {
-      await createEvent(token, eventData);
-      toast.success('Event erfolgreich erstellt!');
-      addEventForm.reset();
-      setIsAddEventDialogOpen(false);
-      await refreshGroupData(selectedGroupId);
-    } catch (err) {
-      let msg = 'Event konnte nicht erstellt werden.';
-      if (err instanceof ApiError)
-        msg = `${err.status}: ${err.detail || err.message}`;
-      else if (err instanceof Error) msg = err.message;
-      toast.error('Fehler Erstellen', { description: msg });
-    }
-  };
+        // ► Soft refresh nach Ergebnis
+        await refreshGroupData(selectedGroupId, {
+          keepExistingDetailsWhileRefreshingSubData: true,
+        });
+      } catch (err) {
+        let msg = 'Das Ergebnis konnte nicht gespeichert werden.';
+        if (err instanceof ApiError)
+          msg = `${err.status}: ${err.detail || err.message}`;
+        else if (err instanceof Error) msg = err.message;
+        toast.error('Fehler Ergebnis', { description: msg });
+      } finally {
+        setIsSettingResult((p) => ({ ...p, [eventId]: false }));
+      }
+    },
+    [token, selectedGroupId, refreshGroupData]
+  );
 
   /* -------------------------------------------------------------------------- */
-  /*                                  Return                                    */
+  /*                               Event anlegen                               */
+  /* -------------------------------------------------------------------------- */
+
+  const handleAddEventSubmit = useCallback(
+    async (values: AddEventFormData) => {
+      if (!token || !selectedGroupId) return;
+
+      const optionsArray = values.options
+        .split('\n')
+        .map((o) => o.trim())
+        .filter(Boolean);
+      if (optionsArray.length < 2) {
+        addEventForm.setError('options', {
+          type: 'manual',
+          message: 'Min. 2 gültige Optionen.',
+        });
+        return;
+      }
+
+      const eventData: EventCreate = {
+        title: values.title,
+        description: values.description || null,
+        group_id: selectedGroupId,
+        question: values.question,
+        options: optionsArray,
+      };
+
+      try {
+        await createEvent(token, eventData);
+        toast.success('Event erfolgreich erstellt!');
+        addEventForm.reset();
+        setIsAddEventDialogOpen(false);
+
+        // ► Soft refresh nach Neuerstellung
+        await refreshGroupData(selectedGroupId, {
+          keepExistingDetailsWhileRefreshingSubData: true,
+        });
+      } catch (err) {
+        let msg = 'Event konnte nicht erstellt werden.';
+        if (err instanceof ApiError)
+          msg = `${err.status}: ${err.detail || err.message}`;
+        else if (err instanceof Error) msg = err.message;
+        toast.error('Fehler Erstellen', { description: msg });
+      }
+    },
+    [token, selectedGroupId, addEventForm, refreshGroupData]
+  );
+
+  /* -------------------------------------------------------------------------- */
+  /*                                  Return                                   */
   /* -------------------------------------------------------------------------- */
 
   return {

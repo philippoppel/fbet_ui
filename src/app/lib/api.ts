@@ -306,7 +306,6 @@ export async function submitTip(
   token: string,
   tipData: TipCreate
 ): Promise<TipOut> {
-  // Annahme: Pfad ist /api/tips
   const response = await fetch(`${API_BASE_URL}/api/tips`, {
     method: 'POST',
     headers: {
