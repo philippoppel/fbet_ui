@@ -161,11 +161,6 @@ export function useGroupInteractions({
     setResultInputs((p) => ({ ...p, [eventId]: value }));
   };
 
-  const SOFT_REFRESH: LoadGroupDataOptions = {
-    showLoadingSpinner: false,
-    keepExistingDetailsWhileRefreshingSubData: true,
-  };
-
   const handleSetResult = async (eventId: number, winningOption: string) => {
     if (!winningOption || !token || !selectedGroupId) return;
 
@@ -181,7 +176,7 @@ export function useGroupInteractions({
         delete n[eventId];
         return n;
       });
-      await refreshGroupData(selectedGroupId, SOFT_REFRESH);
+      await refreshGroupData(selectedGroupId);
     } catch (err) {
       let msg = 'Das Ergebnis konnte nicht gespeichert werden.';
       if (err instanceof ApiError)
@@ -225,7 +220,7 @@ export function useGroupInteractions({
       toast.success('Event erfolgreich erstellt!');
       addEventForm.reset();
       setIsAddEventDialogOpen(false);
-      await refreshGroupData(selectedGroupId, SOFT_REFRESH);
+      await refreshGroupData(selectedGroupId);
     } catch (err) {
       let msg = 'Event konnte nicht erstellt werden.';
       if (err instanceof ApiError)
