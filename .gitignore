@@ -90,3 +90,4 @@ pids/
 # === Generated Type Definitions ===
 # Usually not committed, but depends on project setup
 # next-env.d.ts
+.env*.local

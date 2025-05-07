@@ -5,8 +5,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,8 +45,8 @@
 :root {
   --radius: 0.625rem;
 
-  --background: oklch(0.98 0.01 100);        /* sehr hell mit leichtem Blaustich */
-  --foreground: oklch(0.18 0.02 260);       /* dunkel-lila Text */
+  --background: oklch(0.98 0.01 100);
+  --foreground: oklch(0.18 0.02 260);
 
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.18 0.02 260);
@@ -57,16 +57,16 @@
   --primary: oklch(0.78 0.25 320);
   --primary-foreground: oklch(0.15 0.02 260);
 
-  --secondary: oklch(0.92 0.1 80);          /* warmes Beige */
+  --secondary: oklch(0.92 0.1 80);
   --secondary-foreground: oklch(0.18 0.02 260);
 
-  --muted: oklch(0.93 0.04 260);            /* leicht pastellig */
+  --muted: oklch(0.93 0.04 260);
   --muted-foreground: oklch(0.5 0.05 260);
 
-  --accent: oklch(0.8 0.22 210);            /* sattes Cyan */
+  --accent: oklch(0.8 0.22 210);
   --accent-foreground: oklch(0.12 0.03 230);
 
-  --destructive: oklch(0.55 0.25 27);       /* rot-orange */
+  --destructive: oklch(0.55 0.25 27);
   --border: oklch(0.85 0.02 260);
   --input: oklch(0.9 0.02 260);
   --ring: oklch(0.6 0.1 270);
@@ -88,14 +88,15 @@
 }
 
 .dark {
-  --background: oklch(0.12 0.01 260);        /* sehr dunkles Blau-Lila */
-  --foreground: oklch(0.96 0.01 260);        /* fast Weiß */
+  --background: oklch(0.12 0.01 260);
+  --foreground: oklch(0.96 0.01 260);
 
   --card: oklch(0.16 0.01 260);
   --card-foreground: oklch(0.98 0.01 260);
 
   --popover: oklch(0.18 0.02 260);
   --popover-foreground: oklch(1 0 0);
+
   --primary: oklch(0.55 0.14 270);
   --primary-foreground: oklch(0.98 0.01 260);
 
