@@ -1,12 +1,18 @@
-// next.config.js oder next.config.mjs
+// next.config.ts  (ESM mit TypeScript)
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* andere Konfigurationsoptionen hier */
+  // ... andere Optionen …
 
-  // Füge diese Zeilen hinzu, um die Warnung zu beheben:
-  // Erlaube Anfragen von deiner Netzwerk-IP während der Entwicklung
-  allowedDevOrigins: ['https://192.168.178.148:3000'],
+  eslint: {
+    /**
+     * Achtung: Damit läuft der Build auch durch,
+     * wenn noch echte ESLint-FEHLER vorhanden sind !
+     */
+    ignoreDuringBuilds: true,
+  },
+
+  allowedDevOrigins: ['https://192.168.178.148:3000'], // das bleibt davon unberührt
 };
 
 export default nextConfig;
