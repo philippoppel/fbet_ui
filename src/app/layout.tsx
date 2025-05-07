@@ -39,7 +39,7 @@ export default function RootLayout({
       <head>
         <meta name='viewport' content='width=device-width, initial-scale=1' />
         <link rel='icon' href='/favicon.ico' sizes='any' />
-        <link rel='apple-touch-icon' href='/apple-touch-icon.png' />
+        <link rel='apple-icon' href='/apple-icon.png' />
       </head>
       <body className='font-sans antialiased flex flex-col min-h-screen'>
         <ThemeProvider
