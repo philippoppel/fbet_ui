@@ -1,9 +1,9 @@
 // src/components/dashboard/HighscoreCard.tsx
 'use client';
 
-import type { HighscoreEntry, UserOut } from '@/app/lib/types'; // Import UserOut statt GroupMembership
+import type { HighscoreEntry, UserOut } from '@/app/lib/types';
 import {
-  Card,
+  Card, // Wird als Struktur verwendet, aber mit angepassten Klassen
   CardContent,
   CardHeader,
   CardTitle,
@@ -20,16 +20,14 @@ import {
   TooltipTrigger,
 } from '@/app/components/ui/tooltip';
 
-// Props Definition - members ist jetzt UserOut[]
 type HighscoreCardProps = {
-  highscore: HighscoreEntry[]; // Sollte jetzt alle Mitglieder mit Namen/Punkten enthalten
-  members: UserOut[]; // Wird für die Mitgliederzahl und ggf. als Fallback benötigt
+  highscore: HighscoreEntry[];
+  members: UserOut[];
   isLoading: boolean;
   error: string | null;
-  currentUserId: number;
+  currentUserId: number | undefined | null;
 };
 
-// Typ für die intern verwendete Darstellungsliste (unverändert)
 type DisplayEntry = {
   user_id: number;
   name: string;
@@ -38,50 +36,53 @@ type DisplayEntry = {
   rank: number;
 };
 
-// Skeleton Komponente (unverändert)
+// Angepasstes Skeleton für den neuen Look
 function HighscoreSkeleton() {
   return (
-    <div className='w-full space-y-1 pt-1 px-1'>
-      {/* Header Skeleton */}
-      <div className='flex items-center justify-between h-10 px-2 text-sm font-medium text-muted-foreground border-b'>
-        <Skeleton className='h-4 w-10 rounded' />
-        <Skeleton className='h-4 w-2/5 rounded' />
-        <Skeleton className='h-4 w-1/6 rounded' />
+    <div className='w-full'>
+      {/* Header Skeleton (subtiler Hintergrund) */}
+      <div className='sticky top-0 z-10 bg-background/80 dark:bg-slate-900/70 backdrop-blur-sm'>
+        <div className='flex items-center justify-between h-10 px-2 text-sm font-medium border-b border-white/10 dark:border-white/5'>
+          <Skeleton className='h-4 w-10 rounded bg-muted/50' />
+          <Skeleton className='h-4 w-2/5 rounded bg-muted/50' />
+          <Skeleton className='h-4 w-1/6 rounded bg-muted/50' />
+        </div>
       </div>
       {/* Row Skeletons */}
-      {[...Array(6)].map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            'flex items-center justify-between px-2 py-3 border-b',
-            i % 2 !== 0 && 'bg-muted/30'
-          )}
-        >
-          <Skeleton className='h-6 w-8 rounded-md' /> {/* Rank Badge */}
-          <Skeleton className='h-4 w-1/2 rounded' /> {/* Name */}
-          <Skeleton className='h-4 w-1/5 rounded' /> {/* Points */}
-        </div>
-      ))}
+      <div className='space-y-0 px-1'>
+        {' '}
+        {/* Kein space-y, Trennung durch border */}
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className={cn(
+              'flex items-center justify-between px-2 py-3 border-b border-white/10 dark:border-white/5',
+              // Subtiler Hintergrund für gerade Zeilen im Skeleton
+              i % 2 === 0 && 'bg-white/5 dark:bg-black/10'
+            )}
+          >
+            <Skeleton className='h-6 w-8 rounded-md bg-muted/40' />{' '}
+            {/* Rank Badge */}
+            <Skeleton className='h-4 w-1/2 rounded bg-muted/40' /> {/* Name */}
+            <Skeleton className='h-4 w-1/5 rounded bg-muted/40' />{' '}
+            {/* Points */}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// Die Hauptkomponente (Logik angepasst)
 export function HighscoreCard({
-  highscore, // Diese Prop enthält jetzt die vollständigen Daten vom Backend
-  members, // Diese Prop wird für die Gesamtzahl der Mitglieder verwendet
+  highscore,
+  members,
   isLoading,
   error,
   currentUserId,
 }: HighscoreCardProps) {
-  // useMemo Hook zur Berechnung der anzuzeigenden Liste und Ränge
-  // Hängt jetzt primär von 'highscore' ab
   const displayList = useMemo((): DisplayEntry[] => {
-    // Die 'highscore'-Prop sollte bereits alle Mitglieder enthalten,
-    // sortiert nach Punkten (absteigend) und Namen (aufsteigend) vom Backend.
+    // Sortierung und Rangberechnung bleiben gleich
     const sortedList = highscore ?? [];
-
-    // Rangberechnung (unverändert)
     let rank = 0;
     let lastPoints = -Infinity;
     let playersAtRank = 1;
@@ -97,156 +98,158 @@ export function HighscoreCard({
       }
       lastPoints = entry.points;
 
-      // Überprüfe, ob der Name, der vom Backend kommt, ein Fallback ist.
-      // Die Backend-Logik verwendet "User {ID}" oder E-Mail-Präfix als Fallback.
-      // Wir können hier eine ähnliche Prüfung machen.
       const fallbackNamePattern1 = `User ${entry.user_id}`;
-      // Eine einfache Annahme für E-Mail-Präfix Fallback (könnte verfeinert werden)
       const isLikelyEmailPrefix =
-        !entry.name.includes(' ') && entry.name.includes('@') === false; // Beispielhafte Annahme
+        !entry.name.includes(' ') && entry.name.includes('@') === false;
       const isNameFallback =
         entry.name === fallbackNamePattern1 ||
-        (isLikelyEmailPrefix && entry.name !== `User ${entry.user_id}`); // Anpassbare Logik
+        (isLikelyEmailPrefix && entry.name !== `User ${entry.user_id}`);
 
       return {
         user_id: entry.user_id,
-        name: entry.name, // Name kommt jetzt direkt aus dem highscore-Eintrag
+        name: entry.name,
         points: entry.points,
         isNameFallback: isNameFallback,
         rank: rank,
       };
     });
-  }, [highscore]); // Abhängigkeit ist jetzt nur noch highscore
+  }, [highscore]);
 
-  // Memoisierten Wert für die Anzeige der Fallback-Info berechnen (unverändert)
   const hasFallbackNames = useMemo(
     () => displayList.some((e) => e.isNameFallback),
     [displayList]
   );
-
-  // Anzahl der Mitglieder für die Anzeige im Leerzustand
   const memberCount = members?.length ?? 0;
 
-  // JSX Rendering der Komponente
   return (
     <TooltipProvider delayDuration={100}>
-      <Card className='shadow-sm border h-full flex flex-col'>
-        <CardHeader className='py-3 px-4 border-b'>
-          <CardTitle className='text-lg font-semibold flex items-center gap-2'>
+      {/* Angepasste Haupt-Card */}
+      <Card
+        className={cn(
+          'shadow-md h-full flex flex-col overflow-hidden', // overflow-hidden für sticky header clipping
+          'bg-background/60 dark:bg-slate-900/50 backdrop-blur-lg supports-[backdrop-filter]:bg-background/70',
+          'border border-white/10 dark:border-white/5 rounded-lg'
+        )}
+      >
+        {/* Angepasster Header */}
+        <CardHeader className='py-3 px-4 border-b border-white/10 dark:border-white/5'>
+          <CardTitle className='text-lg font-semibold flex items-center gap-2 text-foreground'>
             <Trophy className='w-5 h-5 text-primary' /> Rangliste
           </CardTitle>
         </CardHeader>
 
+        {/* Angepasster Content-Bereich (kein Padding, da Tabelle es steuert) */}
         <CardContent className='flex-1 overflow-y-auto p-0'>
           {isLoading ? (
-            <HighscoreSkeleton /> // Ladezustand
+            <HighscoreSkeleton />
           ) : error ? (
-            // Fehlerzustand
             <div className='flex flex-col items-center justify-center h-full text-destructive px-4 text-center py-10'>
               <TriangleAlert className='h-10 w-10 mb-3' />
               <p className='text-sm font-medium'>Fehler beim Laden:</p>
               <p className='text-sm text-destructive/90 mt-1'>{error}</p>
             </div>
-          ) : memberCount === 0 ? ( // Prüfe zuerst, ob überhaupt Mitglieder da sind
-            // Leerzustand (keine Mitglieder)
+          ) : memberCount === 0 ? (
             <div className='flex flex-col items-center justify-center h-full text-muted-foreground px-4 text-center py-10'>
               <Users className='h-12 w-12 opacity-50 mb-4' />
               <p className='text-sm'>
-                Keine Mitglieder in dieser Gruppe gefunden.
+                {' '}
+                Keine Mitglieder in dieser Gruppe gefunden.{' '}
               </p>
               <p className='text-xs mt-1'>
-                Lade Freunde über den Beitrittslink ein!
+                {' '}
+                Lade Freunde über den Beitrittslink ein!{' '}
               </p>
             </div>
           ) : displayList.length === 0 && memberCount > 0 ? (
-            // Zustand: Mitglieder da, aber Highscore-Liste (aus irgendeinem Grund) leer
-            // Sollte mit der neuen Backend-Logik nicht oft vorkommen, außer bei Fehlern im Backend, die [] liefern
             <div className='flex flex-col items-center justify-center h-full text-muted-foreground px-4 text-center py-10'>
               <Trophy className='h-12 w-12 opacity-50 mb-4' />
               <p className='text-sm'>
-                Rangliste wird berechnet oder ist noch leer.
+                {' '}
+                Rangliste wird berechnet oder ist noch leer.{' '}
               </p>
             </div>
           ) : (
-            // Normalzustand (Tabelle anzeigen, auch wenn alle 0 Punkte haben)
             <div className='w-full'>
               <table className='w-full caption-bottom text-sm'>
-                <thead className='sticky top-0 bg-card z-10'>
-                  <tr className='border-b'>
+                {/* Angepasster Tabellenkopf */}
+                <thead className='sticky top-0 z-10 bg-background/80 dark:bg-slate-900/70 backdrop-blur-sm'>
+                  <tr className='border-b border-white/10 dark:border-white/5'>
                     <th className='h-10 px-2 text-center align-middle font-medium text-muted-foreground w-[60px]'>
-                      Rang
+                      {' '}
+                      Rang{' '}
                     </th>
                     <th className='h-10 px-3 text-left align-middle font-medium text-muted-foreground'>
-                      Name
+                      {' '}
+                      Name{' '}
                     </th>
                     <th className='h-10 px-3 text-right align-middle font-medium text-muted-foreground w-[70px]'>
-                      Punkte
+                      {' '}
+                      Punkte{' '}
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                {/* Angepasster Tabellenkörper */}
+                <tbody className='divide-y divide-white/5 dark:divide-white/[0.03]'>
                   {displayList.map((entry) => (
                     <tr
                       key={entry.user_id}
                       className={cn(
-                        'border-b transition-colors',
-                        'even:bg-muted/30 hover:bg-muted/50',
-                        entry.user_id === currentUserId &&
-                          'bg-primary/10 font-semibold border-l-2 border-primary'
+                        'transition-colors', // border-b entfernt, da tbody divide-y verwendet
+                        'hover:bg-white/10 dark:hover:bg-black/15', // Angepasster Hover
+                        // Alternating background nicht mehr nötig durch divide-y, kann aber hinzugefügt werden:
+                        // 'even:bg-white/[0.03] dark:even:bg-black/5',
+                        currentUserId != null &&
+                          entry.user_id === currentUserId &&
+                          'bg-primary/10 dark:bg-primary/20 font-semibold' // Ggf. Darkmode-Anpassung für Highlight
+                        // 'border-l-2 border-primary' // Border-Left ist optional
                       )}
                     >
-                      {/* Rang Spalte */}
                       <td className='py-2.5 px-2 align-middle text-center'>
                         <Badge
-                          variant={
-                            entry.rank === 1
-                              ? 'default'
-                              : entry.rank === 2
-                                ? 'secondary'
-                                : entry.rank === 3
-                                  ? 'outline'
-                                  : 'secondary'
-                          }
+                          variant={'secondary'} // Grundvariante, spezielle Ränge überschreiben
                           className={cn(
                             'font-semibold min-w-[24px] justify-center px-1.5 py-0.5 text-xs',
-                            entry.rank === 1 && 'bg-yellow-500 text-black',
-                            entry.rank === 2 && 'bg-slate-400 text-black',
-                            entry.rank === 3 && 'bg-orange-600 text-white'
+                            'border border-transparent', // Standardmäßig kein Rand
+                            entry.rank === 1 &&
+                              'bg-yellow-500/90 border-yellow-600/50 text-black dark:text-yellow-950',
+                            entry.rank === 2 &&
+                              'bg-slate-400/90 border-slate-500/50 text-black dark:text-slate-950',
+                            entry.rank === 3 &&
+                              'bg-orange-600/80 border-orange-700/50 text-white dark:text-orange-100'
                           )}
                         >
                           {entry.rank}
                         </Badge>
                       </td>
-                      {/* Name Spalte */}
                       <td className='py-2.5 px-3 align-middle flex items-center gap-1.5'>
                         {entry.isNameFallback && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span>
-                                <User className='w-3.5 h-3.5 text-muted-foreground flex-shrink-0 opacity-70' />
+                                {' '}
+                                <User className='w-3.5 h-3.5 text-muted-foreground flex-shrink-0 opacity-70' />{' '}
                               </span>
                             </TooltipTrigger>
-                            <TooltipContent>
+                            <TooltipContent className='bg-popover text-popover-foreground border-border'>
                               <p>Nur User-ID #{entry.user_id} verfügbar.</p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                         <span
                           className={cn(
-                            'truncate',
-                            entry.isNameFallback && 'opacity-80 italic'
+                            'truncate text-foreground/90',
+                            entry.isNameFallback && 'opacity-70 italic'
                           )}
                           title={entry.name}
                         >
                           {entry.name}
                         </span>
                       </td>
-                      {/* Punkte Spalte */}
                       <td
                         className={cn(
-                          'py-2.5 px-3 align-middle text-right font-semibold',
+                          'py-2.5 px-3 align-middle text-right font-semibold text-foreground/90',
                           entry.points === 0 &&
-                            'text-muted-foreground font-normal opacity-80'
+                            'text-muted-foreground font-normal opacity-70'
                         )}
                       >
                         {entry.points}

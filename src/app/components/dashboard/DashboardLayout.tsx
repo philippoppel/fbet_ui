@@ -1,14 +1,15 @@
+// src/app/components/dashboard/DashboardLayout.tsx
 import { cn } from '@/app/lib/utils';
 import type {
   Group,
   HighscoreEntry,
-  GroupMembership,
+  // GroupMembership, // Nicht mehr direkt als Prop verwendet, stattdessen UserOut[]
   UserOut,
 } from '@/app/lib/types';
 
 import { HighscoreCard } from '@/app/components/dashboard/HighscoreCard';
 import { HighscorePlaceholder } from './HighscorePlaceholder';
-import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar';
+import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar'; // Sicherstellen, dass der Pfad korrekt ist
 import { Card } from '@/app/components/ui/card';
 
 interface DashboardLayoutProps {
@@ -16,13 +17,18 @@ interface DashboardLayoutProps {
   myGroups: Group[];
   selectedGroupId: number | null;
   selectedGroupHighscore: HighscoreEntry[];
-  selectedGroupMembers: UserOut[]; // <--- HIER ÄNDERN (von GroupMembership[] zu UserOut[])
+  selectedGroupMembers: UserOut[];
   isGroupDataLoading: boolean;
-  loadingInitial: boolean;
+  loadingInitial: boolean; // Diese Prop wird von DashboardPage übergeben
   errors: { groups?: string; groupData?: string };
   isDesktopSidebarCollapsed: boolean;
   onToggleCollapse: () => void;
   onSelectGroup: (groupId: number) => void;
+  currentUserId: number | undefined | null; // <--- NEUE PROP HINZUGEFÜGT
+  // onDeleteGroup (für GroupSidebar) sollte auch hierher, wenn es von DashboardPage kommt
+  // oder direkt in DashboardPage an eine dort gerenderte GroupSidebar (falls Mobile-Sidebar dort ist)
+  // Für die Desktop-Sidebar hier, wird die onDeleteGroup Funktion aus DashboardPage benötigt
+  onDeleteGroupFromPage: (groupId: number) => Promise<void>; // Beispiel für eine Umbenennung zur Klarheit
 }
 
 export function DashboardLayout({
@@ -32,13 +38,21 @@ export function DashboardLayout({
   selectedGroupHighscore,
   selectedGroupMembers,
   isGroupDataLoading,
-  loadingInitial,
+  loadingInitial, // Wird jetzt als Prop empfangen
   errors,
   isDesktopSidebarCollapsed,
   onToggleCollapse,
   onSelectGroup,
+  currentUserId, // <--- NEUE PROP VERWENDEN
+  onDeleteGroupFromPage, // Beispielhafter Name
 }: DashboardLayoutProps) {
-  const hasGroups = myGroups.length > 0;
+  const hasGroups = myGroups && myGroups.length > 0;
+
+  // DEBUG LOG in DashboardLayout
+  console.log(
+    '[DashboardLayout] Props empfangen - currentUserId:',
+    currentUserId
+  );
 
   return (
     <div
@@ -58,14 +72,12 @@ export function DashboardLayout({
               groups={myGroups}
               selectedGroupId={selectedGroupId}
               onSelectGroup={onSelectGroup}
-              isLoading={loadingInitial && !hasGroups}
+              isLoading={loadingInitial && myGroups.length === 0} // Angepasste Logik für isLoading
               error={errors.groups ?? null}
               isCollapsed={isDesktopSidebarCollapsed}
               onToggleCollapse={onToggleCollapse}
-              currentUserId={undefined}
-              onDeleteGroup={function (groupId: number): Promise<void> {
-                throw new Error('Function not implemented.');
-              }}
+              currentUserId={currentUserId} // <--- KORRIGIERT: Prop verwenden
+              onDeleteGroup={onDeleteGroupFromPage} // <--- onDeleteGroup Prop weitergeben
             />
           </aside>
         )}
@@ -76,33 +88,38 @@ export function DashboardLayout({
             'col-span-12',
             hasGroups &&
               (isDesktopSidebarCollapsed ? 'lg:col-span-8' : 'lg:col-span-6'),
-            !hasGroups && 'lg:col-span-9 lg:col-start-2'
+            !hasGroups && 'lg:col-span-9 lg:col-start-2' // Wenn keine Gruppen, dann breiter und zentrierter
           )}
         >
           {children}
         </section>
 
         {/* Right column - Highscore */}
-        {hasGroups && (
+        {hasGroups &&
+          selectedGroupId && ( // Zeige Highscore nur wenn eine Gruppe ausgewählt ist
+            <aside className={cn('col-span-12', 'lg:col-span-3')}>
+              {!errors.groupData ? (
+                <HighscoreCard
+                  highscore={selectedGroupHighscore}
+                  members={selectedGroupMembers}
+                  isLoading={isGroupDataLoading}
+                  error={null}
+                  currentUserId={currentUserId} // <--- currentUserId auch hier übergeben
+                />
+              ) : (
+                <Card className='flex items-center justify-center h-48 text-center shadow-sm border border-dashed'>
+                  <p className='text-sm text-muted-foreground p-4'>
+                    Gruppendaten konnten nicht geladen werden. <br />
+                    Rangliste nicht verfügbar.
+                  </p>
+                </Card>
+              )}
+            </aside>
+          )}
+        {/* Fallback, wenn keine Gruppe ausgewählt ist, aber Gruppen existieren */}
+        {hasGroups && !selectedGroupId && !loadingInitial && (
           <aside className={cn('col-span-12', 'lg:col-span-3')}>
-            {selectedGroupId && !errors.groupData ? (
-              <HighscoreCard
-                highscore={selectedGroupHighscore}
-                members={selectedGroupMembers} // Wird jetzt korrekt als UserOut[] weitergegeben
-                isLoading={isGroupDataLoading}
-                error={null} // oder errors.groupData, falls relevant
-                currentUserId={0} // Hier solltest du die echte currentUserId übergeben
-              />
-            ) : !selectedGroupId ? (
-              <HighscorePlaceholder />
-            ) : (
-              <Card className='flex items-center justify-center h-48 text-center shadow-sm border border-dashed'>
-                <p className='text-sm text-muted-foreground p-4'>
-                  Gruppendaten konnten nicht geladen werden. <br />
-                  Rangliste nicht verfügbar.
-                </p>
-              </Card>
-            )}
+            <HighscorePlaceholder />
           </aside>
         )}
       </div>

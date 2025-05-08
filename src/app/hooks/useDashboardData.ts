@@ -49,7 +49,7 @@ export interface UseDashboardDataReturn {
     userTips?: string;
     combinedEvents?: string;
   };
-  handleSelectGroup: (groupId: number) => void;
+  handleSelectGroup: (groupId: number | null) => void;
   refreshSelectedGroupData: (
     groupId: number,
     options?: LoadGroupDataOptions
@@ -390,7 +390,7 @@ export function useDashboardData(): UseDashboardDataReturn {
   }, [selectedGroupId, token, loadSelectedGroupData]); // `loadSelectedGroupData` ist jetzt stabiler.
 
   const handleSelectGroup = useCallback(
-    (groupId: number) => {
+    (groupId: number | null) => {
       if (groupId !== selectedGroupId) {
         setSelectedGroupId(groupId);
       }

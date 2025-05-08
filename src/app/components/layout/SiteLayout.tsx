@@ -1,23 +1,23 @@
-// src/components/layout/SiteLayout.tsx
-'use client'; // <--- SEHR WICHTIG: Markiert diese Komponente als Client-Komponente
+// src/app/components/layout/SiteLayout.tsx
+'use client';
 
-import React from 'react'; // Import React (gute Praxis)
-import { useAuth } from '@/app/context/AuthContext'; // Importiere den Hook
-import { AppHeader } from '@/app/components/layout/AppHeader'; // Importiere Header
-import { Footer } from '@/app/components/layout/Footer'; // Importiere Footer
+import React from 'react';
+import { useAuth } from '@/app/context/AuthContext';
+// AppHeader Import ist hier, wird aber in der Funktion nicht global verwendet.
+// Er wird spezifisch in der DashboardPage importiert und genutzt.
+// import { AppHeader } from '@/app/components/layout/AppHeader';
+import { Footer } from '@/app/components/layout/Footer';
 
-// Die Funktion, die den Hauptteil des Layouts rendert und useAuth verwendet
 export function SiteLayout({ children }: { children: React.ReactNode }) {
-  // Hole User und Logout-Funktion aus dem Context (funktioniert, da wir 'use client' sind)
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth(); // Wird hier geholt, aber nicht direkt verwendet (z.B. für einen globalen Header)
 
   return (
     <>
-      {/* Das <main>-Tag umschließt den eigentlichen Seiteninhalt (children) */}
-      {/* flex-grow sorgt dafür, dass dieser Bereich den verfügbaren Platz ausfüllt */}
+      {/* Wenn du einen globalen Header für alle Seiten (außer vielleicht Landingpage) wolltest,
+        könntest du ihn hier einfügen und konditional rendern, z.B. basierend auf der Route oder user Status.
+        <AppHeader user={user} onLogout={logout} ... />
+      */}
       <main className='flex-grow'>{children}</main>
-
-      {/* Rendere den Footer */}
       <Footer />
     </>
   );

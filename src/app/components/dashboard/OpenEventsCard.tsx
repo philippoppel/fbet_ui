@@ -1,11 +1,11 @@
-// src/components/dashboard/OpenEventsCard.tsx
+// src/app/components/dashboard/OpenEventsCard.tsx
 'use client';
 
 import { useState, useMemo } from 'react';
 import type { Event as GroupEvent, UserOut } from '@/app/lib/types';
 import { Button } from '@/app/components/ui/button';
 import {
-  Card,
+  Card, // Card wird weiter als Struktur verwendet, aber mit angepassten Styles
   CardContent,
   CardHeader,
   CardTitle,
@@ -43,9 +43,9 @@ import {
 type OpenEventsCardProps = {
   events: GroupEvent[];
   user: UserOut;
-  groupCreatedBy: number;
-  selectedTips: Record<number, string>; // Lokale UI-Auswahl
-  userSubmittedTips: Record<number, string>; // Gespeicherte Tipps
+  groupCreatedBy: number; // Wird verwendet, um isAdmin zu bestimmen
+  selectedTips: Record<number, string>;
+  userSubmittedTips: Record<number, string>;
   resultInputs: Record<number, string>;
   isSubmittingTip: Record<number, boolean>;
   isSettingResult: Record<number, boolean>;
@@ -73,49 +73,66 @@ export function OpenEventsCard({
 }: OpenEventsCardProps) {
   const isAdmin = user.id === groupCreatedBy;
 
-  // Filtere offene Events
   const openEvents = useMemo(
     () =>
       Array.isArray(events)
-        ? events.filter(
-            (event): event is GroupEvent =>
-              !!event &&
-              typeof event.id === 'number' &&
-              (event.winningOption === null ||
-                event.winningOption === undefined)
-          )
+        ? events
+            .filter(
+              (event): event is GroupEvent =>
+                !!event &&
+                typeof event.id === 'number' &&
+                (event.winningOption === null ||
+                  event.winningOption === undefined)
+            )
+            .sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime()
+            ) // Neueste zuerst anzeigen
         : [],
-    [events] // Abhängigkeit von events
+    [events]
   );
 
-  const [isOpen, setIsOpen] = useState(true); // State für Collapsible
+  const [isOpen, setIsOpen] = useState(true);
   const [adminSelectedOption, setAdminSelectedOption] = useState<
     Record<number, string>
-  >({}); // State für Admin-Dialog
+  >({});
 
   const handleAdminOptionSelect = (eventId: number, option: string) => {
     setAdminSelectedOption((prev) => ({ ...prev, [eventId]: option }));
-    onResultInputChange(eventId, option); // Rufe auch den Handler vom Hook auf
+    onResultInputChange(eventId, option);
   };
 
   return (
     <TooltipProvider>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <Card className='shadow-sm border'>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pr-4 py-3'>
-            <CardTitle className='flex items-center gap-2 text-lg font-semibold'>
+        {/* Angepasste Haupt-Card */}
+        <Card
+          className={cn(
+            'shadow-md overflow-hidden',
+            'bg-background/60 dark:bg-slate-900/50 backdrop-blur-lg supports-[backdrop-filter]:bg-background/70', // Semi-transparent mit Blur
+            'border border-white/10 dark:border-white/5 rounded-lg' // Angepasster Rand
+          )}
+        >
+          <CardHeader className='flex flex-row items-center justify-between space-y-0 pr-4 py-3 border-b border-white/10 dark:border-white/5'>
+            <CardTitle className='flex items-center gap-2 text-lg font-semibold text-foreground'>
               <ListChecks className='w-5 h-5 text-primary' />
               Offene Wetten
             </CardTitle>
             <CollapsibleTrigger asChild>
-              <Button variant='ghost' size='sm' className='w-9 p-0'>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='w-9 p-0 text-muted-foreground hover:text-foreground'
+              >
                 <ChevronsUpDown className='h-4 w-4' />
                 <span className='sr-only'>Toggle</span>
               </Button>
             </CollapsibleTrigger>
           </CardHeader>
           <CollapsibleContent>
-            <CardContent className='pt-2 pb-4 px-4'>
+            {/* Padding für den Inhalt */}
+            <CardContent className='pt-2 pb-4 px-3 md:px-4'>
               {openEvents.length === 0 ? (
                 <div className='text-center py-10 text-muted-foreground text-sm'>
                   <ListChecks className='mx-auto h-10 w-10 opacity-50 mb-3' />
@@ -127,14 +144,14 @@ export function OpenEventsCard({
                   )}
                 </div>
               ) : (
-                <ul className='space-y-5'>
-                  {openEvents.map((event) => {
-                    // Sicherheitscheck für Event-Struktur
+                <ul className='space-y-0'>
+                  {' '}
+                  {/* Kein space-y mehr, Trennung durch border */}
+                  {openEvents.map((event, index) => {
                     if (
                       !event ||
                       typeof event.id !== 'number' ||
-                      !Array.isArray(event.options) ||
-                      !event.options.every((opt) => typeof opt === 'string')
+                      !Array.isArray(event.options)
                     ) {
                       console.warn(
                         'OpenEventsCard: Überspringe ungültiges Event:',
@@ -146,11 +163,9 @@ export function OpenEventsCard({
                     const tipIsBeingSubmitted =
                       isSubmittingTip[event.id] ?? false;
                     const resultIsBeingSet = isSettingResult[event.id] ?? false;
+                    const currentUISelection = selectedTips[event.id];
+                    const persistedTip = userSubmittedTips[event.id];
 
-                    const currentUISelection = selectedTips[event.id]; // Aktuelle UI-Auswahl
-                    const persistedTip = userSubmittedTips[event.id]; // Gespeicherter Tipp
-
-                    // Button-Logik
                     let tipButtonText = 'Tipp abgeben';
                     if (
                       persistedTip &&
@@ -159,25 +174,31 @@ export function OpenEventsCard({
                     ) {
                       tipButtonText = 'Tipp ändern';
                     } else if (persistedTip && !currentUISelection) {
-                      tipButtonText = 'Tipp ändern'; // Ermöglicht erneute Auswahl
+                      tipButtonText = 'Tipp ändern';
                     }
                     if (tipIsBeingSubmitted) {
                       tipButtonText = 'Sende...';
                     }
 
                     const isSubmitButtonDisabled =
-                      tipIsBeingSubmitted || // Deaktiviert während Senden
-                      !currentUISelection || // Deaktiviert, wenn nichts im UI ausgewählt
-                      currentUISelection === persistedTip; // Deaktiviert, wenn Auswahl = gespeicherter Tipp
+                      tipIsBeingSubmitted ||
+                      !currentUISelection ||
+                      currentUISelection === persistedTip;
 
                     return (
                       <li
                         key={event.id}
-                        className='rounded-lg border bg-card p-4 space-y-4 shadow-sm'
+                        // Design-Anpassung: Keine separate Karte mehr, nur Trennlinie
+                        className={cn(
+                          'py-5 space-y-4',
+                          index < openEvents.length - 1
+                            ? 'border-b border-white/10 dark:border-white/5'
+                            : '' // Trennlinie außer beim letzten Element
+                        )}
                       >
                         {/* Event Details */}
                         <div>
-                          <h3 className='font-semibold text-base'>
+                          <h3 className='font-semibold text-base text-foreground'>
                             {event.title ?? 'Unbenanntes Event'}
                           </h3>
                           {event.description && (
@@ -190,9 +211,8 @@ export function OpenEventsCard({
                           </p>
                         </div>
 
-                        {/* Tipp-Bereich */}
-                        <div className='bg-muted/50 rounded-md p-3 space-y-3'>
-                          {/* Optionen-Buttons */}
+                        {/* Tipp-Bereich - ggf. Hintergrund leicht anpassen */}
+                        <div className='bg-white/5 dark:bg-black/10 rounded-md p-3 space-y-3'>
                           <div className='flex flex-wrap items-center gap-2 sm:gap-3'>
                             <span className='text-sm font-medium text-muted-foreground mr-2'>
                               {persistedTip
@@ -212,17 +232,17 @@ export function OpenEventsCard({
                                     size='sm'
                                     variant={
                                       isSelectedInUI
-                                        ? 'default'
+                                        ? 'default' // Ausgewählt im UI -> Primary
                                         : showAsPersisted
-                                          ? 'secondary'
-                                          : 'outline'
+                                          ? 'secondary' // Gespeichert -> Secondary
+                                          : 'outline' // Noch nicht ausgewählt/gespeichert -> Outline
                                     }
                                     className={cn(
-                                      'transition-all text-xs sm:text-sm',
+                                      'transition-all text-xs sm:text-sm border-border/50', // Outline-Border ggf. subtiler
                                       isSelectedInUI &&
-                                        'ring-2 ring-primary ring-offset-background ring-offset-1',
+                                        'ring-2 ring-primary/70 ring-offset-background ring-offset-1',
                                       showAsPersisted &&
-                                        'border-dashed border-primary/70 opacity-90 font-semibold'
+                                        'border-dashed border-primary/50 opacity-90 font-semibold'
                                     )}
                                     onClick={() =>
                                       onSelectTip(event.id, option)
@@ -239,49 +259,45 @@ export function OpenEventsCard({
                           {/* Status und Aktions-Buttons */}
                           <div className='flex justify-between items-center pt-1 min-h-[2.25rem]'>
                             <div className='flex-1'>
-                              {/* Anzeige des gespeicherten Tipps */}
                               {persistedTip &&
                                 !currentUISelection &&
                                 !tipIsBeingSubmitted && (
-                                  <div className='flex items-center gap-1 text-sm text-green-600 font-medium'>
+                                  <div className='flex items-center gap-1 text-sm text-green-500 dark:text-green-400 font-medium'>
                                     <CheckCircle className='w-4 h-4' />
                                     Getippt: {persistedTip}
                                   </div>
                                 )}
                             </div>
                             <div className='flex items-center gap-2'>
-                              {/* Button "Auswahl verwerfen" */}
                               {currentUISelection &&
                                 persistedTip &&
                                 currentUISelection !== persistedTip && (
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <Button
-                                        size='sm'
+                                        size='icon' // Nur Icon Button für mehr Platz
                                         variant='ghost'
-                                        className='text-muted-foreground hover:text-destructive px-2'
+                                        className='text-muted-foreground hover:text-destructive h-8 w-8'
                                         onClick={() =>
                                           onClearSelectedTip(event.id)
                                         }
                                         disabled={tipIsBeingSubmitted}
-                                        title='Auswahl verwerfen'
+                                        aria-label='Auswahl verwerfen'
                                       >
                                         <RotateCcw className='h-3.5 w-3.5' />
                                       </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>
+                                    <TooltipContent className='bg-popover text-popover-foreground border-border'>
                                       <p>Auswahl verwerfen</p>
                                     </TooltipContent>
                                   </Tooltip>
                                 )}
-                              {/* Button "Tipp abgeben/ändern" */}
-                              {/* Zeige den Button immer an, wenn Optionen da sind, Logik für disabled regelt den Rest */}
                               <Button
                                 size='sm'
-                                variant='default'
+                                variant='default' // Hauptaktion immer 'default'
                                 onClick={() => onSubmitTip(event.id)}
                                 disabled={isSubmitButtonDisabled}
-                                className='hover:bg-primary/90'
+                                className='bg-primary hover:bg-primary/90 text-primary-foreground' // Sicherstellen, dass Styling passt
                               >
                                 {tipIsBeingSubmitted && (
                                   <Loader2 className='h-4 w-4 animate-spin mr-2' />
@@ -294,14 +310,14 @@ export function OpenEventsCard({
 
                         {/* Admin Bereich */}
                         {isAdmin && (
-                          <div className='pt-3 border-t border-border/50 mt-4'>
+                          <div className='pt-3 border-t border-white/10 dark:border-white/5 mt-4'>
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button
-                                  variant='outline'
+                                  variant='outline' // Outline oder Ghost für weniger Dominanz
                                   size='sm'
                                   disabled={resultIsBeingSet}
-                                  className='gap-1.5 text-muted-foreground hover:text-foreground hover:border-foreground/50'
+                                  className='gap-1.5 text-muted-foreground hover:text-foreground border-border/50 hover:border-foreground/30' // Subtilerer Rand
                                 >
                                   <Edit className='w-3.5 h-3.5' />
                                   {resultIsBeingSet
@@ -309,9 +325,10 @@ export function OpenEventsCard({
                                     : 'Ergebnis eintragen'}
                                 </Button>
                               </DialogTrigger>
-                              <DialogContent className='sm:max-w-[425px]'>
+                              {/* Dialog-Inhalt bleibt funktional gleich, aber mit angepasstem Styling */}
+                              <DialogContent className='sm:max-w-[425px] bg-background border-border'>
                                 <ShadDialogHeader>
-                                  <ShadDialogTitle>
+                                  <ShadDialogTitle className='text-foreground'>
                                     Ergebnis für: {event.title}
                                   </ShadDialogTitle>
                                 </ShadDialogHeader>
@@ -331,7 +348,7 @@ export function OpenEventsCard({
                                               : 'outline'
                                           }
                                           size='sm'
-                                          className='w-full justify-start'
+                                          className='w-full justify-start border-border/50' // Subtilerer Rand
                                           onClick={() =>
                                             handleAdminOptionSelect(
                                               event.id,
@@ -347,7 +364,8 @@ export function OpenEventsCard({
                                   <DialogFooter className='pt-4'>
                                     <DialogClose asChild>
                                       <Button type='button' variant='ghost'>
-                                        Abbrechen
+                                        {' '}
+                                        Abbrechen{' '}
                                       </Button>
                                     </DialogClose>
                                     <Button
@@ -362,11 +380,13 @@ export function OpenEventsCard({
                                         !adminSelectedOption[event.id] ||
                                         resultIsBeingSet
                                       }
+                                      variant='default' // Primäre Aktion
                                     >
                                       {resultIsBeingSet ? (
                                         <>
+                                          {' '}
                                           <Loader2 className='h-4 w-4 animate-spin mr-2' />{' '}
-                                          Speichere...
+                                          Speichere...{' '}
                                         </>
                                       ) : (
                                         'Ergebnis speichern'

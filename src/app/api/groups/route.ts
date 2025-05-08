@@ -42,11 +42,8 @@ export async function POST(req: NextRequest) {
         id: newGroup.id,
         name: newGroup.name,
         description: newGroup.description,
-        created_by_id: newGroup.createdById, // Konsistent mit Prisma-Modell (createdById)
-        inviteToken: newGroup.inviteToken, // Konsistent mit Prisma-Modell (inviteToken)
-        // Wenn dein Client 'created_by' und 'invite_token' erwartet, musst du hier mappen:
-        // created_by: newGroup.createdById,
-        // invite_token: newGroup.inviteToken,
+        createdById: newGroup.createdById, // KORRIGIERT!
+        inviteToken: newGroup.inviteToken,
       },
       { status: 201 }
     );
@@ -85,11 +82,8 @@ export async function GET(req: NextRequest) {
       id: group.id,
       name: group.name,
       description: group.description,
-      created_by_id: group.createdById, // von Prisma
-      inviteToken: group.inviteToken, // von Prisma
-      // Wenn dein Client 'created_by' und 'invite_token' (snake_case) erwartet, dann hier anpassen:
-      // created_by: group.createdById,
-      // invite_token: group.inviteToken,
+      createdById: group.createdById, // KORRIGIERT!
+      inviteToken: group.inviteToken,
     }));
 
     return NextResponse.json(formattedGroups, { status: 200 });
