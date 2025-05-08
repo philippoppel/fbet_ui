@@ -135,6 +135,9 @@ export function GroupDetailsSection({
         addEventForm={interactions.addEventForm}
         onAddEventSubmit={interactions.handleAddEventSubmit}
         onClearSelectedTip={interactions.handleClearSelectedTip} // <<--- Weitergereicht
+        onDeleteGroup={function (group: Group): void {
+          throw new Error('Function not implemented.');
+        }}
       />
     );
   }
