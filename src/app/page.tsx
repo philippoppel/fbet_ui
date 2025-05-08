@@ -11,9 +11,65 @@ import type {
   MixedEvent,
 } from '@/app/lib/types';
 import { toast } from 'sonner';
-import { BarChartBig, LogIn, UserPlus } from 'lucide-react';
+import {
+  LogIn,
+  UserPlus,
+  Eye,
+  Users,
+  PartyPopper,
+  Smartphone,
+  Download,
+  ArrowRight,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react';
 import { EventListPublic } from '@/app/components/dashboard/EventListPublic';
-import { Button } from '@/app/components/ui/button'; // Icons für Header/Buttons
+import { Button } from '@/app/components/ui/button';
+
+// Kleine Hilfskomponente für den PWA Prompt auf Mobile
+const PWAPromptMobile: React.FC<{ onInstall: () => void }> = ({
+  onInstall,
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () =>
+      typeof window !== 'undefined' && window.innerWidth < 768;
+    setIsMobile(checkMobile());
+
+    if (
+      checkMobile() &&
+      typeof window !== 'undefined' &&
+      !window.matchMedia('(display-mode: standalone)').matches
+    ) {
+      const timer = setTimeout(() => setIsVisible(true), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  if (!isVisible || !isMobile) return null;
+
+  return (
+    <div className='md:hidden fixed bottom-4 left-4 right-4 z-50'>
+      <div className='bg-secondary text-secondary-foreground p-4 rounded-lg shadow-xl flex items-center justify-between'>
+        <div className='flex items-center'>
+          <Smartphone className='w-6 h-6 mr-3' />
+          <div>
+            <h4 className='font-semibold'>App installieren?</h4>
+            <p className='text-sm'>
+              Für schnellen Zugriff zum Startbildschirm hinzufügen.
+            </p>
+          </div>
+        </div>
+        <Button variant='ghost' size='sm' onClick={onInstall}>
+          Installieren
+          <Download className='ml-2 w-4 h-4' />
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 export default function LandingPage() {
   const router = useRouter();
@@ -21,10 +77,9 @@ export default function LandingPage() {
   const [boxingEvents, setBoxingEvents] = useState<BoxingScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
 
-  // --- Daten laden ---
   useEffect(() => {
-    // ... (Datenlade-Logik wie im vorherigen Vorschlag) ...
     const loadPublicEvents = async () => {
       setLoading(true);
       setError(null);
@@ -37,10 +92,16 @@ export default function LandingPage() {
         setBoxingEvents(boxing);
       } catch (err: any) {
         console.error('Fehler beim Laden der öffentlichen Events:', err);
-        setError('Fehler beim Laden der Event-Daten.');
+        let errorMessage = 'Fehler beim Laden der Event-Daten.';
         if (err instanceof ApiError) {
-          setError(`Fehler (${err.status}): ${err.detail || err.message}`);
+          errorMessage = `API Fehler (${err.status}): ${err.detail || err.message}`;
+        } else if (err.message) {
+          errorMessage = err.message;
         }
+        setError(errorMessage);
+        toast.error('Ladefehler', {
+          description: errorMessage,
+        });
       } finally {
         setLoading(false);
       }
@@ -48,177 +109,308 @@ export default function LandingPage() {
     loadPublicEvents();
   }, []);
 
-  // --- Hilfsfunktionen & Memoization (parseDate, combinedEvents) ---
-  // ... (Code wie im vorherigen Vorschlag) ...
   const parseDate = (dateStr: string): Date => {
     const now = new Date();
-    const hasYear = /\d{4}/.test(dateStr);
-    const fixedDate = hasYear ? dateStr : `${dateStr} ${now.getFullYear()}`;
-    const parsed = new Date(fixedDate);
+    const hasYear = /\b\d{4}\b/.test(dateStr);
+    let fullDateStr = dateStr;
+    if (!hasYear) {
+      fullDateStr = `${dateStr} ${now.getFullYear()}`;
+    }
+    const parsed = new Date(fullDateStr);
     return isNaN(parsed.getTime()) ? new Date(0) : parsed;
   };
 
   const combinedEvents: MixedEvent[] = useMemo(() => {
-    return [
-      ...ufcEvents.map((e, i) => ({
-        /* ... Mapping ... */ id: e.uid || `ufc-${i}`,
-        title: e.summary || 'Unbekannter UFC Kampf',
-        subtitle:
-          (e.dtstart
-            ? new Date(e.dtstart).toLocaleString('de-DE', {
-                dateStyle: 'short',
-                timeStyle: 'short',
-              })
-            : 'Datum unbekannt') +
-          ' – ' +
-          (e.location || 'Ort unbekannt'),
-        sport: 'ufc' as const,
-        date: e.dtstart ? parseDate(e.dtstart) : new Date(0),
-        original: e,
-      })),
-      ...boxingEvents.map((e, i) => {
-        /* ... Mapping ... */
-        const parsedDate = parseDate(e.date || '');
+    return [...ufcEvents, ...boxingEvents]
+      .map((e, i) => {
+        const isBoxing = 'details' in e;
+        const dateInput = isBoxing ? e.date || '' : e.dtstart || '';
+        const date = parseDate(dateInput);
+
+        if (date.getTime() === new Date(0).getTime() && dateInput) {
+          console.warn(`Ungültiges Datum geparst für Event: ${dateInput}`, e);
+        }
+
         return {
-          id: e.details || `boxing-${i}`,
-          title: e.details || 'Unbekannter Boxkampf',
-          subtitle:
-            parsedDate.toLocaleDateString('de-DE', { dateStyle: 'short' }) +
-            ' – ' +
-            (e.location || 'Ort unbekannt') +
-            (e.broadcaster ? ` (${e.broadcaster})` : ''),
-          sport: 'boxing' as const,
-          date: parsedDate,
+          id: isBoxing ? e.details || `boxing-${i}` : e.uid || `ufc-${i}`,
+          title: isBoxing
+            ? e.details || 'Unbekannter Boxkampf'
+            : e.summary || 'Unbekannter UFC Kampf',
+          subtitle: `${date.getTime() === new Date(0).getTime() ? 'Datum unbekannt' : date.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })} – ${e.location || 'Ort unbekannt'}${isBoxing && e.broadcaster ? ` (${e.broadcaster})` : ''}`,
+          sport: isBoxing ? ('boxing' as const) : ('ufc' as const),
+          date,
           original: e,
         };
-      }),
-    ].sort((a, b) => a.date.getTime() - b.date.getTime());
+      })
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [ufcEvents, boxingEvents]);
 
-  // --- Handler für Gäste-Klick auf "Wette hinzufügen" ---
   const handleProposeEventGuest = (
-    event: UfcEventItem | BoxingScheduleItem // Der Typ ist eine Union
+    event: UfcEventItem | BoxingScheduleItem
   ) => {
-    // Sicher den passenden Titel ermitteln
-    let eventTitle = 'dieses Event'; // Fallback-Titel
+    const title =
+      'details' in event && event.details?.trim()
+        ? event.details
+        : 'summary' in event && event.summary?.trim()
+          ? event.summary
+          : 'dieses Event';
 
-    // Type Guard: Prüfen, ob 'details' im Objekt existiert UND ein sinnvoller String ist
-    if (
-      'details' in event &&
-      typeof event.details === 'string' &&
-      event.details.trim()
-    ) {
-      // Wenn ja, wissen wir hier: event ist (wahrscheinlich) ein BoxingScheduleItem
-      eventTitle = event.details;
-    }
-    // Type Guard: Ansonsten prüfen, ob 'summary' existiert UND ein sinnvoller String ist
-    else if (
-      'summary' in event &&
-      typeof event.summary === 'string' &&
-      event.summary.trim()
-    ) {
-      // Wenn ja, wissen wir hier: event ist (wahrscheinlich) ein UfcEventItem (oder Boxing ohne Details)
-      eventTitle = event.summary;
-    }
-    // Optional: Hier könntest du noch weitere Fallbacks einbauen
-
-    // Jetzt den sicher ermittelten eventTitle verwenden
     toast.info('Login erforderlich', {
-      description: `Melde dich an, um "${eventTitle}" für eine Wette vorzuschlagen.`, // Verwende die Variable
+      description: `Melde dich an oder registriere dich, um "${title}" für eine Wette vorzuschlagen.`,
       action: {
-        label: 'Login / Register',
-        onClick: () => router.push('/login'), // Leitet zur Login-Seite weiter
+        label: 'Login / Registrieren',
+        onClick: () => router.push('/login'),
       },
-      duration: 5000,
+      duration: 6000,
     });
   };
 
+  const showInstallPrompt = () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          toast.success('App installiert!', {
+            description: 'Du findest uns jetzt auf deinem Startbildschirm.',
+          });
+        } else {
+          toast.info('Installation abgebrochen.', {
+            description:
+              'Du kannst die App später über das Browser-Menü hinzufügen.',
+          });
+        }
+        setDeferredInstallPrompt(null);
+      });
+    } else {
+      toast.info('App bereits installiert oder Browser nicht unterstützt.', {
+        description:
+          'Suche im Browser-Menü nach "Zum Startbildschirm hinzufügen".',
+      });
+    }
+  };
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+      console.log(
+        "'beforeinstallprompt' wurde ausgelöst. App ist installierbar."
+      );
+      if (!sessionStorage.getItem('pwaInstallToastShown')) {
+        toast('📲 App installieren?', {
+          description:
+            'Für das beste Erlebnis, füge uns zu deinem Startbildschirm hinzu!',
+          duration: 10000,
+          // 'important: true,' wurde entfernt, da es nicht Teil von ExternalToast ist
+          action: {
+            label: 'Installieren',
+            onClick: () => showInstallPrompt(),
+          },
+          onDismiss: () =>
+            sessionStorage.setItem('pwaInstallToastShown', 'true'),
+          onAutoClose: () =>
+            sessionStorage.setItem('pwaInstallToastShown', 'true'),
+        });
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      sessionStorage.removeItem('pwaInstallToastShown');
+    };
+  }, [deferredInstallPrompt]);
+
   return (
-    <div className='flex flex-col min-h-screen bg-background'>
-      {/* Hauptinhalt */}
-      <main className='flex-1 container mx-auto px-4 md:px-8 py-6'>
-        {/* Hero Sektion */}
-        <section className='text-center py-12 md:py-20'>
-          <h1 className='text-4xl font-bold tracking-tight mb-4 text-foreground sm:text-5xl md:text-6xl'>
-            Einfach mit Freunden wetten.
+    <div className='flex flex-col min-h-dvh bg-gradient-to-b from-background to-slate-50'>
+      <main className='flex-1 container mx-auto px-4 md:px-6 py-8 md:py-12'>
+        {/* Hero Section */}
+        <section className='text-center pt-12 pb-16 md:pt-20 md:pb-24'>
+          <h1 className='text-5xl md:text-7xl font-extrabold tracking-tighter mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 animate-gradient-x'>
+            Wetten unter Freunden – auf alles, was Spaß macht.
           </h1>
-          <p className='max-w-2xl mx-auto mb-8 text-lg text-muted-foreground'>
-            Verfolge UFC & Box-Events und starte deine eigene Tipprunde.{' '}
-            <br className='hidden sm:block' />
-            Ganz ohne externe Anbieter – nur Spaß mit deinen Freunden.
+          <p className='max-w-xl md:max-w-3xl mx-auto mb-10 text-lg md:text-xl text-muted-foreground'>
+            Ob Sport, Serien, absurde Alltagswetten oder der nächste Krypto-Kurs
+            – starte deine Tipprunde, fordere deine Freunde heraus und fiebert
+            gemeinsam mit.
+            <br />
+            <span className='font-semibold text-primary'>
+              100% kostenlos, werbefrei, nur der pure Spaß am Tippen.
+            </span>
           </p>
-          {/* ... (Buttons wie vorher) ... */}
-          <div className='flex justify-center gap-4'>
-            <Link href='/register' passHref>
-              <Button size='lg'>Jetzt Tipprunde starten</Button>
-            </Link>
-            <Link href='/login' passHref>
-              <Button size='lg' variant='outline'>
-                Einloggen
-              </Button>
-            </Link>
+          <div className='flex flex-col sm:flex-row justify-center items-center gap-4'>
+            <Button
+              size='lg' // Geändert von 'xl' zu 'lg'
+              onClick={() => router.push('/register')}
+              className='shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:scale-105'
+            >
+              <UserPlus className='mr-2 h-5 w-5' /> Eigene Gruppe starten
+            </Button>
+            <Button
+              size='lg' // Geändert von 'xl' zu 'lg'
+              variant='outline'
+              onClick={() => router.push('/login')}
+              className='shadow-sm hover:shadow-md transition-shadow duration-300'
+            >
+              <LogIn className='mr-2 h-5 w-5' /> Einloggen & Mitwetten
+            </Button>
           </div>
+          <p className='mt-8 text-sm text-muted-foreground flex items-center justify-center gap-2'>
+            <Smartphone className='w-5 h-5 text-primary' />
+            Auch als App!{' '}
+            <a
+              href='#'
+              onClick={(e) => {
+                e.preventDefault();
+                showInstallPrompt();
+              }}
+              className='text-primary hover:underline font-semibold'
+            >
+              Jetzt installieren
+            </a>{' '}
+            für schnellen Zugriff.
+          </p>
         </section>
-        {/* "Wie es funktioniert"-Sektion */}
-        <section className='text-center py-16'>
-          <h2 className='text-3xl font-bold tracking-tight mb-4'>
-            So einfach geht&#39;s:
+
+        {/* How it works Section */}
+        <section className='py-16 md:py-24 bg-slate-100/70 dark:bg-slate-800/30 rounded-xl shadow-sm'>
+          <h2 className='text-4xl font-bold mb-14 text-center text-primary/90'>
+            So einfach geht der Wett-Spaß
           </h2>
-          <div className='grid md:grid-cols-3 gap-8 max-w-4xl mx-auto text-muted-foreground'>
-            <div>
-              <h3 className='font-semibold text-lg text-foreground mb-2'>
-                1. Events sehen
+          <div className='grid md:grid-cols-3 gap-10 max-w-5xl mx-auto px-4'>
+            <div className='flex flex-col items-center text-center p-6 bg-background rounded-lg shadow-md hover:shadow-lg transition-shadow'>
+              <div className='p-4 bg-primary/10 rounded-full mb-4'>
+                <Eye className='w-10 h-10 text-primary' />
+              </div>
+              <h3 className='font-semibold text-xl text-foreground mb-2'>
+                1. Events entdecken
               </h3>
-              <p>Sieh dir kommende UFC- und Box-Kämpfe direkt hier an.</p>
-            </div>
-            <div>
-              <h3 className='font-semibold text-lg text-foreground mb-2'>
-                2. Freunde einladen
-              </h3>
-              <p>
-                Erstelle (oder trete bei) eine private Gruppe nur für deine
-                Freunde. <span className='text-xs'>(Login nötig)</span>
+              <p className='text-muted-foreground text-sm'>
+                Wählt gemeinsam ein Ereignis aus Sport, Serien, Politik oder
+                völligem Blödsinn. Hauptsache, es macht Laune!
               </p>
             </div>
-            <div>
-              <h3 className='font-semibold text-lg text-foreground mb-2'>
-                3. Spaß haben
+            <div className='flex flex-col items-center text-center p-6 bg-background rounded-lg shadow-md hover:shadow-lg transition-shadow'>
+              <div className='p-4 bg-primary/10 rounded-full mb-4'>
+                <Users className='w-10 h-10 text-primary' />
+              </div>
+              <h3 className='font-semibold text-xl text-foreground mb-2'>
+                2. Freunde einladen
               </h3>
-              <p>
-                Schlagt Kämpfe vor, tippt gemeinsam und seht, wer der Experte
-                ist. <span className='text-xs'>(Login nötig)</span>
+              <p className='text-muted-foreground text-sm'>
+                Erstellt private Gruppen, ladet eure Crew ein und stimmt ab, auf
+                welche Details ihr wetten wollt.
+              </p>
+            </div>
+            <div className='flex flex-col items-center text-center p-6 bg-background rounded-lg shadow-md hover:shadow-lg transition-shadow'>
+              <div className='p-4 bg-primary/10 rounded-full mb-4'>
+                <PartyPopper className='w-10 h-10 text-primary' />
+              </div>
+              <h3 className='font-semibold text-xl text-foreground mb-2'>
+                3. Gemeinsam mitfiebern
+              </h3>
+              <p className='text-muted-foreground text-sm'>
+                Gebt eure Tipps ab, fiebert mit, stichelt untereinander – und
+                feiert am Ende den glorreichen Sieger (oder euch selbst!).
               </p>
             </div>
           </div>
         </section>
 
-        {/* Event Liste */}
-        <section className='mt-12'>
-          <h2 className='text-2xl font-semibold tracking-tight mb-6 text-center sm:text-left'>
-            Anstehende Kämpfe
+        {/* Public Events Section */}
+        <section className='mt-16 md:mt-24'>
+          <h2 className='text-3xl md:text-4xl font-semibold tracking-tight mb-8 text-center sm:text-left text-foreground/90'>
+            🔥 Aktuelle öffentliche Events
           </h2>
-          {/* ... (Loading/Error/Empty States wie vorher) ... */}
           {loading && (
-            <p className='text-center text-muted-foreground animate-pulse'>
-              Lade Events...
-            </p>
+            <div className='flex flex-col items-center justify-center min-h-[200px] text-muted-foreground'>
+              <Loader2 className='w-12 h-12 animate-spin text-primary mb-4' />
+              <p className='text-lg'>Lade die heißesten Events...</p>
+            </div>
           )}
-          {error && <p className='text-center text-destructive'>{error}</p>}
+          {error && (
+            <div className='flex flex-col items-center justify-center min-h-[200px] bg-destructive/10 text-destructive p-6 rounded-lg'>
+              <AlertTriangle className='w-12 h-12 mb-4' />
+              <h3 className='text-xl font-semibold mb-2'>
+                Oops! Etwas ist schiefgelaufen.
+              </h3>
+              <p className='text-center'>{error}</p>
+              <Button
+                variant='outline'
+                onClick={() => window.location.reload()}
+                className='mt-6'
+              >
+                Seite neu laden
+              </Button>
+            </div>
+          )}
           {!loading && !error && combinedEvents.length === 0 && (
-            <p className='text-center text-muted-foreground'>
-              Keine Events gefunden.
-            </p>
+            <div className='text-center text-muted-foreground py-10 min-h-[200px] flex flex-col justify-center items-center'>
+              <PartyPopper className='w-16 h-16 text-slate-400 mb-4' />
+              <p className='text-xl mb-2'>Aktuell keine öffentlichen Events.</p>
+              <p>Warum startest du nicht eine eigene Wettrunde mit Freunden?</p>
+              <Button
+                onClick={() => router.push('/register')}
+                className='mt-6'
+                size='lg'
+              >
+                <UserPlus className='mr-2' />
+                Gruppe erstellen
+              </Button>
+            </div>
           )}
           {!loading && !error && combinedEvents.length > 0 && (
-            <EventListPublic
-              events={combinedEvents.slice(0, 5)}
-              onProposeEvent={handleProposeEventGuest} // Der neue Handler wird übergeben
-            />
+            <>
+              <p className='text-center text-muted-foreground mb-8 md:mb-12 max-w-2xl mx-auto'>
+                Sieh dir an, was gerade angesagt ist! Klicke auf ein Event, um
+                mehr Details zu sehen oder es deiner Gruppe vorzuschlagen (Login
+                erforderlich).
+              </p>
+              <EventListPublic
+                events={combinedEvents.slice(0, 6)}
+                onProposeEvent={handleProposeEventGuest}
+              />
+              {combinedEvents.length > 6 && (
+                <div className='text-center mt-10'>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    onClick={() =>
+                      toast.info(
+                        'Mehr Events verfügbar nach Login/Registrierung.'
+                      )
+                    }
+                  >
+                    Zeige alle Events <ArrowRight className='ml-2 w-5 h-5' />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </section>
+
+        {/* Final CTA or Footer Teaser */}
+        <section className='text-center py-16 md:py-24 mt-12 md:mt-20 border-t border-border'>
+          <h2 className='text-3xl md:text-4xl font-bold mb-6 text-foreground'>
+            Bereit für den ultimativen Wett-Spaß?
+          </h2>
+          <p className='max-w-xl mx-auto mb-8 text-lg text-muted-foreground'>
+            Schluss mit langweiligen Standardwetten. Erstelle deine eigenen,
+            verrückten Tipps und zeig deinen Freunden, wer der wahre Experte
+            ist!
+          </p>
+          <Button
+            size='lg' // Geändert von 'xl' zu 'lg'
+            onClick={() => router.push('/register')}
+            className='shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:scale-105 animate-pulse'
+          >
+            <PartyPopper className='mr-2 h-6 w-6' />
+            Jetzt kostenlos Tippgruppe gründen!
+          </Button>
+        </section>
       </main>
-      {/* Stelle sicher, dass Toaster hier global geladen wird, z.B. in layout.tsx */}
-      {/* <Toaster richColors theme="dark" /> */}
+
+      <PWAPromptMobile onInstall={showInstallPrompt} />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   Users,
   PlusCircle,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import { Button } from '@/app/components/ui/button';
 import { UserOut, Group } from '@/app/lib/types';
@@ -81,6 +82,10 @@ export function AppHeader({
                     isLoading={false}
                     error={null}
                     isCollapsed={false}
+                    currentUserId={undefined}
+                    onDeleteGroup={function (groupId: number): Promise<void> {
+                      throw new Error('Function not implemented.');
+                    }}
                   />
                 </div>
                 <div className='p-4 border-t mt-auto bg-background'>
@@ -94,16 +99,14 @@ export function AppHeader({
             </Sheet>
           </div>
         )}
-
         {/* Logo */}
         <Link
           href={user ? '/dashboard' : '/public'}
-          className='flex items-center space-x-2 transition-opacity hover:opacity-80'
+          className='flex items-center space-x-2 hover:opacity-80 transition-opacity'
         >
-          <BarChartBig className='h-6 w-6 text-primary' />
-          <span className='font-bold'>fbet</span>
+          <img src='/icon0.svg' alt='Fbet Logo' className='h-8 w-auto' />
+          <span className='text-lg font-bold tracking-tight'>fbet</span>
         </Link>
-
         {/* Rechts im Header */}
         <div className='ml-auto flex items-center space-x-2 sm:space-x-3'>
           {user && displayName ? (

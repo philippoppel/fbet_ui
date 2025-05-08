@@ -1,22 +1,22 @@
 // src/app/api/groups/[groupId]/route.ts
-// DIESER CODE LÄDT JETZT GRUPPENDETAILS, NICHT EVENTS!
 import {
   AuthenticatedUser,
   getCurrentUserFromRequest,
-} from '@/app/api/lib/auth';
-import { isUserMemberOfGroup } from '@/app/api/services/groupService';
-import { prisma } from '@/app/api/lib/prisma';
+} from '@/app/api/lib/auth'; // Pfad ggf. anpassen
+import { isUserMemberOfGroup } from '@/app/api/services/groupService'; // Pfad ggf. anpassen
+import { prisma } from '@/app/api/lib/prisma'; // Pfad ggf. anpassen
 import { NextRequest, NextResponse } from 'next/server';
-// Passe den Pfad zu deinem Prisma-Client und deinen Auth-Helfern an
+// NEU: Korrekten Import für Prisma-Fehlertypen hinzufügen
+import { Prisma } from '@prisma/client'; // Stellt Prisma.PrismaClientKnownRequestError bereit
 
+// --- DEIN EXISTIERENDER GET HANDLER ---
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> }
+  { params }: { params: { groupId: string } }
 ) {
-  const { groupId: groupIdString } = await params;
+  const groupIdString = params.groupId;
   const groupId = parseInt(groupIdString, 10);
 
-  // 1. Validierung der groupId
   if (isNaN(groupId) || groupId <= 0) {
     return NextResponse.json(
       { error: 'Invalid group ID format' },
@@ -24,29 +24,25 @@ export async function GET(
     );
   }
 
-  // 2. Authentifizierung
   const currentUser: AuthenticatedUser | null =
     await getCurrentUserFromRequest(req);
   if (!currentUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 3. Autorisierung (Beispiel: User muss Mitglied sein oder Ersteller)
   try {
-    const isMember = await isUserMemberOfGroup(currentUser.id, groupId);
-    // Wichtig: Prüfen, ob die Gruppe überhaupt existiert, bevor man createdById prüft
     const groupForAuthCheck = await prisma.group.findUnique({
       where: { id: groupId },
-      select: { createdById: true },
+      select: { createdById: true, id: true },
     });
 
     if (!groupForAuthCheck) {
-      // Gruppe nicht gefunden, aber isUserMemberOfGroup würde auch false liefern.
-      // Ein expliziter Check hier ist gut, bevor man auf groupForAuthCheck.createdById zugreift.
-      // Der spätere findUnique wird das ohnehin als 404 behandeln.
+      return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    if (!isMember && groupForAuthCheck?.createdById !== currentUser.id) {
+    const isMember = await isUserMemberOfGroup(currentUser.id, groupId);
+
+    if (!isMember && groupForAuthCheck.createdById !== currentUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch (authError) {
@@ -60,26 +56,17 @@ export async function GET(
     );
   }
 
-  // 4. Gruppendetails aus der Datenbank abrufen
   try {
     const group = await prisma.group.findUnique({
       where: {
         id: groupId,
       },
-      // Kein explizites 'select' ist hier nötig, um alle Skalarfelder
-      // (id, name, description, inviteToken, createdById, createdAt, updatedAt)
-      // zu bekommen. Prisma holt sie standardmäßig.
-      // Falls du Relationen brauchst (z.B. members), müsstest du 'include' verwenden.
     });
 
     if (!group) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
-
-    // Stelle sicher, dass das zurückgegebene Objekt dem clientseitigen Typ 'Group' entspricht.
-    // Prisma gibt Felder in camelCase zurück (z.B. inviteToken, createdById).
-    // Dein Client-Typ Group = PrismaGroup sollte das direkt matchen.
-    return NextResponse.json(group); // Gibt das einzelne Gruppenobjekt zurück
+    return NextResponse.json(group);
   } catch (err) {
     console.error(
       `GET /api/groups/[groupId] failed for group ${groupId}:`,
@@ -87,6 +74,78 @@ export async function GET(
     );
     return NextResponse.json(
       { error: 'Server error while reading group details' },
+      { status: 500 }
+    );
+  }
+}
+
+// --- NEUER/KORRIGIERTER DELETE HANDLER ---
+async function getGroupForOwner(groupId: number, userId: number) {
+  return prisma.group.findUnique({
+    where: {
+      id: groupId,
+      createdById: userId,
+    },
+  });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { groupId: string } }
+) {
+  try {
+    const currentUser = await getCurrentUserFromRequest(req);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const groupId = parseInt(params.groupId, 10);
+    if (isNaN(groupId)) {
+      return NextResponse.json({ error: 'Invalid group ID' }, { status: 400 });
+    }
+
+    const group = await getGroupForOwner(groupId, currentUser.id);
+
+    if (!group) {
+      return NextResponse.json(
+        {
+          error: 'Group not found or user not authorized to delete this group',
+        },
+        { status: 404 }
+      );
+    }
+
+    await prisma.group.delete({
+      where: {
+        id: groupId,
+        createdById: currentUser.id,
+      },
+    });
+
+    return NextResponse.json(null, { status: 204 });
+  } catch (error: unknown) {
+    // Explizit 'unknown' für den error-Typ
+    console.error(`Error in DELETE /api/groups/${params.groupId}:`, error);
+
+    // Typüberprüfung für Prisma-spezifische Fehler
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // Jetzt weiß TypeScript, dass 'error' hier vom Typ PrismaClientKnownRequestError ist
+      // und Eigenschaften wie 'code' sicher zugegriffen werden können.
+      if (error.code === 'P2025') {
+        // Record to delete does not exist.
+        return NextResponse.json(
+          { error: 'Group to delete was not found (P2025).' },
+          { status: 404 }
+        );
+      }
+      // Hier könnten weitere spezifische Prisma-Fehlercodes behandelt werden
+    }
+    // Fallback für andere Fehler oder wenn es kein PrismaClientKnownRequestError ist
+    return NextResponse.json(
+      {
+        error: 'Could not delete group.',
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

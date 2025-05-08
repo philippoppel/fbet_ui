@@ -5,7 +5,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"    // Für NeonDB
+  provider = "postgresql" // Für NeonDB
   url      = env("DATABASE_URL")
 }
 
@@ -37,8 +37,8 @@ model Group {
   createdById Int  @map("created_by_id")
   creator     User @relation("GroupCreator", fields: [createdById], references: [id])
 
-  memberships GroupMembership[]
-  events      Event[]
+  memberships GroupMembership[] // Hier KEIN onDelete
+  events      Event[] // Hier KEIN onDelete
 
   @@map("groups")
 }
@@ -47,34 +47,34 @@ model GroupMembership {
   id       Int      @id @default(autoincrement())
   joinedAt DateTime @default(now()) @map("joined_at")
 
-  userId  Int  @map("user_id")
-  user    User @relation(fields: [userId], references: [id])
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id])
 
-  groupId Int  @map("group_id")
-  group   Group @relation(fields: [groupId], references: [id])
+  groupId Int   @map("group_id")
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade) // <-- HIER onDelete
 
   @@unique([userId, groupId], name: "uq_user_group")
   @@map("group_memberships")
 }
 
 model Event {
-  id             Int      @id @default(autoincrement())
-  title          String
-  description    String?
-  question       String
-  options        Json
-  winningOption  String?  @map("winning_option")
-  eventDateTime  DateTime? @map("event_datetime")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id            Int       @id @default(autoincrement())
+  title         String
+  description   String?
+  question      String
+  options       Json // Behalte Json bei, wenn Prisma und DB es unterstützen
+  winningOption String?   @map("winning_option")
+  eventDateTime DateTime? @map("event_datetime")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  groupId        Int    @map("group_id")
-  group          Group  @relation(fields: [groupId], references: [id])
+  groupId Int   @map("group_id")
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade) // <-- HIER onDelete
 
-  createdById    Int    @map("created_by_id")
-  creator        User   @relation("EventCreator", fields: [createdById], references: [id])
+  createdById Int  @map("created_by_id")
+  creator     User @relation("EventCreator", fields: [createdById], references: [id])
 
-  tips           Tip[]
+  tips Tip[]
 
   @@map("events")
 }
@@ -82,16 +82,15 @@ model Event {
 model Tip {
   id             Int      @id @default(autoincrement())
   selectedOption String   @map("selected_option")
-  points         Int?     // <--- HINZUGEFÜGTES FELD (z.B. als optionaler Integer)
-  // Alternativ: Int @default(0) wenn jeder Tipp standardmäßig 0 Punkte hat
+  points         Int?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   eventId Int   @map("event_id")
-  event   Event @relation(fields: [eventId], references: [id])
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade) // Falls Tipps beim Löschen von Events auch weg sollen
 
-  userId  Int   @map("user_id")
-  user    User  @relation(fields: [userId], references: [id])
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id])
 
   @@unique([eventId, userId], name: "unique_tip_per_user_per_event")
   @@map("tips")

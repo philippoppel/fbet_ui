@@ -137,4 +137,33 @@
   body {
     @apply bg-background text-foreground;
   }
+  * {
+    @apply border-border; /* outline-ring/50 kann bei Fokuselementen spezifischer gesetzt werden */
+  }
+  body {
+    @apply bg-background text-foreground antialiased; /* antialiased für bessere Schriftglättung */
+  }
+}
+
+@layer utilities {
+  @keyframes gradient-x {
+    0%, 100% {
+      background-size: 200% 200%;
+      background-position: left center;
+    }
+    50% {
+      background-size: 200% 200%;
+      background-position: right center;
+    }
+  }
+  .animate-gradient-x {
+    animation: gradient-x 5s ease infinite;
+  }
+
+  /* Stellt sicher, dass die App mindestens die volle Viewport-Höhe einnimmt (dynamischer als vh) */
+  /* Diese Klasse kann auf das Root-Element deiner App oder den Body angewendet werden */
+  .min-h-dvh {
+    min-height: 100vh; /* Fallback */
+    min-height: 100dvh;
+  }
 }

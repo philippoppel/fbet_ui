@@ -62,6 +62,10 @@ export function DashboardLayout({
               error={errors.groups ?? null}
               isCollapsed={isDesktopSidebarCollapsed}
               onToggleCollapse={onToggleCollapse}
+              currentUserId={undefined}
+              onDeleteGroup={function (groupId: number): Promise<void> {
+                throw new Error('Function not implemented.');
+              }}
             />
           </aside>
         )}
