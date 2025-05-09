@@ -1,6 +1,7 @@
 // src/app/components/dashboard/GroupActionsMenu.tsx
 'use client';
 
+import React, { useState, useCallback } from 'react'; // useState und useCallback importieren
 import { Button } from '@/app/components/ui/button';
 import {
   Trash2,
@@ -13,7 +14,7 @@ import type { Group } from '@/app/lib/types';
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider, // Provider hier für den Fall, dass die Komponente isoliert verwendet wird
+  TooltipProvider,
   TooltipTrigger,
 } from '@/app/components/ui/tooltip';
 import {
@@ -26,17 +27,14 @@ import {
 } from '@/app/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
-// Definiert die Props, die die Komponente benötigt
 interface GroupActionsMenuProps {
   group: Group;
-  onDelete: (group: Group) => void; // Callback, um den Löschvorgang im Parent zu starten
-  // Zukünftige Props für andere Aktionen könnten hier hinzugefügt werden:
+  onDelete: (group: Group) => void;
   // onRename?: (group: Group) => void;
   // onEditDescription?: (group: Group) => void;
   // onChangeImage?: (group: Group) => void;
 }
 
-// Lokale Hilfsfunktion für noch nicht implementierte Aktionen
 const handlePlaceholderAction = (
   actionName: string,
   groupNameOrId: string | number
@@ -47,16 +45,50 @@ const handlePlaceholderAction = (
   });
 };
 
+const LOG_PREFIX_MENU = '[GroupActionsMenu]';
+
 export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
-  // Hinweis: TooltipProvider wird hier hinzugefügt für Standalone-Nutzung.
-  // Wenn der Parent (GroupSidebar) bereits einen Provider hat, ist dieser technisch nicht nötig,
-  // schadet aber in der Regel auch nicht (Kontext wird überschrieben).
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isDeleteActionPending, setIsDeleteActionPending] = useState(false);
+
+  const handleDropdownOpenChange = useCallback(
+    (open: boolean) => {
+      const groupIdentifier = group.name || group.id;
+      console.log(
+        `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) handleDropdownOpenChange - Neuer Zustand: ${open}, isDeleteActionPending: ${isDeleteActionPending}`
+      );
+      setIsDropdownOpen(open); // Aktualisiere den kontrollierten Zustand
+
+      if (!open && isDeleteActionPending) {
+        console.log(
+          `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) Dropdown geschlossen, führe ausstehende Löschaktion aus.`
+        );
+        onDelete(group);
+        setIsDeleteActionPending(false); // Wichtig: Aktion zurücksetzen
+      }
+    },
+    [group, onDelete, isDeleteActionPending] // Abhängigkeiten korrekt setzen
+  );
+
+  const handleSelectDeleteAction = useCallback(() => {
+    const groupIdentifier = group.name || group.id;
+    console.log(
+      `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) handleSelectDeleteAction - "Gruppe löschen" ausgewählt.`
+    );
+    setIsDeleteActionPending(true);
+    // Das Dropdown schließt sich bei onSelect automatisch durch Radix UI.
+    // onOpenChange wird dann von Radix UI mit `false` aufgerufen.
+    // setIsDropdownOpen(false); // Explizites Schließen hier ist nicht unbedingt nötig.
+  }, [group]);
+
   return (
     <TooltipProvider delayDuration={100}>
-      <DropdownMenu>
+      <DropdownMenu
+        open={isDropdownOpen}
+        onOpenChange={handleDropdownOpenChange}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
-            {/* Wichtig: stopPropagation, damit der Klick auf den Trigger nicht das Parent-Li auswählt */}
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button
                 variant='ghost'
@@ -68,19 +100,11 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent
-            side='right'
-            sideOffset={5}
-            className='bg-popover text-popover-foreground border-border'
-          >
-            <p>Optionen</p>
-          </TooltipContent>
         </Tooltip>
         <DropdownMenuContent
           side='bottom'
           align='end'
           className='w-56 bg-popover text-popover-foreground border-border shadow-md'
-          // Wichtig: stopPropagation, damit Klicks im Menü keine Parent-Handler auslösen
           onClick={(e) => e.stopPropagation()}
         >
           <DropdownMenuLabel className='truncate px-2 py-1.5 text-sm font-semibold'>
@@ -88,8 +112,7 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
           </DropdownMenuLabel>
           <DropdownMenuSeparator className='bg-border/50' />
           <DropdownMenuItem
-            className='focus:bg-accent focus:text-accent-foreground text-sm cursor-pointer' // cursor-pointer hinzugefügt
-            // Ruft die lokale Platzhalterfunktion auf
+            className='focus:bg-accent focus:text-accent-foreground text-sm cursor-pointer'
             onSelect={() =>
               handlePlaceholderAction('Name ändern', group.name || group.id)
             }
@@ -97,6 +120,7 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
             <Edit3 className='mr-2 h-4 w-4' />
             Name ändern
           </DropdownMenuItem>
+          {/* ... Weitere Placeholder-Menüitems ... */}
           <DropdownMenuItem
             className='focus:bg-accent focus:text-accent-foreground text-sm cursor-pointer'
             onSelect={() =>
@@ -123,7 +147,7 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
           </DropdownMenuItem>
           <DropdownMenuSeparator className='bg-border/50' />
           <DropdownMenuItem
-            onSelect={() => onDelete(group)} // Ruft die übergebene onDelete-Prop auf
+            onSelect={handleSelectDeleteAction} // Geändert: Ruft jetzt handleSelectDeleteAction auf
             className='text-destructive focus:bg-destructive/20 focus:text-destructive text-sm cursor-pointer'
           >
             <Trash2 className='mr-2 h-4 w-4' />

@@ -1,3 +1,4 @@
+// src/app/api/groups/[groupId]/route.ts
 import {
   AuthenticatedUser,
   getCurrentUserFromRequest,
@@ -8,12 +9,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 
 // --- GET Handler ---
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> } // <-- MODIFIED HERE
-) {
-  const resolvedParams = await params; // <-- ADDED HERE
-  const groupId = parseInt(resolvedParams.groupId, 10); // <-- MODIFIED HERE
+export async function GET(req: NextRequest, context: any) {
+  const { params } = context as { params: { groupId: string } };
+  const groupId = parseInt(params.groupId, 10);
 
   if (isNaN(groupId) || groupId <= 0) {
     return NextResponse.json(
@@ -45,7 +43,7 @@ export async function GET(
     }
   } catch (authError) {
     console.error(
-      `Authorization error for group ${groupId} by user ${currentUser.id}:`,
+      `Authorization error for group ${groupId} by user ${currentUser?.id}:`,
       authError
     );
     return NextResponse.json(
@@ -65,7 +63,7 @@ export async function GET(
 
     return NextResponse.json(group);
   } catch (err) {
-    console.error(`GET /api/groups/[groupId] failed:`, err);
+    console.error(`GET /api/groups/${params.groupId} failed:`, err);
     return NextResponse.json(
       { error: 'Server error while reading group details' },
       { status: 500 }
@@ -74,20 +72,22 @@ export async function GET(
 }
 
 // --- DELETE Handler ---
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> } // <-- MODIFIED HERE
-) {
+export async function DELETE(req: NextRequest, context: any) {
+  const { params } = context as { params: { groupId: string } };
+  const groupIdString = params.groupId;
+
   try {
-    const resolvedParams = await params; // <-- ADDED HERE
     const currentUser = await getCurrentUserFromRequest(req);
     if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const groupId = parseInt(resolvedParams.groupId, 10); // <-- MODIFIED HERE
+    const groupId = parseInt(groupIdString, 10);
     if (isNaN(groupId)) {
-      return NextResponse.json({ error: 'Invalid group ID' }, { status: 400 });
+      return NextResponse.json(
+        { error: `Invalid group ID: ${groupIdString}` },
+        { status: 400 }
+      );
     }
 
     const group = await prisma.group.findUnique({
@@ -112,21 +112,9 @@ export async function DELETE(
       },
     });
 
-    return NextResponse.json(null, { status: 204 });
+    return new NextResponse(null, { status: 204 });
   } catch (error: unknown) {
-    // It's good practice to log with the specific param if available before awaiting
-    // However, if awaiting params fails, resolvedParams won't be available.
-    // Consider how you want to log if `await params` itself throws.
-    let groupIdForLogging = 'unknown';
-    try {
-      // Attempt to resolve params for logging, but don't let it break the main error handling
-      const p = await params;
-      groupIdForLogging = p.groupId;
-    } catch {
-      /* ignore if params can't be resolved here */
-    }
-
-    console.error(`Error in DELETE /api/groups/${groupIdForLogging}:`, error);
+    console.error(`Error in DELETE /api/groups/${groupIdString}:`, error);
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2025') {

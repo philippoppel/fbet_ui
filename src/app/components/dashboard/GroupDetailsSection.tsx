@@ -1,12 +1,7 @@
-// src/components/dashboard/GroupDetailsSection.tsx
+// src/app/components/dashboard/GroupDetailsSection.tsx
 'use client';
 
-import type {
-  Group,
-  Event as GroupEvent,
-  MixedEvent,
-  UserOut,
-} from '@/app/lib/types';
+import type { Group, Event as GroupEvent, UserOut } from '@/app/lib/types';
 import type { UseGroupInteractionsReturn } from '@/app/hooks/useGroupInteractions';
 
 // UI Components
@@ -21,14 +16,15 @@ interface GroupDetailsSectionProps {
   selectedGroupId: number | null;
   selectedGroupDetails: Group | null;
   selectedGroupEvents: GroupEvent[];
-  userSubmittedTips: Record<number, string>; // <<--- NEU: Empfängt gespeicherte Tipps
-  user: UserOut;
+  userSubmittedTips: Record<number, string>;
+  user: UserOut; // Das vollständige User-Objekt für Berechtigungsprüfungen
   isGroupDataLoading: boolean;
   groupDataError: string | null | undefined;
-  interactions: UseGroupInteractionsReturn; // Enthält selectedTips, handleOptionSelect, handleClearSelectedTip etc.
+  interactions: UseGroupInteractionsReturn;
+  onDeleteGroupInPage: (group: Group) => void; // Funktion, die von DashboardPage kommt, um den Löschdialog dort zu öffnen
 }
 
-// Skeleton Komponente (angenommen, diese ist wie von dir oben gepostet)
+// Skeleton Komponente
 function SelectedGroupViewSkeleton() {
   return (
     <div className='space-y-6'>
@@ -73,11 +69,12 @@ export function GroupDetailsSection({
   selectedGroupId,
   selectedGroupDetails,
   selectedGroupEvents,
-  userSubmittedTips, // <<--- NEU: Wird hier verwendet
-  user,
+  userSubmittedTips,
+  user, // User-Objekt wird hier empfangen
   isGroupDataLoading,
   groupDataError,
-  interactions, // Enthält alle Interaktions-Handler und States
+  interactions,
+  onDeleteGroupInPage, // Funktion zum Initiieren des Löschens aus dem Header
 }: GroupDetailsSectionProps) {
   // Fall 1: Keine Gruppe ausgewählt
   if (!selectedGroupId) {
@@ -99,9 +96,6 @@ export function GroupDetailsSection({
 
   // Fall 3: Fehler beim Laden
   if (groupDataError && !isGroupDataLoading) {
-    // Der Button zum erneuten Versuchen benötigt `refreshSelectedGroupData`,
-    // das aktuell nicht direkt in `interactions` ist, sondern eine Ebene höher.
-    // Fürs Erste auskommentiert gelassen oder du müsstest `refreshSelectedGroupData` auch übergeben.
     return (
       <Card className='border-destructive bg-destructive/10 p-6 shadow-sm flex flex-col items-center text-center min-h-[400px] justify-center'>
         <TriangleAlert className='h-10 w-10 text-destructive mb-3' />
@@ -119,25 +113,10 @@ export function GroupDetailsSection({
       <SelectedGroupView
         group={selectedGroupDetails}
         events={selectedGroupEvents}
-        user={user}
-        // Props aus dem interactions-Objekt und userSubmittedTips direkt übergeben
-        selectedTips={interactions.selectedTips}
-        userSubmittedTips={userSubmittedTips} // <<--- Weitergereicht
-        resultInputs={interactions.resultInputs}
-        isSubmittingTip={interactions.isSubmittingTip}
-        isSettingResult={interactions.isSettingResult}
-        onSelectTip={interactions.handleOptionSelect}
-        onSubmitTip={interactions.handleSubmitTip}
-        onResultInputChange={interactions.handleResultInputChange}
-        onSetResult={interactions.handleSetResult} // Signatur von handleSetResult in interactions ist (eventId, winningOption: string)
-        isAddEventDialogOpen={interactions.isAddEventDialogOpen}
-        onSetAddEventDialogOpen={interactions.setIsAddEventDialogOpen}
-        addEventForm={interactions.addEventForm}
-        onAddEventSubmit={interactions.handleAddEventSubmit}
-        onClearSelectedTip={interactions.handleClearSelectedTip} // <<--- Weitergereicht
-        onDeleteGroup={function (group: Group): void {
-          throw new Error('Function not implemented.');
-        }}
+        user={user} // User-Objekt weitergeben
+        interactions={interactions} // Das gesamte interactions-Objekt
+        userSubmittedTips={userSubmittedTips}
+        onDeleteGroup={onDeleteGroupInPage} // Die Funktion zum Initiieren des Löschens weitergeben
       />
     );
   }

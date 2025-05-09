@@ -1,100 +1,82 @@
-// src/components/dashboard/SelectedGroupView.tsx
+// src/app/components/dashboard/SelectedGroupView.tsx
 'use client';
 
-import type { UseFormReturn } from 'react-hook-form';
-import type {
-  Group,
-  Event as GroupEvent,
-  UserOut,
-  // MixedEvent, // MixedEvent wird hier nicht verwendet
-} from '@/app/lib/types';
+import { useCallback } from 'react';
+import type { Group, Event as GroupEvent, UserOut } from '@/app/lib/types';
+import type { UseGroupInteractionsReturn } from '@/app/hooks/useGroupInteractions';
 
 import { GroupHeaderCard } from './GroupHeaderCard';
 import { OpenEventsCard } from './OpenEventsCard';
 import { ClosedEventsCard } from './ClosedEventsCard';
-import type { AddEventFormData } from '@/app/hooks/useGroupInteractions';
+import DeleteEventDialog from './DeleteEventDialog';
 
-// Props Definition
 type SelectedGroupViewProps = {
   group: Group;
   events: GroupEvent[];
-  user: UserOut; // Wichtig: Das User-Objekt
-  selectedTips: Record<number, string>;
+  user: UserOut;
+  interactions: UseGroupInteractionsReturn;
   userSubmittedTips: Record<number, string>;
-  resultInputs: Record<number, string>;
-  isSubmittingTip: Record<number, boolean>;
-  isSettingResult: Record<number, boolean>;
-  isAddEventDialogOpen: boolean;
-  addEventForm: UseFormReturn<AddEventFormData>;
-  onSelectTip: (eventId: number, option: string) => void;
-  onSubmitTip: (eventId: number) => void;
-  onResultInputChange: (eventId: number, value: string) => void;
-  onSetResult: (eventId: number, winningOption: string) => void;
-  onSetAddEventDialogOpen: (isOpen: boolean) => void;
-  onAddEventSubmit: (values: AddEventFormData) => void;
-  onClearSelectedTip: (eventId: number) => void;
-  onDeleteGroup: (group: Group) => void; // <<--- NEU: onDeleteGroup Prop hinzugefügt
+  onDeleteGroup: (group: Group) => void;
 };
 
 export function SelectedGroupView({
   group,
   events,
-  user, // User-Objekt wird hier empfangen
-  selectedTips,
+  user,
+  interactions,
   userSubmittedTips,
-  resultInputs,
-  isSubmittingTip,
-  isSettingResult,
-  isAddEventDialogOpen,
-  addEventForm,
-  onSelectTip,
-  onSubmitTip,
-  onResultInputChange,
-  onSetResult,
-  onSetAddEventDialogOpen,
-  onAddEventSubmit,
-  onClearSelectedTip,
-  onDeleteGroup, // <<--- onDeleteGroup hier destrukturieren
+  onDeleteGroup,
 }: SelectedGroupViewProps) {
-  // DEBUG-Log, um zu prüfen, ob user.id hier ankommt
-  console.log(
-    `[SelectedGroupView] User ID für GroupHeaderCard: ${user?.id} (Typ: ${typeof user?.id})`
-  );
-  console.log(`[SelectedGroupView] Group-Objekt für GroupHeaderCard:`, group);
-  console.log(
-    `[SelectedGroupView] onDeleteGroup Funktion übergeben:`,
-    typeof onDeleteGroup === 'function'
+  // -------------------- Handler fürs endgültige Löschen --------------------
+  const handleConfirmDeleteEvent = useCallback(
+    async (eventId: number) => {
+      await interactions.handleConfirmDeleteEvent(eventId);
+    },
+    [interactions]
   );
 
   return (
     <div className='space-y-8'>
+      {/* ───────── Gruppen-Header ───────── */}
       <GroupHeaderCard
         group={group}
-        isAddEventDialogOpen={isAddEventDialogOpen}
-        addEventForm={addEventForm}
-        onSetAddEventDialogOpen={onSetAddEventDialogOpen}
-        onAddEventSubmit={onAddEventSubmit}
-        currentUserId={user?.id} // <<--- HIER HINZUGEFÜGT: Die User ID weitergeben
-        onDeleteGroup={onDeleteGroup} // <<--- HIER HINZUGEFÜGT: Die Löschfunktion weitergeben
+        isAddEventDialogOpen={interactions.isAddEventDialogOpen}
+        addEventForm={interactions.addEventForm}
+        onSetAddEventDialogOpen={interactions.setIsAddEventDialogOpen}
+        onAddEventSubmit={interactions.handleAddEventSubmit}
+        currentUserId={user.id}
+        onDeleteGroup={onDeleteGroup}
       />
 
+      {/* ───────── Offene Events ───────── */}
       <OpenEventsCard
         events={events}
         user={user}
         groupCreatedBy={group.createdById}
-        selectedTips={selectedTips}
+        selectedTips={interactions.selectedTips}
         userSubmittedTips={userSubmittedTips}
-        resultInputs={resultInputs}
-        isSubmittingTip={isSubmittingTip}
-        isSettingResult={isSettingResult}
-        onSelectTip={onSelectTip}
-        onSubmitTip={onSubmitTip}
-        onResultInputChange={onResultInputChange}
-        onSetResult={onSetResult}
-        onClearSelectedTip={onClearSelectedTip}
+        resultInputs={interactions.resultInputs}
+        isSubmittingTip={interactions.isSubmittingTip}
+        isSettingResult={interactions.isSettingResult}
+        onSelectTip={interactions.handleOptionSelect}
+        onSubmitTip={interactions.handleSubmitTip}
+        onResultInputChange={interactions.handleResultInputChange}
+        onSetResult={interactions.handleSetResult}
+        onClearSelectedTip={interactions.handleClearSelectedTip}
+        onInitiateDeleteEvent={interactions.handleInitiateDeleteEvent}
       />
 
+      {/* ───────── Geschlossene Events ───────── */}
       <ClosedEventsCard events={events} />
+
+      {/* ───────── Delete-Event-Dialog ───────── */}
+      {interactions.eventToDelete && ( //  ← nur dann rendern!
+        <DeleteEventDialog
+          event={interactions.eventToDelete}
+          onClose={interactions.resetDeleteEventDialog}
+          onConfirm={handleConfirmDeleteEvent}
+        />
+      )}
     </div>
   );
 }

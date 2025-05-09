@@ -345,3 +345,43 @@ export async function getMyTipsForGroup(
   // handleResponse verwenden, erwartet jetzt ein Array von UserTipSelection
   return handleResponse<UserTipSelection[]>(response);
 }
+export async function deleteGroup(
+  token: string,
+  groupId: number
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) {
+    let errorDetail: string | object | undefined;
+    try {
+      const errorData = await response.json();
+      errorDetail = errorData?.detail || errorData?.error;
+    } catch (e) {
+      errorDetail = response.statusText;
+    }
+    throw new ApiError(
+      `API request failed with status ${response.status}`,
+      response.status,
+      errorDetail
+    );
+  }
+}
+
+export async function deleteEvent(
+  token: string,
+  eventId: number
+): Promise<void> {
+  // Erwartet keinen Body zurück (204 No Content)
+  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  // handleResponse kümmert sich um die Fehlerbehandlung und den 204-Status
+  await handleResponse<void>(response);
+}

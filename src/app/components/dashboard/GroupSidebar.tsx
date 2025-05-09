@@ -9,7 +9,6 @@ import {
   Loader2,
   ChevronsLeft,
   ChevronsRight,
-  // Icons, die nur im Menü gebraucht wurden, sind hier entfernt
 } from 'lucide-react';
 import type { Group } from '@/app/lib/types';
 import { cn } from '@/app/lib/utils';
@@ -29,12 +28,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/app/components/ui/alert-dialog';
-// DropdownMenu Imports sind hier nicht mehr nötig
+} from '@/app/components/ui/alert-dialog'; // Stellt sicher, dass dies der richtige Import ist
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { GroupActionsMenu } from '@/app/components/dashboard/GroupActionMenu';
 
+// ... (Rest der Props und des Komponentenkopfs bleibt gleich) ...
 type GroupSidebarProps = {
   groups: Group[];
   selectedGroupId: number | null;
@@ -44,7 +43,7 @@ type GroupSidebarProps = {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   currentUserId: number | undefined | null;
-  onDeleteGroup: (groupId: number) => Promise<void>; // Diese Prop wird an GroupActionsMenu weitergegeben
+  onDeleteGroup: (groupId: number) => Promise<void>;
 };
 
 export function GroupSidebar({
@@ -56,46 +55,28 @@ export function GroupSidebar({
   isCollapsed = false,
   onToggleCollapse,
   currentUserId,
-  onDeleteGroup, // Wird nun für den Callback in GroupActionsMenu verwendet
+  onDeleteGroup,
 }: GroupSidebarProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
 
-  // --- DEBUG LOGS (können später entfernt werden) ---
+  // ... (useEffect, handleDeleteInitiated, confirmDelete bleiben gleich) ...
   useEffect(() => {
-    console.log(
-      '%c[GroupSidebar DEBUG] Component Props:',
-      'color: blue; font-weight: bold;'
-    );
-    console.log(
-      `[GroupSidebar DEBUG] currentUserId:`,
-      currentUserId,
-      `(Typ: ${typeof currentUserId})`
-    );
-    console.log(
-      `[GroupSidebar DEBUG] isCollapsed:`,
-      isCollapsed,
-      `(Typ: ${typeof isCollapsed})`
-    );
-    // ... (restliche Logs können bleiben oder entfernt werden) ...
-    console.log('%c------------------------------------', 'color: blue;');
+    // console.log(
+    //   '%c[GroupSidebar DEBUG] Component Props:',
+    //   'color: blue; font-weight: bold;'
+    // );
   }, [currentUserId, isCollapsed, groups, isLoading, error]);
 
-  // Diese Funktion wird als Prop an GroupActionsMenu übergeben
   const handleDeleteInitiated = (group: Group) => {
-    console.log(
-      '[GroupSidebar] handleDeleteInitiated called for group:',
-      group.id
-    );
     setGroupToDelete(group);
     setShowDeleteDialog(true);
   };
 
-  // Diese Funktion wird vom AlertDialog aufgerufen
   const confirmDelete = async () => {
     if (groupToDelete) {
       try {
-        await onDeleteGroup(groupToDelete.id); // Die eigentliche Löschlogik (API-Call etc.)
+        await onDeleteGroup(groupToDelete.id);
         toast.success(
           `Gruppe "${groupToDelete.name || groupToDelete.id}" wurde gelöscht.`
         );
@@ -109,13 +90,9 @@ export function GroupSidebar({
     setShowDeleteDialog(false);
   };
 
-  // Nicht mehr nötig, da in GroupActionsMenu
-  // const handlePlaceholderAction = (...) => { ... };
-
   return (
-    // Der äußere TooltipProvider ist hier korrekt, da er alle Tooltips in der Sidebar abdeckt
     <TooltipProvider delayDuration={100}>
-      {/* Container mit angepasstem Design */}
+      {/* Container mit angepasstem Design (unverändert) */}
       <div
         className={cn(
           'flex flex-col h-full transition-all duration-300 ease-in-out',
@@ -124,7 +101,7 @@ export function GroupSidebar({
           isCollapsed ? 'w-full lg:w-[60px]' : 'w-full'
         )}
       >
-        {/* Header */}
+        {/* Header (unverändert) */}
         <div
           className={cn(
             'flex flex-row items-center gap-2 px-4 py-3 border-b border-white/10 dark:border-white/5',
@@ -133,7 +110,6 @@ export function GroupSidebar({
               : 'justify-between'
           )}
         >
-          {/* ... Header Inhalt (unverändert) ... */}
           <div
             className={cn(
               'flex items-center gap-2 min-w-0',
@@ -146,7 +122,6 @@ export function GroupSidebar({
             </CardTitle>
           </div>
           <div className='flex items-center flex-shrink-0 space-x-1'>
-            {/* ... Erstellen Button / Collapse Button ... */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -160,7 +135,7 @@ export function GroupSidebar({
                   asChild
                   aria-label='Neue Gruppe erstellen'
                 >
-                  <Link href='/dashboard/groups/create'>
+                  <Link href='/groups/create'>
                     <PlusCircle
                       className={cn(
                         'w-4 h-4 flex-shrink-0',
@@ -168,8 +143,7 @@ export function GroupSidebar({
                       )}
                     />
                     <span className={cn(isCollapsed && 'lg:hidden')}>
-                      {' '}
-                      Erstellen{' '}
+                      Erstellen
                     </span>
                   </Link>
                 </Button>
@@ -180,8 +154,7 @@ export function GroupSidebar({
                   sideOffset={5}
                   className='bg-popover text-popover-foreground border-border'
                 >
-                  {' '}
-                  <p>Neue Gruppe erstellen</p>{' '}
+                  <p>Neue Gruppe erstellen</p>
                 </TooltipContent>
               )}
             </Tooltip>
@@ -198,113 +171,60 @@ export function GroupSidebar({
                     <ChevronsLeft className='h-5 w-5' />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent
-                  side='right'
-                  sideOffset={5}
-                  className='bg-popover text-popover-foreground border-border'
-                >
-                  {' '}
-                  <p>Sidebar einklappen</p>{' '}
-                </TooltipContent>
               </Tooltip>
             )}
           </div>
         </div>
 
-        {/* Content (Gruppenliste) */}
+        {/* Content (Gruppenliste) (unverändert) */}
         <div
           className={cn(
             'flex-1 overflow-y-auto pt-2 pb-4',
             isCollapsed ? 'lg:hidden px-0' : 'px-3'
           )}
         >
-          {/* ... isLoading, error, no groups states (unverändert) ... */}
+          {/* ... isLoading, error, no groups states, groups.map (alles unverändert) ... */}
           {isLoading && (
             <div className='flex items-center justify-center text-sm text-muted-foreground p-4'>
-              {' '}
-              <Loader2 className='mr-2 h-4 w-4 animate-spin' />{' '}
-              <span>Gruppen laden...</span>{' '}
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              <span>Gruppen laden...</span>
             </div>
           )}
           {error && (
             <p className='text-sm text-destructive px-2 py-4 text-center'>
-              {' '}
-              {error}{' '}
+              {error}
             </p>
           )}
           {!isLoading && !error && groups.length === 0 && !isCollapsed && (
             <div className='text-center px-2 py-6 text-muted-foreground text-sm'>
-              {' '}
-              <Users className='mx-auto h-10 w-10 opacity-50 mb-3' />{' '}
-              <p className='mb-3'>Du bist noch in keiner Gruppe.</p>{' '}
+              <Users className='mx-auto h-10 w-10 opacity-50 mb-3' />
+              <p className='mb-3'>Du bist noch in keiner Gruppe.</p>
               <Button
                 size='sm'
                 variant='outline'
                 className='border-border hover:bg-accent'
                 asChild
               >
-                {' '}
-                <Link href='/dashboard/groups/create'>
-                  {' '}
-                  <PlusCircle className='mr-2 h-4 w-4' /> Erste Gruppe
-                  erstellen{' '}
-                </Link>{' '}
-              </Button>{' '}
+                <Link href='/groups/create'>
+                  <PlusCircle className='mr-2 h-4 w-4' /> Erste Gruppe erstellen
+                </Link>
+              </Button>
             </div>
           )}
-
           {!isLoading &&
             !error &&
             groups &&
             groups.length > 0 &&
             !isCollapsed && (
               <ul className='space-y-1'>
-                {groups.map((group, index) => {
-                  // ... Debug Logs können hier bleiben für's Erste ...
-                  if (index === 0) {
-                    console.log(
-                      '%c[GroupSidebar DEBUG] Processing first group in map:',
-                      'color: green; font-weight: bold;'
-                    );
-                    console.log(
-                      `[GroupSidebar DEBUG] Group ID: ${group?.id}, Name: "${group?.name}"`
-                    );
-                    console.log(
-                      `[GroupSidebar DEBUG] Group createdById:`,
-                      group?.createdById,
-                      `(Typ: ${typeof group?.createdById})`
-                    );
-                    console.log(
-                      `[GroupSidebar DEBUG] currentUserId (for comparison):`,
-                      currentUserId,
-                      `(Typ: ${typeof currentUserId})`
-                    );
-                  }
-
+                {groups.map((group) => {
                   if (!group || typeof group.id === 'undefined') {
-                    console.warn(
-                      '[GroupSidebar DEBUG] Ungültiges Gruppenobjekt im Mapping übersprungen:',
-                      group
-                    );
                     return null;
                   }
-
                   const isCreator =
                     currentUserId != null &&
                     group.createdById != null &&
                     currentUserId === group.createdById;
-
-                  if (index === 0) {
-                    console.log(
-                      `[GroupSidebar DEBUG] isCreator (first group):`,
-                      isCreator
-                    );
-                    console.log(
-                      '%c------------------------------------',
-                      'color: green;'
-                    );
-                  }
-
                   const isSelected = selectedGroupId === group.id;
 
                   return (
@@ -332,16 +252,10 @@ export function GroupSidebar({
                       >
                         {group.name || `Gruppe ${group.id}`}
                       </Button>
-
-                      {/* Hier wird die neue Komponente verwendet */}
                       {isCreator && !isCollapsed && (
                         <GroupActionsMenu
                           group={group}
-                          onDelete={handleDeleteInitiated} // Übergibt die Funktion zum Öffnen des Dialogs
-                          // Später hier weitere Props hinzufügen:
-                          // onRename={handleRenameInitiated}
-                          // onEditDescription={handleEditDescriptionInitiated}
-                          // onChangeImage={handleChangeImageInitiated}
+                          onDelete={handleDeleteInitiated}
                         />
                       )}
                     </li>
@@ -351,7 +265,7 @@ export function GroupSidebar({
             )}
         </div>
 
-        {/* Collapse/Expand Toggle */}
+        {/* Collapse/Expand Toggle (unverändert) */}
         {onToggleCollapse && isCollapsed && (
           <div
             className={cn(
@@ -370,53 +284,72 @@ export function GroupSidebar({
                   <ChevronsRight className='h-5 w-5' />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent
-                side='right'
-                sideOffset={5}
-                className='bg-popover text-popover-foreground border-border'
-              >
-                {' '}
-                <p>Sidebar ausklappen</p>{' '}
-              </TooltipContent>
             </Tooltip>
           </div>
         )}
       </div>
 
-      {/* AlertDialog für Löschbestätigung (bleibt hier) */}
+      {/* AlertDialog für Löschbestätigung (MODIFIZIERT) */}
       {groupToDelete && (
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent className='bg-background border-border shadow-lg'>
+          <AlertDialogContent
+            className={cn(
+              // Entfernt Standard-Hintergrund und -Rand, falls vorhanden, um Konflikte zu vermeiden.
+              // Die shadcn/ui Default-Klassen (border, bg-background, shadow-lg, sm:rounded-lg)
+              // werden durch unsere spezifischeren Klassen überschrieben oder ergänzt.
+
+              // Eigene Stile für "Glas"-Effekt:
+              'rounded-xl shadow-xl', // Abrundung und Schatten
+
+              // Hintergrund (leicht transparent, Gradient oder einzelne Farbe)
+              // Einfache transparente Farbe (ähnlich Sidebar):
+              // 'bg-background/80 dark:bg-slate-900/70',
+              // Oder Gradient (ähnlich GroupHeaderCard):
+              'bg-gradient-to-br from-background/80 via-background/75 to-background/80',
+              'dark:from-slate-900/80 dark:via-slate-800/75 dark:to-slate-900/80',
+
+              // Backdrop-Filter für Unschärfe-Effekt
+              'backdrop-blur-lg supports-[backdrop-filter]:bg-opacity-75', // bg-opacity als Fallback
+
+              // Eigener Rand
+              'border border-white/20 dark:border-white/10'
+            )}
+          >
             <AlertDialogHeader>
-              <AlertDialogTitle>
+              <AlertDialogTitle className='text-foreground'>
                 {' '}
+                {/* Sicherstellen, dass Textfarbe passt */}
                 Gruppe &#34;{groupToDelete.name || groupToDelete.id}&#34;
-                wirklich löschen?{' '}
+                wirklich löschen?
               </AlertDialogTitle>
-              <AlertDialogDescription className='text-muted-foreground'>
+              <AlertDialogDescription className='text-muted-foreground/90'>
                 {' '}
+                {/* Ggf. Opazität anpassen für Lesbarkeit */}
                 Diese Aktion kann nicht rückgängig gemacht werden. Alle
                 zugehörigen Daten, wie Mitglieder und Veranstaltungen, werden
-                ebenfalls dauerhaft entfernt.{' '}
+                ebenfalls dauerhaft entfernt.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel
-                className='border-border hover:bg-accent'
                 onClick={() => {
                   setGroupToDelete(null);
                   setShowDeleteDialog(false);
                 }}
+                // Angepasster Stil für den Abbrechen-Button
+                className={cn(
+                  'bg-transparent hover:bg-white/10 dark:hover:bg-black/20', // Subtiler Hover-Effekt
+                  'border border-white/20 dark:border-white/10', // Passender Rand
+                  'text-foreground' // Textfarbe
+                )}
               >
-                {' '}
-                Abbrechen{' '}
+                Abbrechen
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDelete}
-                className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                className='bg-destructive text-destructive-foreground hover:bg-destructive/90' // Dieser Button kann so bleiben
               >
-                {' '}
-                Löschen{' '}
+                Löschen
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

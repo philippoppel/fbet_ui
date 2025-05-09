@@ -4,22 +4,30 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { toast } from 'sonner'; // Import toast für die Beispielfunktion
-
+import { toast } from 'sonner';
 import { Loader2, LogIn, Users } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
-
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/app/components/ui/alert-dialog';
 import { useAuth } from '@/app/context/AuthContext';
 import { useDashboardData } from '@/app/hooks/useDashboardData';
-import { useGroupInteractions } from '@/app/hooks/useGroupInteractions';
-
+import { useGroupInteractions } from '@/app/hooks/useGroupInteractions'; // Importiert
 import { AppHeader } from '@/app/components/layout/AppHeader';
 import { DashboardLayout } from '@/app/components/dashboard/DashboardLayout';
 import { GroupDetailsSection } from '@/app/components/dashboard/GroupDetailsSection';
 import { NoGroupsCard } from '@/app/components/dashboard/NoGroupsCard';
 import { FullscreenCenter } from '@/app/components/dashboard/FullscreenCenter';
-// Import für deleteGroup API-Aufruf, falls noch nicht vorhanden
-// import { deleteGroup as apiDeleteGroup } from '@/app/lib/api';
+import { deleteGroup as apiDeleteGroup } from '@/app/lib/api';
+import type { Group } from '@/app/lib/types';
+import { cn } from '@/app/lib/utils';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -30,10 +38,6 @@ export default function DashboardPage() {
     logout: actualLogoutFunction,
   } = useAuth();
 
-  // DEBUG LOG in DashboardPage
-  console.log('[DashboardPage] Auth User Objekt:', user);
-  console.log('[DashboardPage] Auth User ID (user?.id):', user?.id);
-
   const {
     myGroups,
     selectedGroupId,
@@ -42,24 +46,30 @@ export default function DashboardPage() {
     selectedGroupHighscore,
     selectedGroupMembers,
     userSubmittedTips,
-    loadingInitial, // Wird an DashboardLayout weitergegeben
+    loadingInitial,
     isGroupDataLoading,
     errors,
     handleSelectGroup,
-    refreshSelectedGroupData,
-    updateUserTipState,
+    refreshSelectedGroupData, // Wird für interactions benötigt
+    updateUserTipState, // Wird für interactions benötigt
+    refreshMyGroups,
   } = useDashboardData();
 
+  // useGroupInteractions Hook initialisieren
   const interactions = useGroupInteractions({
     token,
     selectedGroupId,
     selectedGroupEvents,
-    refreshGroupData: refreshSelectedGroupData,
-    updateUserTipState: updateUserTipState,
+    refreshGroupData: refreshSelectedGroupData, // Korrekt übergeben
+    updateUserTipState: updateUserTipState, // Korrekt übergeben
   });
 
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
     useState(false);
+  const [showDeleteGroupDialogFromHeader, setShowDeleteGroupDialogFromHeader] =
+    useState(false);
+  const [groupToDeleteFromHeader, setGroupToDeleteFromHeader] =
+    useState<Group | null>(null);
 
   useEffect(() => {
     if (!isAuthLoading && !user && !token) {
@@ -71,49 +81,58 @@ export default function DashboardPage() {
     setIsDesktopSidebarCollapsed((prev) => !prev);
   };
 
-  // Beispiel für eine handleDeleteGroup Funktion
-  // Diese muss noch an Ihre API angebunden werden.
-  const handleDeleteGroup = async (groupId: number) => {
+  const coreDeleteGroupLogic = async (groupIdToDelete: number) => {
     if (!token) {
       toast.error('Fehler', { description: 'Nicht authentifiziert.' });
-      return;
+      throw new Error('Nicht authentifiziert.');
     }
-    if (
-      window.confirm('Sind Sie sicher, dass Sie diese Gruppe löschen möchten?')
-    ) {
-      try {
-        // Hier würden Sie Ihren API-Aufruf zum Löschen der Gruppe machen
-        // z.B. await apiDeleteGroup(token, groupId);
-        toast.success(
-          `Gruppe ${groupId} (Platzhalter) zum Löschen vorgemerkt.`
-        );
-        // Nach erfolgreichem Löschen: Gruppenliste neu laden oder die gelöschte Gruppe entfernen
-        // Dies könnte bedeuten, `useDashboardData` zu erweitern oder eine globale State-Management-Lösung zu verwenden,
-        // um `myGroups` zu aktualisieren. Für den Moment ein Soft-Refresh der aktuellen Gruppe,
-        // falls es die ausgewählte war, oder ein Neuladen der Gruppenliste.
-        if (selectedGroupId === groupId) {
-          // Wenn die gelöschte Gruppe die ausgewählte war, Auswahl aufheben
-          // und die erste Gruppe der (aktualisierten) Liste auswählen, oder keine
-          handleSelectGroup(
-            myGroups.length > 1
-              ? (myGroups.find((g) => g.id !== groupId)?.id ?? null)
-              : null
-          );
+    try {
+      await apiDeleteGroup(token, groupIdToDelete);
+      if (refreshMyGroups) {
+        const refreshedGroups = await refreshMyGroups();
+        if (selectedGroupId === groupIdToDelete) {
+          if (refreshedGroups.length > 0) {
+            handleSelectGroup(refreshedGroups[0].id);
+          } else {
+            handleSelectGroup(null);
+          }
         }
-        // Sie müssen die Gruppenliste aktualisieren, z.B. durch einen erneuten Fetch in useDashboardData
-        // Dies ist nur ein Beispiel, Ihre `useDashboardData` Logik muss dies unterstützen.
-        // z.B. eine Funktion `refreshMyGroups()` in `useDashboardData` implementieren.
-        // Für dieses Beispiel:
-        // await refreshSelectedGroupData(selectedGroupId, { keepExistingDetailsWhileRefreshingSubData: true });
-        alert(
-          `Platzhalter: Gruppe ${groupId} löschen. Implementieren Sie den API-Aufruf und die Aktualisierung der Gruppenliste.`
+      } else {
+        console.warn(
+          'refreshMyGroups Funktion nicht im useDashboardData Hook gefunden.'
         );
-      } catch (err: any) {
-        toast.error('Fehler beim Löschen der Gruppe', {
-          description: err.message,
-        });
+      }
+    } catch (err: any) {
+      console.error('Fehler beim Löschen der Gruppe (Kernlogik):', err);
+      toast.error('Fehler beim Löschen der Gruppe', {
+        description: err.message || 'Ein unbekannter Fehler ist aufgetreten.',
+      });
+      throw err;
+    }
+  };
+
+  const handleDeleteGroupFromSidebar = async (groupId: number) => {
+    await coreDeleteGroupLogic(groupId);
+  };
+
+  const handleInitiateDeleteGroupFromHeader = (group: Group) => {
+    setGroupToDeleteFromHeader(group);
+    setShowDeleteGroupDialogFromHeader(true);
+  };
+
+  const confirmDeleteGroupFromHeader = async () => {
+    if (groupToDeleteFromHeader) {
+      try {
+        await coreDeleteGroupLogic(groupToDeleteFromHeader.id);
+        toast.success(
+          `Gruppe "${groupToDeleteFromHeader.name || groupToDeleteFromHeader.id}" wurde gelöscht.`
+        );
+        setGroupToDeleteFromHeader(null);
+      } catch (e) {
+        console.error('Fehler in confirmDeleteGroupFromHeader abgefangen:', e);
       }
     }
+    setShowDeleteGroupDialogFromHeader(false);
   };
 
   if (isAuthLoading) {
@@ -138,9 +157,7 @@ export default function DashboardPage() {
       </FullscreenCenter>
     );
   }
-  // loadingInitial wird jetzt an DashboardLayout übergeben und dort für die GroupSidebar verwendet
-  if (loadingInitial && myGroups.length === 0) {
-    // Zeige Fullscreen Loader nur, wenn initial geladen wird UND noch keine Gruppen da sind
+  if (loadingInitial && (!myGroups || myGroups.length === 0)) {
     return (
       <FullscreenCenter>
         <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
@@ -171,20 +188,19 @@ export default function DashboardPage() {
         selectedGroupHighscore={selectedGroupHighscore}
         selectedGroupMembers={selectedGroupMembers}
         isGroupDataLoading={isGroupDataLoading}
-        loadingInitial={loadingInitial} // Wird an DashboardLayout übergeben
+        loadingInitial={loadingInitial}
         errors={errors}
         isDesktopSidebarCollapsed={isDesktopSidebarCollapsed}
         onToggleCollapse={toggleDesktopSidebar}
         onSelectGroup={handleSelectGroup}
-        currentUserId={user?.id} // <--- HIER WIRD user.id ÜBERGEBEN
-        onDeleteGroupFromPage={handleDeleteGroup} // <--- onDeleteGroup Funktion übergeben
+        currentUserId={user?.id}
+        onDeleteGroupFromPage={handleDeleteGroupFromSidebar}
       >
-        {/* Inhalt der mittleren Spalte */}
-        {errors.groups && !loadingInitial ? ( // Zeige Fehler nur, wenn nicht mehr initial geladen wird
+        {errors.groups && !loadingInitial ? (
           <div className='p-4 text-center text-destructive'>
             Fehler beim Laden der Gruppen: {errors.groups}
           </div>
-        ) : !hasGroups && !loadingInitial ? ( // Zeige NoGroupsCard nur, wenn nicht mehr initial geladen wird
+        ) : !hasGroups && !loadingInitial ? (
           <NoGroupsCard />
         ) : hasGroups &&
           selectedGroupId === null &&
@@ -199,21 +215,74 @@ export default function DashboardPage() {
               Wähle links eine Gruppe aus, um die Details anzuzeigen.
             </p>
           </div>
-        ) : hasGroups && selectedGroupId !== null ? ( // Zeige GroupDetailsSection nur, wenn Gruppen vorhanden und eine ausgewählt ist
+        ) : hasGroups && selectedGroupId !== null ? (
           <GroupDetailsSection
-            key={selectedGroupId} // Wichtig für Remount bei Gruppenwechsel
+            key={selectedGroupId}
             selectedGroupId={selectedGroupId}
             selectedGroupDetails={selectedGroupDetails}
             selectedGroupEvents={selectedGroupEvents}
             userSubmittedTips={userSubmittedTips}
-            user={user} // User wird hier bereits übergeben
+            user={user}
             isGroupDataLoading={isGroupDataLoading}
             groupDataError={errors.groupData}
-            interactions={interactions}
+            interactions={interactions} // Das gesamte interactions-Objekt wird übergeben
+            // GroupDetailsSection muss interactions.isDeletingSpecificEvent
+            // an OpenEventsCard als isDeletingEvent weitergeben.
+            onDeleteGroupInPage={handleInitiateDeleteGroupFromHeader}
           />
         ) : null}
-        {/* Wenn loadingInitial noch true ist und keine Gruppen da sind, wird der Fullscreen Loader oben schon angezeigt */}
       </DashboardLayout>
+
+      {groupToDeleteFromHeader && (
+        <AlertDialog
+          open={showDeleteGroupDialogFromHeader}
+          onOpenChange={setShowDeleteGroupDialogFromHeader}
+        >
+          <AlertDialogContent
+            className={cn(
+              'rounded-xl shadow-xl',
+              'bg-gradient-to-br from-background/80 via-background/75 to-background/80',
+              'dark:from-slate-900/80 dark:via-slate-800/75 dark:to-slate-900/80',
+              'backdrop-blur-lg supports-[backdrop-filter]:bg-opacity-75',
+              'border border-white/20 dark:border-white/10'
+            )}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle className='text-foreground'>
+                Gruppe "
+                {groupToDeleteFromHeader.name || groupToDeleteFromHeader.id}"
+                wirklich löschen?
+              </AlertDialogTitle>
+              <AlertDialogDescription className='text-muted-foreground/90'>
+                Diese Aktion kann nicht rückgängig gemacht werden. Alle
+                zugehörigen Daten, wie Mitglieder und Veranstaltungen, werden
+                ebenfalls dauerhaft entfernt.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setShowDeleteGroupDialogFromHeader(false);
+                  setGroupToDeleteFromHeader(null);
+                }}
+                className={cn(
+                  'bg-transparent hover:bg-white/10 dark:hover:bg-black/20',
+                  'border border-white/20 dark:border-white/10',
+                  'text-foreground'
+                )}
+              >
+                Abbrechen
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteGroupFromHeader}
+                className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+              >
+                Löschen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 }

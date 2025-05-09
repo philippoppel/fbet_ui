@@ -9,23 +9,29 @@ import {
   CardDescription,
 } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/app/components/ui/dropdown-menu';
 import { AddEventDialog } from '@/app/components/dashboard/AddEventDialog';
 import { InviteDialog } from '@/app/components/dashboard/InviteDialog';
 import type { Group } from '@/app/lib/types';
 import type { UseFormReturn } from 'react-hook-form';
 import type { AddEventFormData } from '@/app/hooks/useGroupInteractions';
-import { Share2, PlusCircle, Info } from 'lucide-react'; // MoreVertical wird typischerweise IN GroupActionsMenu verwendet
+import { Share2, PlusCircle, Info, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
-import { GroupActionsMenu } from '@/app/components/dashboard/GroupActionMenu'; // Stelle sicher, dass diese Komponente einen Trigger rendert
+import { GroupActionsMenu } from '@/app/components/dashboard/GroupActionMenu'; // Import für GroupActionsMenu
 
 type GroupHeaderCardProps = {
   group: Group;
-  addEventForm: UseFormReturn<AddEventFormData>;
-  onAddEventSubmit: (data: AddEventFormData) => void;
-  isAddEventDialogOpen: boolean;
-  onSetAddEventDialogOpen: (isOpen: boolean) => void;
-  currentUserId: number | undefined | null;
-  onDeleteGroup: (group: Group) => void; // Geändert von (groupId: number) zu (group: Group) um konsistent zu sein
+  addEventForm: UseFormReturn<AddEventFormData>; // Aus SelectedGroupView (via interactions)
+  onAddEventSubmit: (data: AddEventFormData) => void; // Aus SelectedGroupView (via interactions)
+  isAddEventDialogOpen: boolean; // Aus SelectedGroupView (via interactions)
+  onSetAddEventDialogOpen: (isOpen: boolean) => void; // Aus SelectedGroupView (via interactions)
+  currentUserId: number | undefined | null; // <<--- HIER HINZUGEFÜGT/KORRIGIERT
+  onDeleteGroup: (group: Group) => void; // Funktion zum Initiieren des Löschvorgangs
 };
 
 export function GroupHeaderCard({
@@ -34,22 +40,15 @@ export function GroupHeaderCard({
   onAddEventSubmit,
   isAddEventDialogOpen,
   onSetAddEventDialogOpen,
-  currentUserId,
+  currentUserId, // Wird jetzt korrekt empfangen
   onDeleteGroup,
 }: GroupHeaderCardProps) {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
 
-  // Prüfen, ob der aktuelle Benutzer der Ersteller der Gruppe ist
   const isCreator =
-    currentUserId != null && // Stellt sicher, dass currentUserId nicht null oder undefined ist
-    group?.createdById != null && // Stellt sicher, dass group und group.createdById existieren
+    currentUserId != null &&
+    group?.createdById != null &&
     currentUserId === group.createdById;
-
-  // WICHTIG FÜR DEBUGGING: Überprüfe diesen Log in der Konsole deines Browsers!
-  // Dieser Log hilft dir zu verstehen, warum `isCreator` true oder false ist.
-  console.log(
-    `[GroupHeaderCard] Group: "${group?.name}", Created By ID: ${group?.createdById} (Typ: ${typeof group?.createdById}), Current User ID: ${currentUserId} (Typ: ${typeof currentUserId}), Is Creator: ${isCreator}`
-  );
 
   return (
     <>
@@ -62,85 +61,145 @@ export function GroupHeaderCard({
           'border border-white/20 dark:border-white/10 rounded-xl transition-all duration-300 ease-in-out hover:shadow-2xl'
         )}
       >
-        <CardHeader className='flex flex-col md:flex-row md:items-start md:justify-between gap-4 p-5 md:p-6'>
-          {/* Linke Seite: Titel, Beschreibung */}
-          <div className='flex-1 space-y-1.5 min-w-0'>
-            <CardTitle className='text-2xl lg:text-3xl font-extrabold text-foreground group-hover:text-primary transition-colors duration-300'>
+        <CardHeader
+          className={cn(
+            'flex flex-row items-start justify-between gap-x-3 sm:gap-x-4',
+            'p-4 sm:p-5 md:p-6'
+          )}
+        >
+          <div className='flex-1 space-y-1 min-w-0'>
+            <CardTitle
+              className={cn(
+                'font-extrabold text-foreground group-hover:text-primary transition-colors duration-300',
+                'text-base xs:text-lg sm:text-xl md:text-2xl',
+                'whitespace-nowrap overflow-hidden text-ellipsis'
+              )}
+              title={group.name || 'Unbenannte Gruppe'}
+            >
               {group.name || 'Unbenannte Gruppe'}
             </CardTitle>
             {group.description && (
-              <CardDescription className='mt-1 text-sm text-muted-foreground/90 group-hover:text-muted-foreground transition-colors duration-300 max-w-2xl'>
+              <CardDescription
+                className={cn(
+                  'text-xs sm:text-sm text-muted-foreground/90 group-hover:text-muted-foreground transition-colors duration-300',
+                  'max-w-full',
+                  'line-clamp-2'
+                )}
+                title={group.description || ''}
+              >
                 {group.description}
               </CardDescription>
             )}
-            {!group.inviteToken && (
-              <p className='flex items-center text-xs text-amber-600 dark:text-amber-500 mt-2 pt-1'>
+            {!group.description && !group.inviteToken && (
+              <p className='flex items-center text-xs text-amber-600 dark:text-amber-500 mt-1 pt-0.5 whitespace-nowrap overflow-hidden text-ellipsis'>
                 <Info className='mr-1.5 h-3.5 w-3.5 flex-shrink-0' />
-                Diese Gruppe hat aktuell keinen Einladungslink.
+                Kein Einladungslink
               </p>
             )}
           </div>
 
-          {/* Rechte Seite: Aktionen */}
-          <div className='flex flex-col sm:flex-row sm:items-center gap-2 flex-shrink-0 pt-2 md:pt-0'>
-            <AddEventDialog
-              groupName={group.name}
-              open={isAddEventDialogOpen}
-              setOpen={onSetAddEventDialogOpen}
-              form={addEventForm}
-              onSubmit={onAddEventSubmit}
-              triggerProps={{
-                variant: 'outline',
-                size: 'sm',
-                className:
-                  'bg-transparent hover:bg-primary/10 border-primary/30 text-primary hover:text-primary dark:border-primary/40 dark:hover:bg-primary/10 transition-all duration-200 w-full sm:w-auto',
-                children: (
-                  <>
-                    <PlusCircle className='mr-2 h-4 w-4' /> Event erstellen
-                  </>
-                ),
-              }}
-            />
-
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => setIsInviteDialogOpen(true)}
-              disabled={!group.inviteToken}
-              aria-label='Freunde einladen'
-              className='bg-transparent hover:bg-accent/50 border-foreground/20 text-foreground/80 hover:text-foreground disabled:opacity-50 dark:border-foreground/30 transition-all duration-200 w-full sm:w-auto'
-            >
-              <Share2 className='mr-2 h-4 w-4' />
-              Einladen
-            </Button>
-
-            {isCreator && (
-              <GroupActionsMenu
-                group={group}
-                onDelete={() => onDeleteGroup(group)} // Stellt sicher, dass das ganze Group-Objekt übergeben wird
-                // Falls GroupActionsMenu weitere Props benötigt (z.B. für Umbenennen etc.), hier hinzufügen.
-                // Zum Beispiel:
-                // onRename={(g) => console.log("Rename action for", g.name)}
+          <div className='flex items-center gap-x-1 xs:gap-x-2 flex-shrink-0'>
+            <div className='hidden sm:flex sm:items-center sm:gap-x-1.5 md:gap-x-2'>
+              <AddEventDialog
+                groupName={group.name}
+                open={isAddEventDialogOpen}
+                setOpen={onSetAddEventDialogOpen}
+                form={addEventForm}
+                onSubmit={onAddEventSubmit}
+                triggerProps={{
+                  variant: 'outline',
+                  size: 'sm',
+                  className: cn(
+                    'bg-transparent hover:bg-primary/10 border-primary/30 text-primary hover:text-primary dark:border-primary/40 dark:hover:bg-primary/10 transition-all duration-200',
+                    'flex items-center overflow-hidden px-2 md:px-3'
+                  ),
+                  children: (
+                    <>
+                      <PlusCircle className='h-4 w-4 flex-shrink-0 sm:mr-1 md:mr-1.5' />
+                      <span className='whitespace-nowrap overflow-hidden text-ellipsis hidden xs:inline'>
+                        Event
+                      </span>
+                    </>
+                  ),
+                }}
               />
-            )}
-            {/* Wenn du das Menü ZU TESTZWECKEN IMMER sehen willst, auch wenn isCreator false ist: */}
-            {/*
-            {!isCreator && (
-              <div className="p-2 border border-dashed border-yellow-500">
-                <p className="text-xs text-yellow-600">DEBUG: Menü wäre hier (isCreator ist false)</p>
+              <Button
+                size='sm'
+                onClick={() => setIsInviteDialogOpen(true)}
+                disabled={!group.inviteToken}
+                aria-label='Freunde einladen'
+                className={cn(
+                  'text-white disabled:opacity-50 transition-all duration-200',
+                  'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500',
+                  'flex items-center overflow-hidden px-2 md:px-3'
+                )}
+              >
+                <Share2 className='h-4 w-4 flex-shrink-0 sm:mr-1 md:mr-1.5' />
+                <span className='whitespace-nowrap overflow-hidden text-ellipsis hidden xs:inline'>
+                  Einladen
+                </span>
+              </Button>
+            </div>
+
+            {/* Dreipunktemenü für Aktionen (inkl. Gruppe löschen für Creator) */}
+            <div className='sm:hidden'>
+              {' '}
+              {/* Mobiles Menü für Event erstellen & Einladen */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    aria-label='Weitere Aktionen'
+                    className='h-8 w-8 xs:h-9 xs:w-9'
+                  >
+                    <MoreHorizontal className='h-4 w-4 xs:h-5 xs:w-5' />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='end' sideOffset={5}>
+                  <DropdownMenuItem
+                    onClick={() => onSetAddEventDialogOpen(true)}
+                  >
+                    <PlusCircle className='mr-2 h-4 w-4' />
+                    <span>Event erstellen</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setIsInviteDialogOpen(true)}
+                    disabled={!group.inviteToken}
+                  >
+                    <Share2 className='mr-2 h-4 w-4' />
+                    <span>Einladen</span>
+                  </DropdownMenuItem>
+                  {/* Gruppe löschen Option hier im mobilen Menü, wenn Creator */}
+                  {isCreator && (
+                    <DropdownMenuItem
+                      onClick={() => onDeleteGroup(group)}
+                      className='text-destructive focus:text-destructive focus:bg-destructive/10'
+                    >
+                      {/* Ggf. Trash-Icon hier */}
+                      Gruppe löschen
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            {/* Separates GroupActionsMenu für Desktop, nur wenn Creator */}
+            {isCreator && (
+              <div className='hidden sm:block'>
+                {' '}
+                {/* Nur auf Desktop anzeigen */}
                 <GroupActionsMenu
                   group={group}
                   onDelete={() => onDeleteGroup(group)}
+                  // Hier könnten weitere Aktionen wie Umbenennen etc. hin
                 />
               </div>
             )}
-            */}
           </div>
         </CardHeader>
       </Card>
 
-      {/* Invite Dialog (außerhalb der Card) */}
-      {group.inviteToken && ( // Dialog nur rendern, wenn ein Token existiert, um Fehler zu vermeiden
+      {group.inviteToken && (
         <InviteDialog
           open={isInviteDialogOpen}
           setOpen={setIsInviteDialogOpen}
