@@ -41,7 +41,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   /* Manual instructions */
   const showManualHint = () => {
     const txt = isiOS()
-      ? 'Teile‑/Actions‑Button → "Zum Home‑Bildschirm"'
+      ? 'Am Besten einloogen & dann Teilen‑/Actions‑Button → "Zum Home‑Bildschirm"'
       : isAndroid()
         ? 'Chrome-Menü → "Zum Home‑Bildschirm"'
         : 'Installationsoption im Browser-Menü';
@@ -158,7 +158,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       'fbetPwaInstallState',
                       'dismissed_toast_permanently'
                     );
-                    toast.dismiss(t); // KORREKTUR: t statt t.id
+                    toast.dismiss(t);
                   }}
                 >
                   Nicht jetzt
