@@ -1,121 +1,116 @@
-// src/context/AuthContext.tsx
-'use client'; // Wichtig für Context mit Hooks
+'use client';
 
 import React, {
   createContext,
-  useState,
   useContext,
   useEffect,
-  ReactNode,
+  useState,
   useCallback,
 } from 'react';
-import { loginUser, getCurrentUser, ApiError } from '@/app/lib/api'; // Importiere API-Funktionen
-import { UserOut, Token } from '@/app/lib/types'; // Importiere Typen
+import Cookies from 'js-cookie';
+import { loginUser, getCurrentUser, ApiError } from '@/app/lib/api';
+import type { UserOut } from '@/app/lib/types';
 
-interface AuthContextType {
-  token: string | null;
+interface AuthCtx {
   user: UserOut | null;
+  token: string | null;
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const STORAGE_KEY = 'fbet_token';
+const COOKIE_KEY = 'fbet_token';
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+const AuthContext = createContext<AuthCtx | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<UserOut | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Startet true für initialen Check
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Funktion zum Laden des Users basierend auf Token
-  const fetchUser = useCallback(async (currentToken: string) => {
+  /* 🔐 Load stored token once */
+  useEffect(() => {
+    const stored =
+      typeof window !== 'undefined'
+        ? localStorage.getItem(STORAGE_KEY) || Cookies.get(COOKIE_KEY)
+        : null;
+    if (stored) setToken(stored);
+    else setIsLoading(false);
+  }, []);
+
+  /* 👤 Fetch current user when token changes */
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const me = await getCurrentUser(token);
+        setUser(me);
+      } catch (err) {
+        console.error('[Auth] getCurrentUser failed', err);
+        flushToken();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [token]);
+
+  const persistToken = (tok: string) => {
+    localStorage.setItem(STORAGE_KEY, tok);
+    Cookies.set(COOKIE_KEY, tok, { expires: 7 });
+  };
+
+  const flushToken = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem(STORAGE_KEY);
+    Cookies.remove(COOKIE_KEY);
+  };
+
+  /* 🔑 login */
+  const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const userData = await getCurrentUser(currentToken);
-      setUser(userData);
-      setToken(currentToken); // Bestätige Token, wenn User erfolgreich geladen
+      const { access_token } = await loginUser(email, password);
+      persistToken(access_token);
+      setToken(access_token);
+      const me = await getCurrentUser(access_token);
+      setUser(me);
+      return true;
     } catch (err) {
-      console.error('Failed to fetch user', err);
-      // Token ist ungültig oder User nicht gefunden -> ausloggen
-      setToken(null);
-      setUser(null);
-      localStorage.removeItem('authToken'); // Token aus Speicher entfernen
-      if (err instanceof ApiError) {
-        setError(err.detail || err.message);
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred while fetching user data.');
-      }
+      const msg =
+        err instanceof ApiError
+          ? err.detail || err.message
+          : 'Unbekannter Fehler';
+      setError(msg);
+      flushToken();
+      return false;
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Initialer Check beim Laden der App (nur client-seitig)
-  useEffect(() => {
-    const storedToken = localStorage.getItem('authToken');
-    if (storedToken) {
-      fetchUser(storedToken);
-    } else {
-      setIsLoading(false); // Kein Token gefunden, Ladevorgang beendet
-    }
-  }, [fetchUser]);
-
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const tokenData: Token = await loginUser(email, password);
-      localStorage.setItem('authToken', tokenData.access_token); // Token speichern
-      await fetchUser(tokenData.access_token); // User-Daten holen & Zustand setzen
-      return true; // Login erfolgreich
-    } catch (err) {
-      console.error('Login failed', err);
-      localStorage.removeItem('authToken'); // Sicherstellen, dass kein alter Token bleibt
-      setToken(null);
-      setUser(null);
-      if (err instanceof ApiError) {
-        setError(err.detail || err.message);
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unknown error occurred during login.');
-      }
-      setIsLoading(false);
-      return false; // Login fehlgeschlagen
-    }
-    // setIsLoading wird in fetchUser auf false gesetzt
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    setError(null);
-    localStorage.removeItem('authToken'); // Token entfernen
-    // Optional: Weiterleitung zur Login-Seite (kann auch in der Komponente erfolgen)
-    // window.location.href = '/login';
-  };
+  /* 🚪 logout */
+  const logout = useCallback(() => {
+    flushToken();
+  }, []);
 
   return (
     <AuthContext.Provider
-      value={{ token, user, isLoading, error, login, logout }}
+      value={{ user, token, isLoading, error, login, logout }}
     >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Hook für einfachen Zugriff auf den Context
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
+  return ctx;
 };

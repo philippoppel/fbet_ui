@@ -1,13 +1,13 @@
-// src/app/login/page.tsx
 'use client';
 
-import { useState, useEffect, Suspense } from 'react'; // Suspense importieren
-import { useRouter, useSearchParams } from 'next/navigation'; // useSearchParams importieren
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 import { useAuth } from '@/app/context/AuthContext';
 import { Button } from '@/app/components/ui/button';
@@ -28,164 +28,166 @@ import {
   FormLabel,
   FormMessage,
 } from '@/app/components/ui/form';
-import { Loader2 } from 'lucide-react'; // Für Ladeanzeige
 
-const formSchema = z.object({
-  email: z
-    .string()
-    .email({ message: 'Bitte gib eine gültige E-Mail-Adresse ein.' }),
-  password: z.string().min(1, { message: 'Bitte gib dein Passwort ein.' }),
+/* ------------------ Validation ------------------ */
+const schema = z.object({
+  email: z.string().email('Gib eine gültige E‑Mail an.'),
+  password: z.string().min(1, 'Bitte Passwort eingeben.'),
 });
 
-// Eigene Komponente für den Inhalt, um useSearchParams verwenden zu können
-function LoginContent() {
+type FormData = z.infer<typeof schema>;
+
+/* ------------------ Inner content ------------------ */
+function LoginCard() {
   const router = useRouter();
-  const searchParams = useSearchParams(); // Hook hier verwenden
-  const auth = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const searchParams = useSearchParams();
+  const { user, isLoading: authLoading, login } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [pwVisible, setPwVisible] = useState(false);
+  const redirectPath = searchParams.get('redirect') || '/dashboard';
 
-  // Redirect-Pfad aus der URL lesen
-  const redirectPath = searchParams.get('redirect');
+  /* Auto‑redirect if already authed */
+  useEffect(() => {
+    if (!authLoading && user) router.replace(redirectPath);
+  }, [authLoading, user, redirectPath, router]);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
   });
 
-  // Redirect Logic, wenn User bereits eingeloggt ist (beim Laden der Seite)
-  useEffect(() => {
-    if (!auth.isLoading && auth.user) {
-      const targetPath = redirectPath || '/dashboard';
-      console.log(
-        `LoginContent Effect: User logged in, redirecting to ${targetPath}`
-      );
-      router.replace(targetPath);
-    }
-  }, [auth.isLoading, auth.user, router, redirectPath]);
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true);
-    console.log('Versuche Login für:', values.email);
-    const success = await auth.login(values.email, values.password);
-    setIsSubmitting(false);
-    if (success) {
-      toast.success('Login erfolgreich!');
-      // Nach erfolgreichem Login zum redirectPath oder /dashboard weiterleiten
-      // Der useEffect oben wird dies auch tun, aber hier ist es expliziter nach dem Klick
-      const targetPath = redirectPath || '/dashboard';
-      console.log(`Login Submit Success: Redirecting to ${targetPath}`);
-      router.replace(targetPath); // router.replace, um nicht im Verlauf zu landen
+  const onSubmit = async (values: FormData) => {
+    setSubmitting(true);
+    const ok = await login(values.email, values.password);
+    setSubmitting(false);
+    if (ok) {
+      toast.success('Willkommen zurück!');
+      router.replace(redirectPath);
     } else {
       toast.error('Login fehlgeschlagen', {
-        description:
-          auth.error || 'Bitte überprüfe deine E-Mail und dein Passwort.',
+        description: 'Bitte Daten prüfen.',
       });
-      console.error('Login fehlgeschlagen:', auth.error);
     }
-  }
+  };
 
-  // --- Konditionale Render-Logik innerhalb von LoginContent ---
-  if (auth.isLoading || (!auth.isLoading && auth.user)) {
-    // Zeige Ladeanzeige, während Auth lädt oder der Redirect im useEffect vorbereitet wird
+  if (authLoading || user) {
     return (
-      <div className='flex items-center justify-center min-h-[300px]'>
+      <div className='flex flex-col items-center justify-center gap-3 py-20'>
         <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-        <span className='ml-2'>Wird geladen...</span>
+        <p className='text-sm text-muted-foreground'>Lade…</p>
       </div>
     );
   }
 
-  // Nur wenn NICHT geladen wird UND KEIN User eingeloggt ist, zeige das Formular:
   return (
-    <Card className='w-full max-w-sm'>
-      <CardHeader>
-        <CardTitle className='text-2xl'>Login</CardTitle>
-        <CardDescription>
-          Gib deine E-Mail und dein Passwort ein, um dich anzumelden.
-          {redirectPath && (
-            <p className='text-sm text-blue-600 mt-2'>
-              Du wirst nach dem Login weitergeleitet.
-            </p>
-          )}
-        </CardDescription>
+    <Card className='w-full max-w-md shadow-xl border-border/60 bg-card/80 backdrop-blur'>
+      <CardHeader className='text-center space-y-2'>
+        <img src='/icon0.svg' aria-hidden height={36} className='mx-auto' />
+        <CardTitle className='text-2xl font-bold tracking-tight'>
+          Anmelden
+        </CardTitle>
+        <CardDescription>Schön, dich zu sehen! Logge dich ein.</CardDescription>
       </CardHeader>
+
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
-          <CardContent className='grid gap-4'>
-            <FormField
-              control={form.control}
-              name='email'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>E-Mail</FormLabel>
-                  <FormControl>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          autoComplete='on'
+          className='space-y-6 p-6 pt-0'
+        >
+          <FormField
+            control={form.control}
+            name='email'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>E‑Mail</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    id='email'
+                    name='email'
+                    type='email'
+                    autoComplete='username email'
+                    placeholder='name@example.com'
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='password'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Passwort</FormLabel>
+                <FormControl>
+                  <div className='relative'>
                     <Input
-                      placeholder='deine@email.de'
-                      type='email'
-                      autoComplete='email'
                       {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='password'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Passwort</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder='********'
-                      type='password'
+                      id='password'
+                      name='password'
+                      type={pwVisible ? 'text' : 'password'}
                       autoComplete='current-password'
-                      {...field}
+                      placeholder='••••••••'
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-          <CardFooter className='flex flex-col gap-4 pt-0'>
-            <Button type='submit' className='w-full' disabled={isSubmitting}>
-              {isSubmitting ? (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              ) : null}
-              {isSubmitting ? 'Logge ein...' : 'Login'}
-            </Button>
-            <p className='text-center text-sm text-muted-foreground'>
-              Noch kein Konto?{' '}
-              <Link
-                // Wichtig: Redirect-Parameter auch an Registrierung weitergeben!
-                href={`/register?redirect=${encodeURIComponent(redirectPath || '')}`}
-                className='underline hover:text-foreground'
-              >
-                Registrieren
-              </Link>
-            </p>
-          </CardFooter>
+                    <Button
+                      type='button'
+                      size='icon'
+                      variant='ghost'
+                      className='absolute right-0 top-0 h-full w-9 text-muted-foreground'
+                      onClick={() => setPwVisible((v) => !v)}
+                      tabIndex={-1}
+                    >
+                      {pwVisible ? (
+                        <EyeOff className='h-4 w-4' />
+                      ) : (
+                        <Eye className='h-4 w-4' />
+                      )}
+                    </Button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <Button type='submit' className='w-full' disabled={submitting}>
+            {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+            Anmelden
+          </Button>
         </form>
       </Form>
+
+      <CardFooter className='flex flex-col gap-4 pt-0'>
+        <p className='text-sm text-muted-foreground text-center w-full'>
+          Neu hier?{' '}
+          <Link
+            href={`/register?redirect=${encodeURIComponent(redirectPath)}`}
+            className='underline underline-offset-4 hover:text-foreground'
+          >
+            Konto erstellen
+          </Link>
+        </p>
+      </CardFooter>
     </Card>
   );
 }
 
-// Hauptkomponente, die Suspense bereitstellt
+/* ------------------ Page wrapper ------------------ */
 export default function LoginPage() {
   return (
-    <div className='flex items-center justify-center min-h-screen bg-background'>
+    <div className='min-h-dvh flex items-center justify-center bg-gradient-to-b from-background to-slate-50 dark:from-slate-900 dark:to-slate-800 p-4'>
       <Suspense
         fallback={
-          <div className='flex items-center justify-center'>
+          <div className='flex flex-col items-center gap-3 py-20'>
             <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-            <span className='ml-2'>Lade Login...</span>
+            <p className='text-sm text-muted-foreground'>Lade Login…</p>
           </div>
         }
       >
-        <LoginContent />
+        <LoginCard />
       </Suspense>
     </div>
   );
