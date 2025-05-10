@@ -68,28 +68,6 @@ export function GroupSidebar({
     // );
   }, [currentUserId, isCollapsed, groups, isLoading, error]);
 
-  const handleDeleteInitiated = (group: Group) => {
-    setGroupToDelete(group);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDelete = async () => {
-    if (groupToDelete) {
-      try {
-        await onDeleteGroup(groupToDelete.id);
-        toast.success(
-          `Gruppe "${groupToDelete.name || groupToDelete.id}" wurde gelöscht.`
-        );
-        setGroupToDelete(null);
-      } catch (e: any) {
-        toast.error('Fehler beim Löschen der Gruppe', {
-          description: e.message,
-        });
-      }
-    }
-    setShowDeleteDialog(false);
-  };
-
   return (
     <TooltipProvider delayDuration={100}>
       {/* Container mit angepasstem Design (unverändert) */}
@@ -252,12 +230,6 @@ export function GroupSidebar({
                       >
                         {group.name || `Gruppe ${group.id}`}
                       </Button>
-                      {isCreator && !isCollapsed && (
-                        <GroupActionsMenu
-                          group={group}
-                          onDelete={handleDeleteInitiated}
-                        />
-                      )}
                     </li>
                   );
                 })}
@@ -288,73 +260,6 @@ export function GroupSidebar({
           </div>
         )}
       </div>
-
-      {/* AlertDialog für Löschbestätigung (MODIFIZIERT) */}
-      {groupToDelete && (
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent
-            className={cn(
-              // Entfernt Standard-Hintergrund und -Rand, falls vorhanden, um Konflikte zu vermeiden.
-              // Die shadcn/ui Default-Klassen (border, bg-background, shadow-lg, sm:rounded-lg)
-              // werden durch unsere spezifischeren Klassen überschrieben oder ergänzt.
-
-              // Eigene Stile für "Glas"-Effekt:
-              'rounded-xl shadow-xl', // Abrundung und Schatten
-
-              // Hintergrund (leicht transparent, Gradient oder einzelne Farbe)
-              // Einfache transparente Farbe (ähnlich Sidebar):
-              // 'bg-background/80 dark:bg-slate-900/70',
-              // Oder Gradient (ähnlich GroupHeaderCard):
-              'bg-gradient-to-br from-background/80 via-background/75 to-background/80',
-              'dark:from-slate-900/80 dark:via-slate-800/75 dark:to-slate-900/80',
-
-              // Backdrop-Filter für Unschärfe-Effekt
-              'backdrop-blur-lg supports-[backdrop-filter]:bg-opacity-75', // bg-opacity als Fallback
-
-              // Eigener Rand
-              'border border-white/20 dark:border-white/10'
-            )}
-          >
-            <AlertDialogHeader>
-              <AlertDialogTitle className='text-foreground'>
-                {' '}
-                {/* Sicherstellen, dass Textfarbe passt */}
-                Gruppe &#34;{groupToDelete.name || groupToDelete.id}&#34;
-                wirklich löschen?
-              </AlertDialogTitle>
-              <AlertDialogDescription className='text-muted-foreground/90'>
-                {' '}
-                {/* Ggf. Opazität anpassen für Lesbarkeit */}
-                Diese Aktion kann nicht rückgängig gemacht werden. Alle
-                zugehörigen Daten, wie Mitglieder und Veranstaltungen, werden
-                ebenfalls dauerhaft entfernt.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                onClick={() => {
-                  setGroupToDelete(null);
-                  setShowDeleteDialog(false);
-                }}
-                // Angepasster Stil für den Abbrechen-Button
-                className={cn(
-                  'bg-transparent hover:bg-white/10 dark:hover:bg-black/20', // Subtiler Hover-Effekt
-                  'border border-white/20 dark:border-white/10', // Passender Rand
-                  'text-foreground' // Textfarbe
-                )}
-              >
-                Abbrechen
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                className='bg-destructive text-destructive-foreground hover:bg-destructive/90' // Dieser Button kann so bleiben
-              >
-                Löschen
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
     </TooltipProvider>
   );
 }

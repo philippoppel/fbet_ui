@@ -1,7 +1,7 @@
 // src/app/components/dashboard/GroupActionsMenu.tsx
 'use client';
 
-import React, { useState, useCallback } from 'react'; // useState und useCallback importieren
+import React, { useState, useCallback } from 'react';
 import { Button } from '@/app/components/ui/button';
 import {
   Trash2,
@@ -30,9 +30,6 @@ import { toast } from 'sonner';
 interface GroupActionsMenuProps {
   group: Group;
   onDelete: (group: Group) => void;
-  // onRename?: (group: Group) => void;
-  // onEditDescription?: (group: Group) => void;
-  // onChangeImage?: (group: Group) => void;
 }
 
 const handlePlaceholderAction = (
@@ -57,17 +54,17 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
       console.log(
         `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) handleDropdownOpenChange - Neuer Zustand: ${open}, isDeleteActionPending: ${isDeleteActionPending}`
       );
-      setIsDropdownOpen(open); // Aktualisiere den kontrollierten Zustand
+      setIsDropdownOpen(open);
 
       if (!open && isDeleteActionPending) {
         console.log(
           `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) Dropdown geschlossen, führe ausstehende Löschaktion aus.`
         );
         onDelete(group);
-        setIsDeleteActionPending(false); // Wichtig: Aktion zurücksetzen
+        setIsDeleteActionPending(false);
       }
     },
-    [group, onDelete, isDeleteActionPending] // Abhängigkeiten korrekt setzen
+    [group, onDelete, isDeleteActionPending]
   );
 
   const handleSelectDeleteAction = useCallback(() => {
@@ -76,9 +73,6 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
       `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) handleSelectDeleteAction - "Gruppe löschen" ausgewählt.`
     );
     setIsDeleteActionPending(true);
-    // Das Dropdown schließt sich bei onSelect automatisch durch Radix UI.
-    // onOpenChange wird dann von Radix UI mit `false` aufgerufen.
-    // setIsDropdownOpen(false); // Explizites Schließen hier ist nicht unbedingt nötig.
   }, [group]);
 
   return (
@@ -89,12 +83,13 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
       >
         <Tooltip>
           <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuTrigger asChild>
               <Button
                 variant='ghost'
                 size='icon'
                 className='p-1 h-7 w-7 text-muted-foreground hover:text-foreground data-[state=open]:bg-white/20 dark:data-[state=open]:bg-white/10 flex-shrink-0 rounded-md'
                 aria-label={`Optionen für Gruppe "${group.name || group.id}"`}
+                onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className='h-4 w-4' />
               </Button>
@@ -120,7 +115,6 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
             <Edit3 className='mr-2 h-4 w-4' />
             Name ändern
           </DropdownMenuItem>
-          {/* ... Weitere Placeholder-Menüitems ... */}
           <DropdownMenuItem
             className='focus:bg-accent focus:text-accent-foreground text-sm cursor-pointer'
             onSelect={() =>
@@ -147,7 +141,7 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
           </DropdownMenuItem>
           <DropdownMenuSeparator className='bg-border/50' />
           <DropdownMenuItem
-            onSelect={handleSelectDeleteAction} // Geändert: Ruft jetzt handleSelectDeleteAction auf
+            onSelect={handleSelectDeleteAction}
             className='text-destructive focus:bg-destructive/20 focus:text-destructive text-sm cursor-pointer'
           >
             <Trash2 className='mr-2 h-4 w-4' />
