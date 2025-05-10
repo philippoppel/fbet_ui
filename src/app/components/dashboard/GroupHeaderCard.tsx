@@ -224,13 +224,11 @@ export function GroupHeaderCard({
             </div>
 
             {isCreator && (
-              <div className='hidden sm:block'>
-                <GroupActionsMenu
-                  group={group}
-                  onDelete={() => onDeleteGroup(group)}
-                  onImageChanged={onImageChanged}
-                />
-              </div>
+              <GroupActionsMenu
+                group={group}
+                onDelete={() => onDeleteGroup(group)}
+                onImageChanged={onImageChanged}
+              />
             )}
           </div>
         </CardHeader>

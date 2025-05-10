@@ -88,18 +88,6 @@ export function AppHeader({
                     }}
                   />
                 </div>
-                <div className='p-4 border-t mt-auto bg-background'>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    asChild
-                    className='w-full'
-                  >
-                    <Link href='/dashboard/groups/create'>
-                      <PlusCircle className='mr-2 w-4 h-4' /> Gruppe erstellen
-                    </Link>
-                  </Button>
-                </div>
               </SheetContent>
             </Sheet>
           </div>
