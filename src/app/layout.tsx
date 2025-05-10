@@ -105,6 +105,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     }
   }, [deferredPrompt]);
 
+  /* ⇢ Listen for global manual dispatch (Landing‑Page link) */
+  useEffect(() => {
+    const handler = () => handleInstallClick();
+    window.addEventListener('requestPWAInstall', handler);
+    return () => window.removeEventListener('requestPWAInstall', handler);
+  }, [handleInstallClick]);
+
   /* Manual instructions */
   const showManualHint = () => {
     const txt = isiOS()
@@ -115,7 +122,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     toast.info('Manuelle Installation', { description: txt, duration: 8000 });
   };
 
-  /* ------------------ SW REGISTRATION (unchanged) ------------------ */
+  /* ------------------ SW REGISTRATION ------------------ */
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     const regSw = async () => {
