@@ -74,9 +74,9 @@ export async function GET(req: NextRequest, context: any) {
 
 export async function PATCH(
   req: NextRequest,
-  ctx: { params: { groupId: string } }
+  context: { params: { groupId: string } }
 ) {
-  const groupId = parseInt(ctx.params.groupId, 10);
+  const groupId = parseInt(context.params.groupId, 10);
   const json = await req.json();
 
   const parsed = groupUpdateSchema.safeParse(json);
