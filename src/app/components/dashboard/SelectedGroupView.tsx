@@ -1,14 +1,13 @@
-// src/app/components/dashboard/SelectedGroupView.tsx
 'use client';
 
 import { useCallback } from 'react';
 import type { Group, Event as GroupEvent, UserOut } from '@/app/lib/types';
 import type { UseGroupInteractionsReturn } from '@/app/hooks/useGroupInteractions';
 
-import { GroupHeaderCard } from './GroupHeaderCard';
 import { OpenEventsCard } from './OpenEventsCard';
 import { ClosedEventsCard } from './ClosedEventsCard';
 import DeleteEventDialog from './DeleteEventDialog';
+import { GroupHeaderCard } from '@/app/components/dashboard/GroupHeaderCard';
 
 type SelectedGroupViewProps = {
   group: Group;
@@ -27,7 +26,6 @@ export function SelectedGroupView({
   userSubmittedTips,
   onDeleteGroup,
 }: SelectedGroupViewProps) {
-  // -------------------- Handler fürs endgültige Löschen --------------------
   const handleConfirmDeleteEvent = useCallback(
     async (eventId: number) => {
       await interactions.handleConfirmDeleteEvent(eventId);
@@ -64,13 +62,14 @@ export function SelectedGroupView({
         onSetResult={interactions.handleSetResult}
         onClearSelectedTip={interactions.handleClearSelectedTip}
         onInitiateDeleteEvent={interactions.handleInitiateDeleteEvent}
+        onOpenAddEventDialog={() => interactions.setIsAddEventDialogOpen(true)} // 🔧 Wichtig: Neues Prop übergeben!
       />
 
       {/* ───────── Geschlossene Events ───────── */}
       <ClosedEventsCard events={events} />
 
       {/* ───────── Delete-Event-Dialog ───────── */}
-      {interactions.eventToDelete && ( //  ← nur dann rendern!
+      {interactions.eventToDelete && (
         <DeleteEventDialog
           event={interactions.eventToDelete}
           onClose={interactions.resetDeleteEventDialog}

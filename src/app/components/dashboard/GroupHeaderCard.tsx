@@ -1,4 +1,3 @@
-// src/app/components/dashboard/GroupHeaderCard.tsx
 'use client';
 
 import { useState } from 'react';
@@ -22,16 +21,16 @@ import type { UseFormReturn } from 'react-hook-form';
 import type { AddEventFormData } from '@/app/hooks/useGroupInteractions';
 import { Share2, PlusCircle, Info, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
-import { GroupActionsMenu } from '@/app/components/dashboard/GroupActionMenu'; // Import für GroupActionsMenu
+import { GroupActionsMenu } from '@/app/components/dashboard/GroupActionMenu';
 
 type GroupHeaderCardProps = {
   group: Group;
-  addEventForm: UseFormReturn<AddEventFormData>; // Aus SelectedGroupView (via interactions)
-  onAddEventSubmit: (data: AddEventFormData) => void; // Aus SelectedGroupView (via interactions)
-  isAddEventDialogOpen: boolean; // Aus SelectedGroupView (via interactions)
-  onSetAddEventDialogOpen: (isOpen: boolean) => void; // Aus SelectedGroupView (via interactions)
-  currentUserId: number | undefined | null; // <<--- HIER HINZUGEFÜGT/KORRIGIERT
-  onDeleteGroup: (group: Group) => void; // Funktion zum Initiieren des Löschvorgangs
+  addEventForm: UseFormReturn<AddEventFormData>;
+  onAddEventSubmit: (data: AddEventFormData) => void;
+  isAddEventDialogOpen: boolean;
+  onSetAddEventDialogOpen: (isOpen: boolean) => void;
+  currentUserId: number | undefined | null;
+  onDeleteGroup: (group: Group) => void;
 };
 
 export function GroupHeaderCard({
@@ -40,10 +39,11 @@ export function GroupHeaderCard({
   onAddEventSubmit,
   isAddEventDialogOpen,
   onSetAddEventDialogOpen,
-  currentUserId, // Wird jetzt korrekt empfangen
+  currentUserId,
   onDeleteGroup,
 }: GroupHeaderCardProps) {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const isCreator =
     currentUserId != null &&
@@ -78,18 +78,35 @@ export function GroupHeaderCard({
             >
               {group.name || 'Unbenannte Gruppe'}
             </CardTitle>
+
             {group.description && (
-              <CardDescription
-                className={cn(
-                  'text-xs sm:text-sm text-muted-foreground/90 group-hover:text-muted-foreground transition-colors duration-300',
-                  'max-w-full',
-                  'line-clamp-2'
+              <div className='relative'>
+                <CardDescription
+                  className={cn(
+                    'text-xs sm:text-sm text-muted-foreground/90 group-hover:text-muted-foreground transition-colors duration-300',
+                    'max-w-full',
+                    !isDescriptionExpanded && 'line-clamp-2'
+                  )}
+                  title={group.description}
+                >
+                  {group.description}
+                </CardDescription>
+                {group.description.length > 80 && (
+                  <button
+                    type='button'
+                    onClick={() =>
+                      setIsDescriptionExpanded(!isDescriptionExpanded)
+                    }
+                    className='mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline'
+                  >
+                    {isDescriptionExpanded
+                      ? 'Weniger anzeigen'
+                      : 'Mehr anzeigen'}
+                  </button>
                 )}
-                title={group.description || ''}
-              >
-                {group.description}
-              </CardDescription>
+              </div>
             )}
+
             {!group.description && !group.inviteToken && (
               <p className='flex items-center text-xs text-amber-600 dark:text-amber-500 mt-1 pt-0.5 whitespace-nowrap overflow-hidden text-ellipsis'>
                 <Info className='mr-1.5 h-3.5 w-3.5 flex-shrink-0' />
@@ -123,6 +140,7 @@ export function GroupHeaderCard({
                   ),
                 }}
               />
+
               <Button
                 size='sm'
                 onClick={() => setIsInviteDialogOpen(true)}
@@ -141,10 +159,8 @@ export function GroupHeaderCard({
               </Button>
             </div>
 
-            {/* Dreipunktemenü für Aktionen (inkl. Gruppe löschen für Creator) */}
+            {/* Mobiles Menü */}
             <div className='sm:hidden'>
-              {' '}
-              {/* Mobiles Menü für Event erstellen & Einladen */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -170,28 +186,23 @@ export function GroupHeaderCard({
                     <Share2 className='mr-2 h-4 w-4' />
                     <span>Einladen</span>
                   </DropdownMenuItem>
-                  {/* Gruppe löschen Option hier im mobilen Menü, wenn Creator */}
                   {isCreator && (
                     <DropdownMenuItem
                       onClick={() => onDeleteGroup(group)}
                       className='text-destructive focus:text-destructive focus:bg-destructive/10'
                     >
-                      {/* Ggf. Trash-Icon hier */}
                       Gruppe löschen
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            {/* Separates GroupActionsMenu für Desktop, nur wenn Creator */}
+
             {isCreator && (
               <div className='hidden sm:block'>
-                {' '}
-                {/* Nur auf Desktop anzeigen */}
                 <GroupActionsMenu
                   group={group}
                   onDelete={() => onDeleteGroup(group)}
-                  // Hier könnten weitere Aktionen wie Umbenennen etc. hin
                 />
               </div>
             )}

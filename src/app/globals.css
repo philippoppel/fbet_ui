@@ -91,8 +91,8 @@
   --background: oklch(0.12 0.01 260);
   --foreground: oklch(0.96 0.01 260);
 
-  --card: oklch(0.16 0.01 260);
-  --card-foreground: oklch(0.98 0.01 260);
+  --card: oklch(0.22 0.02 260); /* z.B. wie --muted, nur leicht abgesetzt */
+  --card-foreground: oklch(0.96 0.01 260); /* bleibt wie gehabt */
 
   --popover: oklch(0.18 0.02 260);
   --popover-foreground: oklch(1 0 0);
