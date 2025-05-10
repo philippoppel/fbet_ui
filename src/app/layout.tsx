@@ -163,7 +163,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           sizes='180x180'
           href='/apple-touch-icon.png'
         />
-        <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
       </head>
       <body className='font-sans antialiased'>
         <ThemeProvider

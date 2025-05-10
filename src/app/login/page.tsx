@@ -13,7 +13,6 @@ import { useAuth } from '@/app/context/AuthContext';
 import { Button } from '@/app/components/ui/button';
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -91,8 +90,11 @@ function LoginCard() {
 
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit(onSubmit)}
+          name='login' /* hilft Chrome/Safari‑Heuristik */
+          method='post' /* notwendig für einige AutoFill‑Scanner */
+          action='/login' /* fiktiv – verhindert echtes Reload */
           autoComplete='on'
+          onSubmit={form.handleSubmit(onSubmit)}
           className='space-y-6 p-6 pt-0'
         >
           <FormField
@@ -105,9 +107,10 @@ function LoginCard() {
                   <Input
                     {...field}
                     id='email'
-                    name='email'
+                    name='username' /* <- entscheidend */
                     type='email'
-                    autoComplete='username email'
+                    inputMode='email'
+                    autoComplete='username'
                     placeholder='name@example.com'
                   />
                 </FormControl>
