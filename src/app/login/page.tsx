@@ -61,6 +61,10 @@ function LoginCard() {
     setSubmitting(false);
     if (ok) {
       toast.success('Willkommen zurück!');
+
+      // NEU: Event für PWA Installations-Aufforderung auslösen
+      window.dispatchEvent(new CustomEvent('successfulLoginForPwaPrompt'));
+
       router.replace(redirectPath);
     } else {
       toast.error('Login fehlgeschlagen', {
