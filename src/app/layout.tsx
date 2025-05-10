@@ -27,6 +27,10 @@ const firaCode = Fira_Code({
   display: 'swap',
 });
 
+const isIOS = () =>
+  typeof navigator !== 'undefined' &&
+  /iphone|ipad|ipod/i.test(navigator.userAgent);
+
 const PWAPromptMobile: React.FC<{ onInstall: () => void }> = ({
   onInstall,
 }) => {
@@ -90,7 +94,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (
       typeof window !== 'undefined' &&
-      window.matchMedia('(display-mode: standalone)').matches
+      window.matchMedia('(display-mode: standalone)').matches &&
+      isIOS()
     ) {
       setIsStandalone(true);
     }

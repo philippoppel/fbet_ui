@@ -1,20 +1,16 @@
-// src/app/components/layout/AppHeader.tsx
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  BarChartBig, // Nicht verwendet in diesem Snippet, ggf. für andere Features
   LogOut,
   LogIn,
   UserPlus,
   Menu,
   Users,
   PlusCircle,
+  RefreshCw,
 } from 'lucide-react';
-// Image-Komponente von Next.js nicht verwendet, stattdessen <img> für SVG
-// import Image from 'next/image';
-
 import { Button } from '@/app/components/ui/button';
 import { UserOut, Group } from '@/app/lib/types';
 import {
@@ -25,6 +21,7 @@ import {
   SheetTrigger,
 } from '@/app/components/ui/sheet';
 import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar';
+import { useAppRefresh } from '@/app/hooks/useAppRefresh';
 
 interface AppHeaderProps {
   user: UserOut | null;
@@ -42,99 +39,106 @@ export function AppHeader({
   onSelectGroup,
 }: AppHeaderProps) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const hasGroups = myGroups && myGroups.length > 0; // Sicherstellen, dass myGroups existiert
-  const displayName = user?.name?.split(' ')[0] || user?.email;
+  const hasGroups = myGroups.length > 0;
+  const displayName = user?.name?.split(' ')[0] || user?.email || '';
+  const { refresh, updateAvailable, online } = useAppRefresh();
 
   const handleSelectAndClose = (groupId: number) => {
-    if (onSelectGroup) {
-      // Sicherstellen, dass onSelectGroup existiert
-      onSelectGroup(groupId);
-    }
+    onSelectGroup?.(groupId);
     setIsSheetOpen(false);
   };
 
   return (
-    // Diese Klasse ist schon sehr gut für das gewünschte Design
     <header className='sticky top-0 z-50 w-full border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6 lg:px-8'>
       <div className='flex h-14 items-center'>
-        {/* Burger Menu nur bei Gruppen und auf Mobile */}
-        {user &&
-          hasGroups &&
-          onSelectGroup && ( // Zeige Burger Menü nur wenn User eingeloggt ist, Gruppen hat und onSelectGroup existiert
-            <div className='mr-2 lg:hidden'>
-              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetTrigger asChild>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    aria-label='Gruppen anzeigen'
-                  >
-                    <Menu className='h-5 w-5' />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent
-                  side='left'
-                  className='w-[280px] sm:w-[320px] p-0 flex flex-col'
+        {/* Side‑menu trigger (mobile) */}
+        {user && hasGroups && onSelectGroup && (
+          <div className='mr-2 lg:hidden'>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  aria-label='Gruppen anzeigen'
                 >
-                  <SheetHeader className='p-4 border-b'>
-                    <SheetTitle className='flex items-center gap-2 text-base font-semibold'>
-                      <Users className='w-5 h-5 text-muted-foreground' /> Meine
-                      Gruppen
-                    </SheetTitle>
-                  </SheetHeader>
-                  <div className='flex-1 overflow-y-auto p-4'>
-                    <GroupSidebar
-                      groups={myGroups} // myGroups wird hier sicher existieren wegen hasGroups
-                      selectedGroupId={selectedGroupId}
-                      onSelectGroup={handleSelectAndClose}
-                      isLoading={false} // Diese Props sollten dynamisch sein, falls zutreffend
-                      error={null} // oder aus einem Context kommen
-                      isCollapsed={false}
-                      currentUserId={user?.id} // currentUserId hinzugefügt, falls benötigt
-                      onDeleteGroup={async (groupId: number) => {
-                        // Dummy-Implementierung, sollte ersetzt werden
-                        console.warn(
-                          'onDeleteGroup nicht implementiert in AppHeader'
-                        );
-                        // throw new Error('Function not implemented.');
-                      }}
-                    />
-                  </div>
-                  <div className='p-4 border-t mt-auto bg-background'>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      asChild
-                      className='w-full'
-                    >
-                      <Link href='/dashboard/groups/create'>
-                        {' '}
-                        {/* Korrekter Link für Gruppenerstellung im Dashboard */}
-                        <PlusCircle className='mr-2 w-4 h-4' /> Gruppe erstellen
-                      </Link>
-                    </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
-          )}
+                  <Menu className='h-5 w-5' />
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side='left'
+                className='w-[280px] sm:w-[320px] p-0 flex flex-col'
+              >
+                <SheetHeader className='p-4 border-b'>
+                  <SheetTitle className='flex items-center gap-2 text-base font-semibold'>
+                    <Users className='w-5 h-5 text-muted-foreground' /> Meine
+                    Gruppen
+                  </SheetTitle>
+                </SheetHeader>
+                <div className='flex-1 overflow-y-auto p-4'>
+                  <GroupSidebar
+                    groups={myGroups}
+                    selectedGroupId={selectedGroupId}
+                    onSelectGroup={handleSelectAndClose}
+                    isLoading={false}
+                    error={null}
+                    isCollapsed={false}
+                    currentUserId={user?.id}
+                    onDeleteGroup={async () => {
+                      console.warn('onDeleteGroup nicht implementiert');
+                    }}
+                  />
+                </div>
+                <div className='p-4 border-t mt-auto bg-background'>
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    asChild
+                    className='w-full'
+                  >
+                    <Link href='/dashboard/groups/create'>
+                      <PlusCircle className='mr-2 w-4 h-4' /> Gruppe erstellen
+                    </Link>
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+        )}
+
         {/* Logo */}
         <Link
-          href={user ? '/dashboard' : '/'} // Zur Landingpage ('/'), wenn nicht eingeloggt
+          href={user ? '/dashboard' : '/'}
           className='flex items-center space-x-2 hover:opacity-80 transition-opacity'
         >
-          {/* Verwendung von <img> für SVG ist okay, Next/Image wäre für Optimierungen bei anderen Formaten besser */}
           <img src='/icon0.svg' alt='Fbet Logo' className='h-8 w-auto' />
           <span className='text-lg font-bold tracking-tight'>fbet</span>
         </Link>
-        {/* Rechts im Header */}
+
+        {/* Right‑side controls */}
         <div className='ml-auto flex items-center space-x-2 sm:space-x-3'>
-          {user && displayName ? (
+          {/* Refresh / Update‑Badge */}
+          <Button
+            variant={updateAvailable ? 'default' : 'ghost'}
+            size='icon'
+            aria-label='App neu laden'
+            onClick={refresh}
+            className='relative'
+          >
+            <RefreshCw
+              className={`h-4 w-4 transition-transform ${updateAvailable ? 'animate-spin' : ''}`}
+            />
+            {!online && (
+              <span className='absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-destructive' />
+            )}
+          </Button>
+
+          {/* Auth / Profile */}
+          {user ? (
             <>
               <span className='hidden text-sm text-muted-foreground sm:inline-block'>
                 Hi, {displayName}!
               </span>
-              {onLogout && ( // Logout Button nur anzeigen wenn onLogout Funktion existiert
+              {onLogout && (
                 <Button
                   aria-label='Logout'
                   onClick={onLogout}
