@@ -5,9 +5,9 @@ import { useEffect, useState, useMemo } from 'react';
 import type { Event as GroupEvent, EventPointDetail } from '@/app/lib/types';
 import {
   Card,
-  // CardContent, // Wird durch div ersetzt für mehr Styling-Kontrolle
-  // CardHeader, // Wird durch div ersetzt
-  CardTitle, // Behalten für semantische Korrektheit
+  CardContent, // Wieder eingeführt für konsistentes Padding
+  CardHeader, // Wieder eingeführt
+  CardTitle,
 } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
 import { Badge } from '@/app/components/ui/badge';
@@ -32,14 +32,13 @@ import {
   EyeOff,
   Search,
   X,
-  Users, // Users Icon nicht direkt verwendet hier, aber ggf. für Leerzustände
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
 
 type ClosedEventsCardProps = {
-  events: GroupEvent[]; // Sollte jetzt 'awardedPoints' enthalten
+  events: GroupEvent[];
 };
 
 const STORAGE_KEY = 'closedEventsArchivedEventIds';
@@ -117,7 +116,7 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
           .sort(
             (a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          ) // Neueste abgeschlossene zuerst
+          )
       : [];
 
     const filteredBySearchTerm =
@@ -129,7 +128,7 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
               event.title?.toLowerCase().includes(lowerSearchTerm) ||
               event.description?.toLowerCase().includes(lowerSearchTerm) ||
               event.question?.toLowerCase().includes(lowerSearchTerm) ||
-              event.winningOption?.toLowerCase().includes(lowerSearchTerm) // Suche auch nach Gewinner
+              event.winningOption?.toLowerCase().includes(lowerSearchTerm)
             );
           });
 
@@ -153,99 +152,192 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
     };
   }, [events, archivedEventIds, searchTerm]);
 
+  // Hilfsfunktion zum Rendern der Event-Liste
+  const renderEventItem = (event: GroupEvent, isArchived: boolean) => (
+    <div
+      key={event.id}
+      className={cn(
+        'rounded-xl bg-card border border-border p-4 sm:p-5 shadow-sm transition-colors', // Angelehnt an SingleOpenEventItem
+        isArchived && 'opacity-70 hover:opacity-100'
+      )}
+    >
+      <div className='flex items-start justify-between gap-3'>
+        <div className='space-y-1 flex-1'>
+          <h4 className='text-base font-semibold text-foreground leading-tight'>
+            {event.title}
+          </h4>
+          {event.question && (
+            <p className='text-sm text-muted-foreground'>{event.question}</p>
+          )}
+          <Badge
+            variant={isArchived ? 'outline' : 'default'} // Unterschiedliche Badge für Archiv
+            className={cn(
+              'text-xs font-normal mt-1',
+              isArchived
+                ? 'border-border/50'
+                : 'border-primary/30 text-primary-foreground bg-primary/90' // Primäre Farbe für aktive
+            )}
+          >
+            Gewinner: {event.winningOption}
+          </Badge>
+        </div>
+        <div className='flex items-center flex-shrink-0 gap-1'>
+          {event.awardedPoints && event.awardedPoints.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='h-8 w-8 text-muted-foreground hover:text-primary'
+                  onClick={() => toggleEventPointDetails(event.id)}
+                >
+                  {expandedEvents.has(event.id) ? (
+                    <ChevronDown className='h-4 w-4' />
+                  ) : (
+                    <ChevronRight className='h-4 w-4' />
+                  )}
+                  <span className='sr-only'>Punktedetails</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Punkteverteilung</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant='ghost'
+                size='icon'
+                className='h-8 w-8 text-muted-foreground hover:text-foreground'
+                onClick={() => handleToggleArchive(event.id)}
+              >
+                {isArchived ? (
+                  <ArchiveRestore className='h-4 w-4' />
+                ) : (
+                  <Archive className='h-4 w-4' />
+                )}
+                <span className='sr-only'>
+                  {isArchived ? 'Wiederherstellen' : 'Archivieren'}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{isArchived ? 'Wiederherstellen' : 'Wette archivieren'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      {expandedEvents.has(event.id) &&
+        event.awardedPoints &&
+        event.awardedPoints.length > 0 && (
+          <div className='mt-3 ml-1 pl-3 py-2 bg-muted/50 dark:bg-black/20 rounded-md text-sm border-l-2 border-primary/50'>
+            <h5 className='font-semibold mb-1.5 text-xs text-foreground/90 uppercase tracking-wide'>
+              Punkteverteilung:
+            </h5>
+            <ul className='space-y-1 text-xs'>
+              {event.awardedPoints.map((detail) => (
+                <li
+                  key={detail.userId}
+                  className='flex justify-between text-muted-foreground'
+                >
+                  <span>{detail.userName || `User ${detail.userId}`}:</span>
+                  <span className='font-medium text-foreground/80'>
+                    {detail.points ?? 0} Pkt.
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+    </div>
+  );
+
   return (
     <TooltipProvider delayDuration={100}>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen} className='w-full'>
-        {/* Angepasster Container (ersetzt Card) */}
-        <div
-          className={cn(
-            'shadow-md overflow-hidden',
-            'bg-background/60 dark:bg-slate-900/50 backdrop-blur-lg supports-[backdrop-filter]:bg-background/70',
-            'border border-white/10 dark:border-white/5 rounded-lg'
-          )}
-        >
-          {/* Angepasster Header */}
-          <div className='py-3 px-4 space-y-2 border-b border-white/10 dark:border-white/5'>
-            <div className='flex flex-row items-center justify-between'>
-              <CardTitle className='flex items-center gap-2 text-lg font-semibold text-foreground'>
-                <CheckCircle2 className='w-5 h-5 text-green-500 dark:text-green-400' />
+      <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen} className='w-full'>
+          <CardHeader className='flex flex-row items-center justify-between gap-2 pb-3 pr-3 sm:pr-4'>
+            <div className='flex items-center gap-2'>
+              <CheckCircle2 className='h-5 w-5 text-green-500 dark:text-green-400' />
+              <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
                 Abgeschlossene Wetten
               </CardTitle>
-              <div className='flex items-center gap-1'>
-                {/* Icons/Buttons im Header */}
+            </div>
+            <div className='flex items-center gap-1'>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className='h-8 w-8 text-muted-foreground hover:text-foreground data-[state=on]:bg-accent data-[state=on]:text-accent-foreground'
+                    onClick={() => setIsSearchVisible(!isSearchVisible)}
+                    data-state={isSearchVisible ? 'on' : 'off'}
+                  >
+                    <Search className='h-4 w-4' />
+                    <span className='sr-only'>
+                      {isSearchVisible ? 'Suche ausblenden' : 'Suchen'}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {isSearchVisible
+                      ? 'Suche ausblenden'
+                      : 'Wetten durchsuchen'}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+              {totalArchivedCount > 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant='ghost'
                       size='icon'
-                      className='h-8 w-8 text-muted-foreground hover:text-foreground'
-                      onClick={() => setIsSearchVisible(!isSearchVisible)}
-                      data-state={isSearchVisible ? 'on' : 'off'}
+                      className='h-8 w-8 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground text-muted-foreground hover:text-foreground'
+                      onClick={() => setShowArchived(!showArchived)}
+                      data-state={showArchived ? 'on' : 'off'}
                     >
-                      <Search className='h-4 w-4' />{' '}
+                      {showArchived ? (
+                        <EyeOff className='h-4 w-4' />
+                      ) : (
+                        <Eye className='h-4 w-4' />
+                      )}
                       <span className='sr-only'>
-                        {isSearchVisible ? 'Suche ausblenden' : 'Suchen'}
+                        {showArchived ? 'Archiv ausblenden' : 'Archiv anzeigen'}
                       </span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent className='bg-popover text-popover-foreground border-border'>
+                  <TooltipContent>
                     <p>
-                      {isSearchVisible
-                        ? 'Suche ausblenden'
-                        : 'Wetten durchsuchen'}
+                      {showArchived ? 'Archiv ausblenden' : 'Archiv anzeigen'}
                     </p>
                   </TooltipContent>
                 </Tooltip>
-                {totalArchivedCount > 0 && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        className='h-8 w-8 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground text-muted-foreground hover:text-foreground'
-                        onClick={() => setShowArchived(!showArchived)}
-                        data-state={showArchived ? 'on' : 'off'}
-                      >
-                        {showArchived ? (
-                          <EyeOff className='h-4 w-4' />
-                        ) : (
-                          <Eye className='h-4 w-4' />
-                        )}{' '}
-                        <span className='sr-only'>
-                          {showArchived
-                            ? 'Archiv ausblenden'
-                            : 'Archiv anzeigen'}
-                        </span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className='bg-popover text-popover-foreground border-border'>
-                      <p>
-                        {showArchived ? 'Archiv ausblenden' : 'Archiv anzeigen'}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    className='w-9 h-8 p-0 text-muted-foreground hover:text-foreground'
-                  >
-                    <ChevronsUpDown className='h-4 w-4' />{' '}
-                    <span className='sr-only'>Toggle</span>
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
+              )}
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='h-8 w-8 text-muted-foreground hover:text-foreground'
+                >
+                  <ChevronsUpDown className='h-4 w-4' />
+                  <span className='sr-only'>Toggle</span>
+                </Button>
+              </CollapsibleTrigger>
             </div>
-            {/* Suchfeld mit angepasstem Styling */}
-            {isSearchVisible && (
-              <div className='relative pt-1'>
+          </CardHeader>
+
+          {isSearchVisible && (
+            <div className='px-4 sm:px-6 pb-3'>
+              <div className='relative'>
                 <Input
                   type='text'
                   placeholder='Titel, Frage, Gewinner durchsuchen...'
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className='w-full pr-8 h-9 text-sm bg-background/50 dark:bg-black/20 border-border/50 focus:border-primary/50 focus:ring-primary/20' // Angepasstes Input-Styling
+                  className='w-full pr-10 h-9 text-sm bg-background/70 dark:bg-black/30 border-border/70 focus:border-primary/70 focus:ring-primary/30 rounded-md'
                 />
                 {searchTerm && (
                   <Button
@@ -255,319 +347,111 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                     onClick={() => setSearchTerm('')}
                     aria-label='Suche löschen'
                   >
-                    {' '}
-                    <X className='h-4 w-4' />{' '}
+                    <X className='h-4 w-4' />
                   </Button>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <CollapsibleContent>
-            {/* Angepasster Content-Bereich */}
-            <div className='pt-2 pb-4 px-3 md:px-4 space-y-4'>
-              {/* Leere Zustände (unverändert) */}
+            <CardContent className='space-y-6 pt-2 pb-4'>
               {!totalClosedEventCount && (
-                <div className='text-center py-10 text-muted-foreground text-sm'>
-                  {' '}
-                  <CheckCircle2 className='mx-auto h-10 w-10 opacity-50 mb-3' />{' '}
-                  <p>Es gibt noch keine abgeschlossenen Wetten.</p>{' '}
+                <div className='py-8 text-center text-sm text-muted-foreground'>
+                  <div className='flex flex-col items-center gap-4'>
+                    <CheckCircle2 className='mx-auto h-12 w-12 opacity-30 mb-2' />
+                    <p className='text-xs sm:text-sm'>
+                      Es gibt noch keine abgeschlossenen Wetten.
+                    </p>
+                  </div>
                 </div>
               )}
+
               {totalClosedEventCount > 0 &&
                 !hasAnyClosedEventsToShow &&
                 searchTerm && (
-                  <div className='text-center py-10 text-muted-foreground text-sm'>
-                    {' '}
-                    <Search className='mx-auto h-10 w-10 opacity-50 mb-3' />{' '}
-                    <p>
-                      {' '}
-                      Keine abgeschlossenen Wetten entsprechen deiner Suche "
-                      {searchTerm}".{' '}
-                    </p>{' '}
+                  <div className='py-8 text-center text-sm text-muted-foreground'>
+                    <div className='flex flex-col items-center gap-4'>
+                      <Search className='mx-auto h-12 w-12 opacity-30 mb-2' />
+                      <p className='text-xs sm:text-sm'>
+                        Keine abgeschlossenen Wetten entsprechen deiner Suche
+                        &#34;
+                        {searchTerm}&#34;.
+                      </p>
+                    </div>
                   </div>
                 )}
+
               {activeClosedEvents.length === 0 &&
                 totalArchivedCount > 0 &&
                 !showArchived &&
                 !searchTerm &&
-                hasAnyClosedEventsToShow && (
-                  <p className='text-muted-foreground text-sm px-2 py-4 italic'>
-                    {' '}
-                    Keine aktiven abgeschlossenen Wetten sichtbar.{' '}
-                    {totalArchivedCount} archiviert (
+                totalClosedEventCount > 0 && ( // Sicherstellen, dass es überhaupt Events gibt
+                  <p className='text-muted-foreground text-sm text-center italic py-6'>
+                    Alle abgeschlossenen Wetten sind archiviert.
                     <Button
                       variant='link'
-                      className='p-0 h-auto text-xs italic'
+                      className='p-0 h-auto text-xs italic ml-1'
                       onClick={() => {
                         setShowArchived(true);
                       }}
                     >
-                      {' '}
-                      anzeigen{' '}
+                      Archiv anzeigen ({totalArchivedCount})
                     </Button>
-                    ).{' '}
                   </p>
                 )}
 
-              {/* Aktive, nicht archivierte Events */}
               {activeClosedEvents.length > 0 && (
-                <ul className='space-y-0'>
+                <div className='space-y-4'>
                   {' '}
-                  {/* Kein Y-Abstand, Trennung durch border */}
-                  {activeClosedEvents.map((event, index) => (
-                    <li
-                      key={event.id}
-                      className={cn(
-                        'py-4', // Vertikales Padding
-                        index < activeClosedEvents.length - 1
-                          ? 'border-b border-white/10 dark:border-white/5'
-                          : '' // Trennlinie
-                      )}
-                    >
-                      <div className='flex items-start justify-between gap-3'>
-                        <div className='space-y-1 flex-1'>
-                          <div className='text-sm font-medium text-foreground'>
-                            {event.title}
-                          </div>
-                          {event.question && (
-                            <div className='text-muted-foreground text-xs'>
-                              {event.question}
-                            </div>
-                          )}
-                          <Badge
-                            variant='outline'
-                            className='text-xs font-normal border-primary/30 text-primary/90 bg-primary/10'
-                          >
-                            Gewinner: {event.winningOption}
-                          </Badge>
-                        </div>
-                        <div className='flex items-center flex-shrink-0'>
-                          {' '}
-                          {/* flex-shrink-0 hinzugefügt */}
-                          {event.awardedPoints &&
-                            event.awardedPoints.length > 0 && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant='ghost'
-                                    size='icon'
-                                    className='h-7 w-7 mr-1 text-muted-foreground hover:text-primary'
-                                    onClick={() =>
-                                      toggleEventPointDetails(event.id)
-                                    }
-                                  >
-                                    {expandedEvents.has(event.id) ? (
-                                      <ChevronDown className='h-4 w-4' />
-                                    ) : (
-                                      <ChevronRight className='h-4 w-4' />
-                                    )}
-                                    <span className='sr-only'>
-                                      Punktedetails
-                                    </span>
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className='bg-popover text-popover-foreground border-border'>
-                                  <p>Punkteverteilung</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant='ghost'
-                                size='icon'
-                                className='h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground'
-                                onClick={() => handleToggleArchive(event.id)}
-                              >
-                                <Archive className='h-3.5 w-3.5' />{' '}
-                                <span className='sr-only'>Archivieren</span>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className='bg-popover text-popover-foreground border-border'>
-                              <p>Wette archivieren</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </div>
-                      {/* Aufklappbare Punktedetails */}
-                      {expandedEvents.has(event.id) &&
-                        event.awardedPoints &&
-                        event.awardedPoints.length > 0 && (
-                          <div className='mt-3 ml-2 pl-3 pr-2 py-2 bg-white/5 dark:bg-black/10 rounded-md text-xs border-l-2 border-primary/30'>
-                            {' '}
-                            {/* Angepasstes Styling */}
-                            <h5 className='font-semibold mb-1.5 text-xs text-foreground/90'>
-                              Punkteverteilung:
-                            </h5>
-                            <ul className='space-y-0.5'>
-                              {event.awardedPoints.map((detail) => (
-                                <li
-                                  key={detail.userId}
-                                  className='flex justify-between text-muted-foreground'
-                                >
-                                  <span>
-                                    {' '}
-                                    {detail.userName || `User ${detail.userId}`}
-                                    :{' '}
-                                  </span>
-                                  <span className='font-medium text-foreground/80'>
-                                    {' '}
-                                    {detail.points ?? 0} Pkt.{' '}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                    </li>
-                  ))}
-                </ul>
+                  {/* Container für aktive Events */}
+                  {activeClosedEvents.map((event) =>
+                    renderEventItem(event, false)
+                  )}
+                </div>
               )}
 
-              {/* Archivierte Events */}
               {showArchived && archivedClosedEvents.length > 0 && (
-                <div className='mt-6 pt-4 border-t border-white/10 dark:border-white/5'>
-                  <h4 className='text-sm font-medium text-muted-foreground mb-3'>
+                <div className='mt-6 pt-6 border-t border-border/70'>
+                  <h3 className='text-sm font-semibold text-muted-foreground mb-4 px-1'>
                     Archiv ({archivedClosedEvents.length}
                     {searchTerm &&
                     archivedClosedEvents.length !== totalArchivedCount
-                      ? ' gefiltert von ' + totalArchivedCount
+                      ? ` von ${totalArchivedCount} passend zum Filter`
                       : ''}
                     )
-                  </h4>
-                  <ul className='space-y-0 divide-y-0'>
+                  </h3>
+                  <div className='space-y-4'>
                     {' '}
-                    {/* Kein Y-Abstand, Trennung durch border */}
-                    {archivedClosedEvents.map((event, index) => (
-                      <li
-                        key={event.id}
-                        className={cn(
-                          'py-3 opacity-70 hover:opacity-100 transition-opacity',
-                          index < archivedClosedEvents.length - 1
-                            ? 'border-b border-white/5 dark:border-white/5'
-                            : '' // Subtilere Trennlinie im Archiv
-                        )}
-                      >
-                        <div className='flex items-start justify-between gap-3'>
-                          <div className='space-y-1 flex-1'>
-                            <div className='text-sm font-medium'>
-                              {event.title}
-                            </div>
-                            {event.question && (
-                              <div className='text-muted-foreground text-xs'>
-                                {event.question}
-                              </div>
-                            )}
-                            <Badge
-                              variant='outline'
-                              className='text-xs font-normal border-border/50'
-                            >
-                              {' '}
-                              Gewinner: {event.winningOption}{' '}
-                            </Badge>
-                          </div>
-                          <div className='flex items-center flex-shrink-0'>
-                            {' '}
-                            {/* flex-shrink-0 hinzugefügt */}
-                            {event.awardedPoints &&
-                              event.awardedPoints.length > 0 && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant='ghost'
-                                      size='icon'
-                                      className='h-7 w-7 mr-1 text-muted-foreground hover:text-primary'
-                                      onClick={() =>
-                                        toggleEventPointDetails(event.id)
-                                      }
-                                    >
-                                      {expandedEvents.has(event.id) ? (
-                                        <ChevronDown className='h-4 w-4' />
-                                      ) : (
-                                        <ChevronRight className='h-4 w-4' />
-                                      )}
-                                      <span className='sr-only'>
-                                        Punktedetails
-                                      </span>
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent className='bg-popover text-popover-foreground border-border'>
-                                    <p>Punkteverteilung</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant='ghost'
-                                  size='icon'
-                                  className='h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground'
-                                  onClick={() => handleToggleArchive(event.id)}
-                                >
-                                  <ArchiveRestore className='h-3.5 w-3.5' />{' '}
-                                  <span className='sr-only'>
-                                    Wiederherstellen
-                                  </span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className='bg-popover text-popover-foreground border-border'>
-                                <p>Wiederherstellen</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                        {/* Aufklappbare Punktedetails (auch für archivierte) */}
-                        {expandedEvents.has(event.id) &&
-                          event.awardedPoints &&
-                          event.awardedPoints.length > 0 && (
-                            <div className='mt-3 ml-2 pl-3 pr-2 py-2 bg-white/5 dark:bg-black/10 rounded-md text-xs border-l-2 border-border/30'>
-                              {' '}
-                              {/* Angepasstes Styling */}
-                              <h5 className='font-semibold mb-1.5 text-xs text-foreground/90'>
-                                Punkteverteilung:
-                              </h5>
-                              <ul className='space-y-0.5'>
-                                {event.awardedPoints.map((detail) => (
-                                  <li
-                                    key={detail.userId}
-                                    className='flex justify-between text-muted-foreground'
-                                  >
-                                    <span>
-                                      {' '}
-                                      {detail.userName ||
-                                        `User ${detail.userId}`}
-                                      :{' '}
-                                    </span>
-                                    <span className='font-medium text-foreground/80'>
-                                      {' '}
-                                      {detail.points ?? 0} Pkt.{' '}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                      </li>
-                    ))}
-                  </ul>
+                    {/* Container für archivierte Events */}
+                    {archivedClosedEvents.map((event) =>
+                      renderEventItem(event, true)
+                    )}
+                  </div>
                 </div>
               )}
-              {/* ... (Restliche Logik für leeres Archiv bei Suche unverändert) ... */}
               {showArchived &&
                 archivedClosedEvents.length === 0 &&
                 searchTerm &&
                 totalArchivedCount > 0 && (
-                  <p className='text-muted-foreground text-sm px-2 py-4 italic mt-4 border-t pt-4 border-white/10 dark:border-white/5'>
-                    {' '}
-                    Keine archivierten Wetten entsprechen deiner Suche "
-                    {searchTerm}".{' '}
+                  <p className='text-muted-foreground text-sm italic text-center py-6 mt-4 border-t border-border/70'>
+                    Keine archivierten Wetten entsprechen deiner Suche &#34;
+                    {searchTerm}&#34;.
                   </p>
                 )}
-            </div>
+              {showArchived &&
+                archivedClosedEvents.length === 0 &&
+                !searchTerm &&
+                totalArchivedCount > 0 && (
+                  <p className='text-muted-foreground text-sm italic text-center py-6 mt-4 border-t border-border/70'>
+                    Das Archiv ist leer oder alle archivierten Events wurden
+                    durch Filter ausgeblendet.
+                  </p>
+                )}
+            </CardContent>
           </CollapsibleContent>
-        </div>
-      </Collapsible>
+        </Collapsible>
+      </Card>
     </TooltipProvider>
   );
 }
