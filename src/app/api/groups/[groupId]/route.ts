@@ -64,7 +64,7 @@ export async function GET(req: NextRequest, context: any) {
 
     return NextResponse.json(group);
   } catch (err) {
-    console.error(`GET /api/groups/${params.groupId} failed:`, err);
+    console.error(`GET /api/groups/${params.groupId} failed:`, err); // params ist hier dank Assertion verfügbar
     return NextResponse.json(
       { error: 'Server error while reading group details' },
       { status: 500 }
@@ -74,10 +74,32 @@ export async function GET(req: NextRequest, context: any) {
 
 export async function PATCH(
   req: NextRequest,
-  context: { params: { groupId: string } }
+  context: any // Geändert zu any
 ) {
-  const groupId = parseInt(context.params.groupId, 10);
+  const { params } = context as { params: { groupId: string } }; // Typ-Assertion hinzugefügt
+  const groupId = parseInt(params.groupId, 10); // params.groupId verwenden
   const json = await req.json();
+
+  // Authentifizierung/Autorisierung für PATCH hinzufügen!
+  const currentUser = await getCurrentUserFromRequest(req);
+  if (!currentUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Fügen Sie hier eine Überprüfung hinzu, ob der currentUser berechtigt ist, diese Gruppe zu bearbeiten.
+  // Zum Beispiel: Ist er der Ersteller oder ein Admin?
+  const groupToPatch = await prisma.group.findUnique({
+    where: { id: groupId },
+    select: { createdById: true },
+  });
+
+  if (!groupToPatch) {
+    return NextResponse.json({ error: 'Group not found' }, { status: 404 });
+  }
+
+  // Beispiel für eine Berechtigungsprüfung (anpassen nach Bedarf)
+  // if (groupToPatch.createdById !== currentUser.id) {
+  //   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // }
 
   const parsed = groupUpdateSchema.safeParse(json);
   if (!parsed.success) {
@@ -87,12 +109,28 @@ export async function PATCH(
     );
   }
 
-  const updated = await prisma.group.update({
-    where: { id: groupId },
-    data: { imageUrl: parsed.data.imageUrl ?? null }, // null → Bild löschen
-  });
-
-  return NextResponse.json(updated);
+  try {
+    const updated = await prisma.group.update({
+      where: { id: groupId },
+      data: { imageUrl: parsed.data.imageUrl ?? null },
+    });
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error(`PATCH /api/groups/${params.groupId} failed:`, error); // params.groupId verwenden
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2025'
+    ) {
+      return NextResponse.json(
+        { error: 'Group not found to update' },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Server error while updating group' },
+      { status: 500 }
+    );
+  }
 }
 
 // --- DELETE Handler ---
@@ -107,7 +145,8 @@ export async function DELETE(req: NextRequest, context: any) {
     }
 
     const groupId = parseInt(groupIdString, 10);
-    if (isNaN(groupId)) {
+    if (isNaN(groupId) || groupId <= 0) {
+      // Konsistente Prüfung hinzugefügt
       return NextResponse.json(
         { error: `Invalid group ID: ${groupIdString}` },
         { status: 400 }
@@ -117,16 +156,27 @@ export async function DELETE(req: NextRequest, context: any) {
     const group = await prisma.group.findUnique({
       where: {
         id: groupId,
-        createdById: currentUser.id,
+        // Stelle sicher, dass der createdById Check hier sinnvoll ist oder entferne ihn,
+        // wenn die Berechtigungsprüfung anderswo erfolgt.
+        // createdById: currentUser.id, // War vorher aktiv
       },
+      select: { createdById: true }, // Nur benötigtes Feld für die Prüfung
     });
 
     if (!group) {
       return NextResponse.json(
         {
-          error: 'Group not found or user not authorized to delete this group',
+          error: 'Group not found', // Angepasste Fehlermeldung
         },
         { status: 404 }
+      );
+    }
+
+    // Explizite Berechtigungsprüfung, falls createdById nicht in der where-Klausel ist
+    if (group.createdById !== currentUser.id) {
+      return NextResponse.json(
+        { error: 'User not authorized to delete this group' },
+        { status: 403 }
       );
     }
 

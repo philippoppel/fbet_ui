@@ -3,7 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { UTApi, UTFile } from 'uploadthing/server';
 
 export const runtime = 'nodejs'; // ⬅️ ganz wichtig
-export const utapi = new UTApi();
+
+// Die UTApi-Instanz wird hier im Modul-Scope erstellt, aber NICHT exportiert.
+// Sie ist weiterhin für die POST-Funktion in dieser Datei verfügbar.
+const utapi = new UTApi();
 
 export async function POST(req: NextRequest) {
   const logPrefix = '[upload-route]';
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
     );
 
     /* --------------------------------- STEP 3 -------------------------------- */
+    // utapi ist hier immer noch verfügbar, da es im selben Modul definiert wurde.
     const resultArr = await utapi.uploadFiles([utFile]);
     const result = resultArr[0];
 
@@ -70,3 +74,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Andere Handler (GET, PUT, etc.) oder Konfigurationen könnten hier folgen,
+// aber keine anderen "beliebigen" Exporte.
