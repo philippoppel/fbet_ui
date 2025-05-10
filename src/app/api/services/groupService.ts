@@ -1,9 +1,16 @@
 // src/app/api/services/groupService.ts
+//
+// Vollständig angepasste Version mit Unterstützung für imageUrl
+// ───────────────────────────────────────────────────────────────
 
 import { GroupCreateInput } from '../lib/groupSchema';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@/app/api/lib/prisma';
 import type { Group, GroupMembership, User } from '@prisma/client';
+
+/* ------------------------------------------------------------------ */
+/*  Create                                                            */
+/* ------------------------------------------------------------------ */
 
 export async function createGroup(
   groupData: GroupCreateInput,
@@ -17,8 +24,9 @@ export async function createGroup(
       data: {
         name: groupData.name,
         description: groupData.description,
+        imageUrl: groupData.imageUrl ?? null, // ← NEU
         createdById: creatorId,
-        inviteToken: inviteToken,
+        inviteToken,
       },
     });
 
@@ -29,9 +37,6 @@ export async function createGroup(
       },
     });
 
-    console.log(
-      `Transaction for group ${group.id} and initial membership for user ${creatorId} should be committed.`
-    );
     return group;
   });
 
@@ -41,53 +46,45 @@ export async function createGroup(
   return newGroup;
 }
 
-export async function getGroupById(groupId: number): Promise<Group | null> {
-  return prisma.group.findUnique({
-    where: { id: groupId },
-  });
-}
+/* ------------------------------------------------------------------ */
+/*  Read                                                              */
+/* ------------------------------------------------------------------ */
 
-export async function getUserGroups(
-  userId: number,
-  skip: number = 0,
-  limit: number = 100
-): Promise<Group[]> {
-  return prisma.group.findMany({
-    where: {
-      memberships: {
-        some: {
-          userId: userId,
-        },
-      },
-    },
-    skip,
-    take: limit,
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
+export async function getGroupById(groupId: number): Promise<Group | null> {
+  return prisma.group.findUnique({ where: { id: groupId } });
 }
 
 export async function getGroupByInviteToken(
   token: string
 ): Promise<Group | null> {
-  return prisma.group.findUnique({
-    where: { inviteToken: token },
+  return prisma.group.findUnique({ where: { inviteToken: token } });
+}
+
+export async function getUserGroups(
+  userId: number,
+  skip = 0,
+  limit = 100
+): Promise<Group[]> {
+  return prisma.group.findMany({
+    where: {
+      memberships: { some: { userId } },
+    },
+    skip,
+    take: limit,
+    orderBy: { createdAt: 'desc' },
   });
 }
+
+/* ------------------------------------------------------------------ */
+/*  Update                                                            */
+/* ------------------------------------------------------------------ */
 
 export async function regenerateInviteTokenForGroup(
   groupId: number,
   currentUserId: number
 ): Promise<Group | null> {
-  const group = await prisma.group.findUnique({
-    where: { id: groupId },
-  });
-
-  if (!group) {
-    return null;
-  }
-
+  const group = await prisma.group.findUnique({ where: { id: groupId } });
+  if (!group) return null;
   if (group.createdById !== currentUserId) {
     throw new Error('Unauthorized to regenerate token for this group');
   }
@@ -99,27 +96,16 @@ export async function regenerateInviteTokenForGroup(
   });
 }
 
-export async function getMembersOfGroup(groupId: number): Promise<User[]> {
-  const memberships = await prisma.groupMembership.findMany({
-    where: { groupId: groupId },
-    include: {
-      user: true, // Lädt die zugehörigen Benutzerdaten
-    },
-  });
-
-  // Extrahiere und gib die Benutzerobjekte zurück
-  return memberships.map((membership) => membership.user);
-}
+/* ------------------------------------------------------------------ */
+/*  Membership utils                                                  */
+/* ------------------------------------------------------------------ */
 
 export async function isUserMemberOfGroup(
   userId: number,
   groupId: number
 ): Promise<boolean> {
   const membership = await prisma.groupMembership.findFirst({
-    where: {
-      userId,
-      groupId,
-    },
+    where: { userId, groupId },
   });
   return !!membership;
 }
@@ -128,16 +114,28 @@ export async function addUserToGroup(
   userId: number,
   groupId: number
 ): Promise<GroupMembership> {
-  const alreadyMember = await isUserMemberOfGroup(userId, groupId);
-  if (alreadyMember) {
-    console.log(`User ${userId} is already a member of group ${groupId}.`);
+  if (await isUserMemberOfGroup(userId, groupId)) {
     throw new Error('User is already a member of this group.');
   }
 
   return prisma.groupMembership.create({
-    data: {
-      userId,
-      groupId,
-    },
+    data: { userId, groupId },
+  });
+}
+
+export async function getMembersOfGroup(groupId: number): Promise<User[]> {
+  const memberships = await prisma.groupMembership.findMany({
+    where: { groupId },
+    include: { user: true },
+  });
+  return memberships.map((m) => m.user);
+}
+export async function updateGroupImage(
+  groupId: number,
+  imageUrl: string | null
+) {
+  return prisma.group.update({
+    where: { id: groupId },
+    data: { imageUrl },
   });
 }

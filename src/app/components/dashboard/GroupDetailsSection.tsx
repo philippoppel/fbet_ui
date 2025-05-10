@@ -18,6 +18,7 @@ interface GroupDetailsSectionProps {
   groupDataError: string | null | undefined;
   interactions: UseGroupInteractionsReturn;
   onDeleteGroupInPage: (group: Group) => void;
+  onImageChanged: () => void;
 }
 
 function SelectedGroupViewSkeleton() {
@@ -72,6 +73,7 @@ export function GroupDetailsSection({
   groupDataError,
   interactions,
   onDeleteGroupInPage,
+  onImageChanged,
 }: GroupDetailsSectionProps) {
   // 1. Keine Gruppe ausgewählt
   if (!selectedGroupId) {
@@ -112,6 +114,7 @@ export function GroupDetailsSection({
         interactions={interactions}
         userSubmittedTips={userSubmittedTips}
         onDeleteGroup={onDeleteGroupInPage}
+        onImageChanged={onImageChanged}
       />
     );
   }

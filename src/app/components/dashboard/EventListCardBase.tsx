@@ -102,7 +102,7 @@ export function EventListCardBase({
                     </p>
                   </TooltipContent>
                 </Tooltip>
-                {headerActions}{' '}
+                {headerActions}
                 {/* Platz für spezifische Aktionen wie Archiv-Toggle */}
                 <CollapsibleTrigger asChild>
                   <Button variant='ghost' size='sm' className='w-9 p-0'>

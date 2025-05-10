@@ -2,8 +2,13 @@
 import { z } from 'zod';
 
 export const groupCreateSchema = z.object({
-  name: z.string().min(1, { message: 'Group name cannot be empty' }).max(100),
-  description: z.string().max(500).nullable().optional(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  imageUrl: z.string().url().optional(), // ➋ NEU
+});
+
+export const groupUpdateSchema = z.object({
+  imageUrl: z.string().url().nullable().optional(), // null = remove
 });
 
 export type GroupCreateInput = z.infer<typeof groupCreateSchema>;

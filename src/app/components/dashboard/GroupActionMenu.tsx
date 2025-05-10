@@ -1,19 +1,13 @@
 // src/app/components/dashboard/GroupActionsMenu.tsx
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/app/components/ui/button';
-import {
-  Trash2,
-  MoreHorizontal,
-  Edit3,
-  FileText,
-  Image as ImageIcon,
-} from 'lucide-react';
+import { Trash2, MoreHorizontal, Image as ImageIcon } from 'lucide-react';
 import type { Group } from '@/app/lib/types';
 import {
   Tooltip,
-  TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/app/components/ui/tooltip';
@@ -25,69 +19,66 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
-import { toast } from 'sonner';
+import { ChangeGroupImageDialog } from './ChangeGroupImageDialog';
 
 interface GroupActionsMenuProps {
   group: Group;
   onDelete: (group: Group) => void;
+  onImageChanged: () => void;
 }
 
-const handlePlaceholderAction = (
-  actionName: string,
-  groupNameOrId: string | number
-) => {
-  toast.info(`${actionName} für Gruppe "${groupNameOrId}"`, {
-    description: 'Diese Funktion ist noch nicht implementiert.',
-    duration: 3000,
-  });
-};
+export function GroupActionsMenu({
+  group,
+  onDelete,
+  onImageChanged,
+}: GroupActionsMenuProps) {
+  const router = useRouter();
 
-const LOG_PREFIX_MENU = '[GroupActionsMenu]';
-
-export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
+  /* ───────────────────── State ───────────────────── */
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isDeleteActionPending, setIsDeleteActionPending] = useState(false);
+  const [isDeletePending, setIsDeletePending] = useState(false);
+  const [isImgDialogOpen, setIsImgDialogOpen] = useState(false);
 
+  /* ───────────────── Dropdown Handling ───────────── */
   const handleDropdownOpenChange = useCallback(
     (open: boolean) => {
-      const groupIdentifier = group.name || group.id;
-      console.log(
-        `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) handleDropdownOpenChange - Neuer Zustand: ${open}, isDeleteActionPending: ${isDeleteActionPending}`
-      );
       setIsDropdownOpen(open);
 
-      if (!open && isDeleteActionPending) {
-        console.log(
-          `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) Dropdown geschlossen, führe ausstehende Löschaktion aus.`
-        );
+      // Löschaktion erst ausführen, wenn der User das Menü geschlossen hat
+      if (!open && isDeletePending) {
         onDelete(group);
-        setIsDeleteActionPending(false);
+        setIsDeletePending(false);
       }
     },
-    [group, onDelete, isDeleteActionPending]
+    [group, isDeletePending, onDelete]
   );
 
-  const handleSelectDeleteAction = useCallback(() => {
-    const groupIdentifier = group.name || group.id;
-    console.log(
-      `${LOG_PREFIX_MENU} (Gruppe: ${groupIdentifier}) handleSelectDeleteAction - "Gruppe löschen" ausgewählt.`
-    );
-    setIsDeleteActionPending(true);
-  }, [group]);
+  /* ───────────────── Menüaktionen ────────────────── */
+  const handleSelectDelete = () => setIsDeletePending(true);
 
+  const handleSelectChangeImg = () => {
+    setIsImgDialogOpen(true); // Dialog öffnen
+    setIsDropdownOpen(false); // Menü sofort schließen
+  };
+
+  /* Callback aus dem Dialog – Seite sofort neu laden */
+  const handleImageChanged = () => router.refresh();
+
+  /* ───────────────────────── UI ───────────────────── */
   return (
     <TooltipProvider delayDuration={100}>
       <DropdownMenu
         open={isDropdownOpen}
         onOpenChange={handleDropdownOpenChange}
       >
+        {/* Trigger (3 Punkte) */}
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
               <Button
                 variant='ghost'
                 size='icon'
-                className='p-1 h-7 w-7 text-muted-foreground hover:text-foreground data-[state=open]:bg-white/20 dark:data-[state=open]:bg-white/10 flex-shrink-0 rounded-md'
+                className='p-1 h-7 w-7 text-muted-foreground hover:text-foreground data-[state=open]:bg-white/20 dark:data-[state=open]:bg-white/10'
                 aria-label={`Optionen für Gruppe "${group.name || group.id}"`}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -96,6 +87,8 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
             </DropdownMenuTrigger>
           </TooltipTrigger>
         </Tooltip>
+
+        {/* Menüinhalt */}
         <DropdownMenuContent
           side='bottom'
           align='end'
@@ -106,49 +99,41 @@ export function GroupActionsMenu({ group, onDelete }: GroupActionsMenuProps) {
             Aktionen für: {group.name || group.id}
           </DropdownMenuLabel>
           <DropdownMenuSeparator className='bg-border/50' />
+
+          {/* Gruppenbild ändern */}
           <DropdownMenuItem
+            onSelect={handleSelectChangeImg}
             className='focus:bg-accent focus:text-accent-foreground text-sm cursor-pointer'
-            onSelect={() =>
-              handlePlaceholderAction('Name ändern', group.name || group.id)
-            }
-          >
-            <Edit3 className='mr-2 h-4 w-4' />
-            Name ändern
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className='focus:bg-accent focus:text-accent-foreground text-sm cursor-pointer'
-            onSelect={() =>
-              handlePlaceholderAction(
-                'Beschreibung ändern',
-                group.name || group.id
-              )
-            }
-          >
-            <FileText className='mr-2 h-4 w-4' />
-            Beschreibung ändern
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className='focus:bg-accent focus:text-accent-foreground text-sm cursor-pointer'
-            onSelect={() =>
-              handlePlaceholderAction(
-                'Gruppenbild ändern',
-                group.name || group.id
-              )
-            }
           >
             <ImageIcon className='mr-2 h-4 w-4' />
-            Gruppenbild ändern
+            Gruppenbild&nbsp;ändern
           </DropdownMenuItem>
+
           <DropdownMenuSeparator className='bg-border/50' />
+
+          {/* Gruppe löschen */}
           <DropdownMenuItem
-            onSelect={handleSelectDeleteAction}
+            onSelect={handleSelectDelete}
             className='text-destructive focus:bg-destructive/20 focus:text-destructive text-sm cursor-pointer'
           >
             <Trash2 className='mr-2 h-4 w-4' />
-            Gruppe löschen
+            Gruppe&nbsp;löschen
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Dialog zum Bild-Upload */}
+      {isImgDialogOpen && (
+        <ChangeGroupImageDialog
+          groupId={group.id}
+          open={isImgDialogOpen}
+          setOpen={setIsImgDialogOpen}
+          onImageChanged={() => {
+            handleImageChanged(); // router.refresh()
+            onImageChanged(); // 2️⃣  Hook-Refresh
+          }}
+        />
+      )}
     </TooltipProvider>
   );
 }

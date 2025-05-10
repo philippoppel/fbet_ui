@@ -16,6 +16,7 @@ type SelectedGroupViewProps = {
   interactions: UseGroupInteractionsReturn;
   userSubmittedTips: Record<number, string>;
   onDeleteGroup: (group: Group) => void;
+  onImageChanged: () => void;
 };
 
 export function SelectedGroupView({
@@ -25,6 +26,7 @@ export function SelectedGroupView({
   interactions,
   userSubmittedTips,
   onDeleteGroup,
+  onImageChanged,
 }: SelectedGroupViewProps) {
   const handleConfirmDeleteEvent = useCallback(
     async (eventId: number) => {
@@ -44,6 +46,7 @@ export function SelectedGroupView({
         onAddEventSubmit={interactions.handleAddEventSubmit}
         currentUserId={user.id}
         onDeleteGroup={onDeleteGroup}
+        onImageChanged={onImageChanged}
       />
 
       {/* ───────── Offene Events ───────── */}

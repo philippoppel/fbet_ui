@@ -1,4 +1,3 @@
-// src/app/groups/create/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -22,7 +21,7 @@ import {
   CardTitle,
 } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
-import { Textarea } from '@/app/components/ui/textarea'; // Textarea für Beschreibung
+import { Textarea } from '@/app/components/ui/textarea';
 import {
   Form,
   FormControl,
@@ -32,12 +31,20 @@ import {
   FormMessage,
 } from '@/app/components/ui/form';
 
-// Zod Schema für Gruppenerstellung
+// ───────── Zod-Schema inkl. Bild ─────────
+const MB = 1024 * 1024;
+
 const formSchema = z.object({
   name: z
     .string()
     .min(3, { message: 'Gruppenname muss mindestens 3 Zeichen lang sein.' }),
   description: z.string().optional(),
+  imageFile: z
+    .custom<File>() // ← nur File, kein FileList
+    .refine((file) => !file || file.size <= 4 * MB, {
+      message: 'Bild darf höchstens 4 MB groß sein.',
+    })
+    .optional(),
 });
 
 export default function CreateGroupPage() {
@@ -47,14 +54,12 @@ export default function CreateGroupPage() {
 
   // Auth Guard
   useEffect(() => {
-    if (!auth.isLoading && !auth.user) {
-      router.replace('/login');
-    }
+    if (!auth.isLoading && !auth.user) router.replace('/login');
   }, [auth.isLoading, auth.user, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: '', description: '' },
+    defaultValues: { name: '', description: '', imageFile: undefined },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -64,33 +69,57 @@ export default function CreateGroupPage() {
       });
       return;
     }
+
     setIsSubmitting(true);
+    let imageUrl: string | null = null;
+
+    // ───────── Bild hochladen ─────────
+    if (values.imageFile) {
+      try {
+        const fd = new FormData();
+        fd.append('file', values.imageFile);
+
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Upload fehlgeschlagen');
+        imageUrl = data.url;
+      } catch (err) {
+        toast.error('Bild-Upload fehlgeschlagen', {
+          description: err instanceof Error ? err.message : String(err),
+        });
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // ───────── Gruppe erstellen ─────────
     try {
-      const newGroup = await createGroup(auth.token, {
+      const payload: GroupCreate = {
         name: values.name,
         description: values.description || null,
-      });
+        imageUrl,
+      };
+
+      const newGroup = await createGroup(auth.token, payload);
       toast.success('Gruppe erfolgreich erstellt!', {
         description: `Gruppe "${newGroup.name}" wurde angelegt.`,
       });
-      router.push(`/dashboard`);
+      router.push('/dashboard');
     } catch (err) {
       console.error('Fehler beim Erstellen der Gruppe', err);
-      let errorMessage = 'Ein unerwarteter Fehler ist aufgetreten.';
-      if (err instanceof ApiError && err.detail) {
-        errorMessage =
-          typeof err.detail === 'string'
+      const errorMessage =
+        err instanceof ApiError && err.detail
+          ? typeof err.detail === 'string'
             ? err.detail
-            : JSON.stringify(err.detail);
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
-      }
+            : JSON.stringify(err.detail)
+          : err instanceof Error
+            ? err.message
+            : 'Ein unerwarteter Fehler ist aufgetreten.';
       toast.error('Fehler beim Erstellen der Gruppe', {
         description: errorMessage,
       });
-      setIsSubmitting(false); // Bleibe auf der Seite bei Fehler
+      setIsSubmitting(false);
     }
-    // setIsSubmitting wird bei Erfolg durch Redirect verlassen
   }
 
   if (auth.isLoading || !auth.user) {
@@ -104,17 +133,18 @@ export default function CreateGroupPage() {
   return (
     <div className='flex items-center justify-center min-h-screen bg-background'>
       <Card className='w-full max-w-lg'>
-        {' '}
-        {/* Etwas breiter */}
         <CardHeader>
           <CardTitle className='text-2xl'>Neue Gruppe erstellen</CardTitle>
           <CardDescription>
-            Gib deiner Tipprunde einen Namen und eine optionale Beschreibung.
+            Gib deiner Tipprunde einen Namen, eine optionale Beschreibung &amp;
+            ein Bild.
           </CardDescription>
         </CardHeader>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
             <CardContent className='grid gap-4'>
+              {/* Name */}
               <FormField
                 control={form.control}
                 name='name'
@@ -131,12 +161,14 @@ export default function CreateGroupPage() {
                   </FormItem>
                 )}
               />
+
+              {/* Beschreibung */}
               <FormField
                 control={form.control}
                 name='description'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Beschreibung (Optional)</FormLabel>
+                    <FormLabel>Beschreibung (optional)</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder='Regeln, Einsatz, etc.'
@@ -147,18 +179,38 @@ export default function CreateGroupPage() {
                   </FormItem>
                 )}
               />
+
+              {/* Bild */}
+              <FormField
+                control={form.control}
+                name='imageFile'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gruppenbild (optional, max. 4 MB)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='file'
+                        accept='image/*'
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]; // EIN File oder undefined
+                          form.setValue('imageFile', f); // RHF-Setter
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
+
             <CardFooter className='flex justify-between'>
-              {' '}
-              {/* Buttons nebeneinander */}
               <Link href='/dashboard' passHref>
                 <Button type='button' variant='outline'>
                   Abbrechen
-                </Button>{' '}
-                {/* type="button" wichtig */}
+                </Button>
               </Link>
               <Button type='submit' disabled={isSubmitting}>
-                {isSubmitting ? 'Erstelle...' : 'Gruppe erstellen'}
+                {isSubmitting ? 'Erstelle…' : 'Gruppe erstellen'}
               </Button>
             </CardFooter>
           </form>

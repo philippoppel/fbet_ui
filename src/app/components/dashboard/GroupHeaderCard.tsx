@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import {
   Card,
   CardHeader,
@@ -19,7 +20,13 @@ import { InviteDialog } from '@/app/components/dashboard/InviteDialog';
 import type { Group } from '@/app/lib/types';
 import type { UseFormReturn } from 'react-hook-form';
 import type { AddEventFormData } from '@/app/hooks/useGroupInteractions';
-import { Share2, PlusCircle, Info, MoreHorizontal } from 'lucide-react';
+import {
+  Share2,
+  PlusCircle,
+  Info,
+  MoreHorizontal,
+  Image as ImageIcon,
+} from 'lucide-react';
 import { cn } from '@/app/lib/utils';
 import { GroupActionsMenu } from '@/app/components/dashboard/GroupActionMenu';
 
@@ -31,6 +38,7 @@ type GroupHeaderCardProps = {
   onSetAddEventDialogOpen: (isOpen: boolean) => void;
   currentUserId: number | undefined | null;
   onDeleteGroup: (group: Group) => void;
+  onImageChanged: () => void;
 };
 
 export function GroupHeaderCard({
@@ -41,6 +49,7 @@ export function GroupHeaderCard({
   onSetAddEventDialogOpen,
   currentUserId,
   onDeleteGroup,
+  onImageChanged,
 }: GroupHeaderCardProps) {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -61,6 +70,21 @@ export function GroupHeaderCard({
           'border border-white/20 dark:border-white/10 rounded-xl transition-all duration-300 ease-in-out hover:shadow-2xl'
         )}
       >
+        {/* ───────── Hero-Bild ───────── */}
+        {group.imageUrl && (
+          <div className='relative w-full h-52'>
+            <Image
+              src={group.imageUrl}
+              alt={group.name}
+              fill
+              sizes='(max-width: 768px) 100vw, 768px'
+              className='object-cover rounded-b-none rounded-t-xl'
+              priority
+            />
+          </div>
+        )}
+
+        {/* ───────── Header-Bereich ───────── */}
         <CardHeader
           className={cn(
             'flex flex-row items-start justify-between gap-x-3 sm:gap-x-4',
@@ -115,6 +139,7 @@ export function GroupHeaderCard({
             )}
           </div>
 
+          {/* ───────── Action-Buttons ───────── */}
           <div className='flex items-center gap-x-1 xs:gap-x-2 flex-shrink-0'>
             <div className='hidden sm:flex sm:items-center sm:gap-x-1.5 md:gap-x-2'>
               <AddEventDialog
@@ -159,7 +184,7 @@ export function GroupHeaderCard({
               </Button>
             </div>
 
-            {/* Mobiles Menü */}
+            {/* Mobile-Menü */}
             <div className='sm:hidden'>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -203,6 +228,7 @@ export function GroupHeaderCard({
                 <GroupActionsMenu
                   group={group}
                   onDelete={() => onDeleteGroup(group)}
+                  onImageChanged={onImageChanged}
                 />
               </div>
             )}

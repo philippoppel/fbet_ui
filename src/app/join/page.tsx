@@ -215,7 +215,7 @@ function JoinGroupContent() {
             {isAlreadyMember ? 'Bereits Mitglied' : 'Erfolgreich beigetreten!'}
           </CardTitle>
           <CardDescription>
-            Du bist {isAlreadyMember ? 'bereits' : 'jetzt'} Mitglied der Gruppe{' '}
+            Du bist {isAlreadyMember ? 'bereits' : 'jetzt'} Mitglied der Gruppe
             <strong>
               {joinedGroupInfo?.name ??
                 `(ID: ${joinedGroupInfo?.id ?? 'unbekannt'})`}
@@ -296,7 +296,6 @@ export default function JoinPage() {
     // es sei denn, JoinPage soll ein komplett anderes äußeres Layout haben.
     // Für eine einfache zentrierte Seite ist ein div ausreichend.
     <div className='container mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[calc(100vh-150px)]'>
-      {' '}
       {/* Beispiel für Mindesthöhe */}
       <Suspense
         fallback={

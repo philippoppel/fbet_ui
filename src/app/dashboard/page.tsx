@@ -229,6 +229,7 @@ export default function DashboardPage() {
             // GroupDetailsSection muss interactions.isDeletingSpecificEvent
             // an OpenEventsCard als isDeletingEvent weitergeben.
             onDeleteGroupInPage={handleInitiateDeleteGroupFromHeader}
+            onImageChanged={() => refreshSelectedGroupData(selectedGroupId!)}
           />
         ) : null}
       </DashboardLayout>

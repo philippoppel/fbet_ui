@@ -119,7 +119,6 @@ function RegisterContent() {
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
-          {' '}
           {/* Weniger Abstand als space-y-8 */}
           <CardContent className='grid gap-4'>
             <FormField
@@ -127,12 +126,11 @@ function RegisterContent() {
               name='name'
               render={({ field }) => (
                 <FormItem>
-                  {' '}
-                  <FormLabel>Name (Optional)</FormLabel>{' '}
+                  <FormLabel>Name (Optional)</FormLabel>
                   <FormControl>
                     <Input placeholder='Dein Name' {...field} />
-                  </FormControl>{' '}
-                  <FormMessage />{' '}
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -141,16 +139,15 @@ function RegisterContent() {
               name='email'
               render={({ field }) => (
                 <FormItem>
-                  {' '}
-                  <FormLabel>E-Mail</FormLabel>{' '}
+                  <FormLabel>E-Mail</FormLabel>
                   <FormControl>
                     <Input
                       placeholder='deine@email.de'
                       type='email'
                       {...field}
                     />
-                  </FormControl>{' '}
-                  <FormMessage />{' '}
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -159,12 +156,11 @@ function RegisterContent() {
               name='password'
               render={({ field }) => (
                 <FormItem>
-                  {' '}
-                  <FormLabel>Passwort</FormLabel>{' '}
+                  <FormLabel>Passwort</FormLabel>
                   <FormControl>
                     <Input placeholder='********' type='password' {...field} />
-                  </FormControl>{' '}
-                  <FormMessage />{' '}
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -173,12 +169,11 @@ function RegisterContent() {
               name='confirmPassword'
               render={({ field }) => (
                 <FormItem>
-                  {' '}
-                  <FormLabel>Passwort bestätigen</FormLabel>{' '}
+                  <FormLabel>Passwort bestätigen</FormLabel>
                   <FormControl>
                     <Input placeholder='********' type='password' {...field} />
-                  </FormControl>{' '}
-                  <FormMessage />{' '}
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -191,7 +186,7 @@ function RegisterContent() {
               {isSubmitting ? 'Registriere...' : 'Konto erstellen'}
             </Button>
             <p className='text-sm text-muted-foreground'>
-              Bereits ein Konto?{' '}
+              Bereits ein Konto?
               <Link
                 // Wichtig: Redirect-Parameter auch an Login weitergeben!
                 href={`/login?redirect=${encodeURIComponent(redirectPath || '')}`}

@@ -91,11 +91,9 @@ export function HighscoreCard({
         <CardContent className='flex-1 overflow-y-auto p-0 flex flex-col'>
           {isLoading ? (
             <div className='w-full p-2 sm:p-0'>
-              {' '}
               {/* Padding für Skeleton, wenn keine Tabelle da ist */}
               {/* Sticky Header Skeleton */}
               <div className='sticky top-0 z-10 bg-muted/50 backdrop-blur-sm'>
-                {' '}
                 {/* Hellerer Hintergrund für Sticky Header */}
                 <div className='flex items-center justify-between h-10 px-3 sm:px-4 text-sm font-medium border-b border-border/70'>
                   <Skeleton className='h-4 w-10 rounded bg-muted' />
@@ -145,14 +143,11 @@ export function HighscoreCard({
             </div>
           ) : (
             <div className='w-full relative flex-1 overflow-y-auto'>
-              {' '}
               {/* Container für Tabelle, damit Sticky funktioniert */}
               <table className='w-full caption-bottom text-sm'>
                 <thead className='sticky top-0 z-10 bg-muted/50 backdrop-blur-sm shadow-sm'>
-                  {' '}
                   {/* Hellerer Hintergrund und leichter Schatten */}
                   <tr className='border-b border-border/70'>
-                    {' '}
                     {/* Standard-Randfarbe */}
                     <th className='h-10 px-3 sm:px-4 text-center font-medium text-muted-foreground w-[70px] sm:w-[80px]'>
                       Rang
@@ -199,7 +194,6 @@ export function HighscoreCard({
                         </Badge>
                       </td>
                       <td className='py-2.5 px-3 sm:px-4 flex items-center gap-2'>
-                        {' '}
                         {/* Mehr Gap */}
                         {entry.isNameFallback && (
                           <Tooltip>

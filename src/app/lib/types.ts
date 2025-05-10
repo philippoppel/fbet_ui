@@ -45,6 +45,7 @@ export type Group = PrismaGroup;
 export interface GroupCreate {
   name: string;
   description?: string | null;
+  imageUrl?: string | null; // ➊ hinzugefügt
 }
 
 export interface GroupMembership extends PrismaGroupMembership {

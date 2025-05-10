@@ -8,7 +8,6 @@ export function Footer() {
     // text-opacity oder eine leicht andere Textfarbe könnte nötig sein,
     // je nachdem, wie gut der Kontrast am unteren Rand des Gradienten ist.
     <footer className='py-6 md:px-8 md:py-0 border-t border-border/60 bg-transparent text-center'>
-      {' '}
       {/* text-center hinzugefügt */}
       <div className='container flex flex-col items-center justify-center gap-4 md:h-24 md:flex-row'>
         <p className='text-sm leading-loose text-muted-foreground'>

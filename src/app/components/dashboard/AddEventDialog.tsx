@@ -379,7 +379,6 @@ export function AddEventDialog({
               !suggestionsError &&
               internalSuggestions.length > 0 && (
                 <div className='overflow-y-auto pr-3 max-h-[300px]'>
-                  {' '}
                   {/* max-h hinzugefügt für bessere Scrollbarkeit */}
                   <EventList
                     events={internalSuggestions}

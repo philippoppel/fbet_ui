@@ -403,7 +403,6 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
 
               {activeClosedEvents.length > 0 && (
                 <div className='space-y-4'>
-                  {' '}
                   {/* Container für aktive Events */}
                   {activeClosedEvents.map((event) =>
                     renderEventItem(event, false)
@@ -422,7 +421,6 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                     )
                   </h3>
                   <div className='space-y-4'>
-                    {' '}
                     {/* Container für archivierte Events */}
                     {archivedClosedEvents.map((event) =>
                       renderEventItem(event, true)

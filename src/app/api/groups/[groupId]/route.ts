@@ -7,6 +7,7 @@ import { isUserMemberOfGroup } from '@/app/api/services/groupService';
 import { prisma } from '@/app/api/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
+import { groupUpdateSchema } from '@/app/api/lib/groupSchema';
 
 // --- GET Handler ---
 export async function GET(req: NextRequest, context: any) {
@@ -69,6 +70,29 @@ export async function GET(req: NextRequest, context: any) {
       { status: 500 }
     );
   }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: { groupId: string } }
+) {
+  const groupId = parseInt(ctx.params.groupId, 10);
+  const json = await req.json();
+
+  const parsed = groupUpdateSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid input', details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const updated = await prisma.group.update({
+    where: { id: groupId },
+    data: { imageUrl: parsed.data.imageUrl ?? null }, // null → Bild löschen
+  });
+
+  return NextResponse.json(updated);
 }
 
 // --- DELETE Handler ---

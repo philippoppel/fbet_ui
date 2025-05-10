@@ -30,15 +30,16 @@ model Group {
   id          Int      @id @default(autoincrement())
   name        String
   description String?
+  imageUrl    String?  @map("image_url")   // ➊ NEU
   inviteToken String?  @unique @map("invite_token")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  createdById Int  @map("created_by_id")
-  creator     User @relation("GroupCreator", fields: [createdById], references: [id])
+  createdById Int      @map("created_by_id")
+  creator     User     @relation("GroupCreator", fields: [createdById], references: [id])
 
-  memberships GroupMembership[] // Hier KEIN onDelete
-  events      Event[] // Hier KEIN onDelete
+  memberships GroupMembership[]
+  events      Event[]
 
   @@map("groups")
 }

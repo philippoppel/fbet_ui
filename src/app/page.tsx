@@ -164,7 +164,7 @@ export default function LandingPage() {
         </div>
         <p className='mt-8 text-sm text-muted-foreground flex items-center justify-center gap-2'>
           <Smartphone className='w-5 h-5 text-primary' />
-          Auch als App!{' '}
+          Auch als App!
           <a
             href='#'
             onClick={(e) => {
@@ -174,7 +174,7 @@ export default function LandingPage() {
             className='text-primary hover:underline font-semibold'
           >
             Jetzt installieren
-          </a>{' '}
+          </a>
           für schnellen Zugriff.
         </p>
       </section>
