@@ -249,7 +249,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           disableTransitionOnChange
         >
           <AuthProvider>
-            <div className='flex flex-col min-h-dvh bg-gradient-to-b from-background to-slate-50 dark:from-slate-900 dark:to-slate-800'>
+            <div className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b from-background to-slate-50 dark:from-slate-900 dark:to-slate-800'>
               <SiteLayout>{children}</SiteLayout>
             </div>
             {/* PWAPromptMobile wurde entfernt, da der Hinweis nun nach Login kommt */}

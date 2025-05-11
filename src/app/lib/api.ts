@@ -385,3 +385,18 @@ export async function deleteEvent(
   // handleResponse kümmert sich um die Fehlerbehandlung und den 204-Status
   await handleResponse<void>(response);
 }
+
+export interface GroupWithOpenEvents {
+  groupId: number;
+  groupName: string;
+  openEvents: { id: number; title: string }[];
+}
+
+export async function getGroupsWithOpenEvents(
+  token: string
+): Promise<GroupWithOpenEvents[]> {
+  const response = await fetch('/api/open-events', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<GroupWithOpenEvents[]>(response);
+}

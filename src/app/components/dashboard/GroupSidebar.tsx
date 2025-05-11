@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import {
   Users,
@@ -9,33 +10,20 @@ import {
   Loader2,
   ChevronsLeft,
   ChevronsRight,
-  TriangleAlert, // Hinzugefügt für Fehlerzustand
+  TriangleAlert,
+  Star,
 } from 'lucide-react';
 import type { Group } from '@/app/lib/types';
 import { cn } from '@/app/lib/utils';
-import { CardTitle } from '@/app/components/ui/card'; // Wird für den Titel verwendet
+import { CardTitle } from '@/app/components/ui/card';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/app/components/ui/tooltip';
-// AlertDialog Imports bleiben, falls benötigt, aber nicht direkt im Design angepasst
-// import {
-//   AlertDialog,
-//   AlertDialogAction,
-//   AlertDialogCancel,
-//   AlertDialogContent,
-//   AlertDialogDescription,
-//   AlertDialogFooter,
-//   AlertDialogHeader,
-//   AlertDialogTitle,
-// } from '@/app/components/ui/alert-dialog';
-// import { useState, useEffect } from 'react'; // useState, useEffect bleiben für interne Logik
-// import { toast } from 'sonner';
-// import { GroupActionsMenu } from '@/app/components/dashboard/GroupActionMenu';
 
-type GroupSidebarProps = {
+interface GroupSidebarProps {
   groups: Group[];
   selectedGroupId: number | null;
   onSelectGroup: (groupId: number) => void;
@@ -45,7 +33,7 @@ type GroupSidebarProps = {
   onToggleCollapse?: () => void;
   currentUserId: number | undefined | null;
   onDeleteGroup: (groupId: number) => Promise<void>;
-};
+}
 
 export function GroupSidebar({
   groups,
@@ -56,27 +44,36 @@ export function GroupSidebar({
   isCollapsed = false,
   onToggleCollapse,
   currentUserId,
-  // onDeleteGroup, // Behalten, falls noch verwendet
 }: GroupSidebarProps) {
-  // const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  // const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+  const [favoriteGroupId, setFavoriteGroupId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const favId = localStorage.getItem('favoriteGroupId');
+      if (favId) setFavoriteGroupId(parseInt(favId, 10));
+    }
+  }, []);
+
+  const sortedGroups = [...groups].sort((a, b) => {
+    if (a.id === favoriteGroupId) return -1;
+    if (b.id === favoriteGroupId) return 1;
+    return 0;
+  });
 
   return (
     <TooltipProvider delayDuration={100}>
       <div
         className={cn(
           'flex flex-col h-full transition-all duration-300 ease-in-out',
-          // Angewandtes Kartendesign
           'bg-muted/30 border border-border rounded-xl shadow-sm',
-          isCollapsed ? 'w-full lg:w-[72px]' : 'w-full md:w-64 lg:w-72 xl:w-80' // Angepasste Breiten
+          isCollapsed ? 'w-full lg:w-[72px]' : 'w-full md:w-64 lg:w-72 xl:w-80'
         )}
       >
-        {/* Header - angelehnt an CardHeader */}
         <div
           className={cn(
             'flex flex-row items-center gap-2 px-3 sm:px-4 py-3 border-b border-border',
             isCollapsed
-              ? 'lg:px-2.5 lg:py-3 lg:justify-center' // Leicht angepasstes Padding für collapsed
+              ? 'lg:px-2.5 lg:py-3 lg:justify-center'
               : 'justify-between'
           )}
         >
@@ -92,7 +89,6 @@ export function GroupSidebar({
             </CardTitle>
           </div>
           <div className='flex items-center flex-shrink-0'>
-            {/* Kein space-x-1 mehr, direkter Button */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -102,7 +98,7 @@ export function GroupSidebar({
                     'text-muted-foreground hover:text-foreground',
                     isCollapsed
                       ? 'lg:w-9 lg:h-9 p-0'
-                      : 'flex items-center gap-1.5 px-2 py-1 h-auto' // Kompaktere Größen
+                      : 'flex items-center gap-1.5 px-2 py-1 h-auto'
                   )}
                   asChild
                   aria-label='Neue Gruppe erstellen'
@@ -131,7 +127,6 @@ export function GroupSidebar({
                 </TooltipContent>
               )}
             </Tooltip>
-            {/* Collapse Button für Desktop Ansicht im Header wenn NICHT collapsed */}
             {onToggleCollapse && !isCollapsed && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -139,7 +134,7 @@ export function GroupSidebar({
                     variant='ghost'
                     size='icon'
                     onClick={onToggleCollapse}
-                    className='hidden lg:flex w-9 h-9 text-muted-foreground hover:text-foreground ml-1' // Kleiner Abstand zum Erstellen-Button
+                    className='hidden lg:flex w-9 h-9 text-muted-foreground hover:text-foreground ml-1'
                     aria-label='Sidebar einklappen'
                   >
                     <ChevronsLeft className='h-5 w-5' />
@@ -153,11 +148,10 @@ export function GroupSidebar({
           </div>
         </div>
 
-        {/* Content - angelehnt an CardContent */}
         <div
           className={cn(
-            'flex-1 overflow-y-auto', // pt-2 pb-4 entfernt, wird durch innere Elemente oder Padding der Leerzustände gesteuert
-            isCollapsed ? 'lg:hidden px-0' : 'py-2 px-2 sm:px-3 space-y-1' // Padding und Space für Gruppenliste
+            'flex-1 overflow-y-auto',
+            isCollapsed ? 'lg:hidden px-0' : 'py-2 px-2 sm:px-3 space-y-1'
           )}
         >
           {isLoading && (
@@ -180,65 +174,74 @@ export function GroupSidebar({
               <p className='text-xs'>
                 Erstelle eine neue Gruppe oder lass dich einladen.
               </p>
-              {/* Der Button "Erste Gruppe erstellen" wurde entfernt, da der "Erstellen"-Button im Header diese Funktion übernimmt. */}
             </div>
           )}
-          {!isLoading &&
-            !error &&
-            groups &&
-            groups.length > 0 &&
-            !isCollapsed && (
-              <ul className='space-y-0.5'>
-                {/* Reduzierter Abstand zwischen Gruppen */}
-                {groups.map((group) => {
-                  if (!group || typeof group.id === 'undefined') {
-                    return null;
-                  }
-                  // const isCreator = currentUserId != null && group.createdById != null && currentUserId === group.createdById;
-                  const isSelected = selectedGroupId === group.id;
+          {!isLoading && !error && sortedGroups.length > 0 && !isCollapsed && (
+            <ul className='space-y-0.5'>
+              {sortedGroups.map((group) => {
+                if (!group || typeof group.id === 'undefined') return null;
+                const isSelected = selectedGroupId === group.id;
 
-                  return (
-                    <li key={group.id}>
-                      {/* Kein extra Padding/Margin hier, wird vom Button gesteuert */}
-                      <Button
-                        data-testid={`group-btn-${group.id}`}
-                        variant={isSelected ? 'default' : 'ghost'} // Default für selected, ghost für andere
-                        size='sm' // Einheitliche Größe
+                return (
+                  <li key={group.id} className='relative'>
+                    <Button
+                      data-testid={`group-btn-${group.id}`}
+                      variant={isSelected ? 'default' : 'ghost'}
+                      size='sm'
+                      className={cn(
+                        'w-full justify-start text-left h-auto py-1.5 px-2.5 transition-all duration-150',
+                        'rounded-md text-sm pr-10',
+                        isSelected
+                          ? 'bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm'
+                          : 'text-foreground/80 hover:text-foreground hover:bg-muted focus-visible:bg-muted'
+                      )}
+                      onClick={() => onSelectGroup(group.id)}
+                      title={group.name || `Gruppe ${group.id}`}
+                    >
+                      <span className='truncate'>
+                        {group.name || `Gruppe ${group.id}`}
+                      </span>
+                    </Button>
+                    <button
+                      onClick={() => {
+                        localStorage.setItem(
+                          'favoriteGroupId',
+                          group.id.toString()
+                        );
+                        setFavoriteGroupId(group.id);
+                      }}
+                      className='absolute right-2 top-2'
+                      title={
+                        favoriteGroupId === group.id
+                          ? 'Favorit – wird zuerst angezeigt'
+                          : 'Als Favorit festlegen'
+                      }
+                    >
+                      <Star
                         className={cn(
-                          'w-full justify-start text-left h-auto py-1.5 px-2.5 transition-all duration-150', // Schnellerer Übergang
-                          'rounded-md text-sm', // Einheitliche Textgröße
-                          isSelected
-                            ? 'bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm' // Dunklerer Hintergrund für Selected
-                            : 'text-foreground/80 hover:text-foreground hover:bg-muted focus-visible:bg-muted' // Hellerer Hover für nicht ausgewählte
+                          'w-4 h-4 transition-colors',
+                          favoriteGroupId === group.id
+                            ? 'fill-yellow-400 text-yellow-500'
+                            : 'fill-transparent text-yellow-400 hover:fill-yellow-300 hover:text-yellow-500'
                         )}
-                        onClick={() => onSelectGroup(group.id)}
-                        title={group.name || `Gruppe ${group.id}`}
-                      >
-                        <span className='truncate'>
-                          {group.name || `Gruppe ${group.id}`}
-                        </span>
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                      />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
-        {/* Collapse/Expand Toggle im Footer nur für Desktop Ansicht wenn collapsed */}
         {onToggleCollapse && isCollapsed && (
-          <div
-            className={cn(
-              'hidden lg:flex justify-center items-center py-2.5 border-t border-border' // Angepasstes Padding und Standard-Border
-            )}
-          >
+          <div className='hidden lg:flex justify-center items-center py-2.5 border-t border-border'>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant='ghost'
                   size='icon'
                   onClick={onToggleCollapse}
-                  className='w-9 h-9 text-muted-foreground hover:text-foreground' // Einheitliche Größe
+                  className='w-9 h-9 text-muted-foreground hover:text-foreground'
                   aria-label='Sidebar ausklappen'
                 >
                   <ChevronsRight className='h-5 w-5' />
