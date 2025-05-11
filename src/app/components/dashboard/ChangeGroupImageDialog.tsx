@@ -11,56 +11,76 @@ import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { mutate } from 'swr'; // SWR-Cache invalidieren
+import { mutate } from 'swr';
+import { useAuth } from '@/app/context/AuthContext'; // 🔐 Auth-Kontext
 
 type Props = {
   groupId: number;
   open: boolean;
   setOpen: (o: boolean) => void;
-  onImageChanged: (url: string | null) => void; // ➊ NEU
+  onImageChanged: (url: string | null) => void;
 };
 
 export function ChangeGroupImageDialog({
   groupId,
   open,
   setOpen,
-  onImageChanged, // ➋
+  onImageChanged,
 }: Props) {
   const router = useRouter();
+  const auth = useAuth(); // 🔐 Token holen
   const [file, setFile] = useState<File>();
   const [busy, setBusy] = useState(false);
 
   async function handleSave() {
     if (!file) return;
 
+    if (!auth.token) {
+      toast.error('Nicht eingeloggt', {
+        description: 'Du musst eingeloggt sein, um das Bild zu ändern.',
+      });
+      return;
+    }
+
     setBusy(true);
     try {
-      /* ---------- Upload ---------- */
+      // ---------- Upload ----------
       const fd = new FormData();
       fd.append('file', file);
-      const { url } = await fetch('/api/upload', {
+      const uploadRes = await fetch('/api/upload', {
         method: 'POST',
         body: fd,
-      }).then((r) => r.json());
+      });
 
-      /* ---------- PATCH ---------- */
-      await fetch(`/api/groups/${groupId}`, {
+      const { url, error } = await uploadRes.json();
+      if (!uploadRes.ok || !url)
+        throw new Error(error || 'Upload fehlgeschlagen');
+
+      // ---------- PATCH ----------
+      const patchRes = await fetch(`/api/groups/${groupId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${auth.token}`, // 🔐 Auth-Header
+        },
         body: JSON.stringify({ imageUrl: url }),
       });
 
-      /* ---------- Client-Refresh ---------- */
-      onImageChanged(url); // ➌ Optimistisches Update
-      mutate(`/api/groups/${groupId}`); // ➍ SWR-Cache aktualisieren
+      if (!patchRes.ok) {
+        const errJson = await patchRes.json();
+        throw new Error(errJson?.error || 'Update fehlgeschlagen');
+      }
 
-      // App-Router: Server Components revalidieren
-      startTransition(() => router.refresh()); // ➎ kein UI-Block
-
+      // ---------- Client-Refresh ----------
+      onImageChanged(url);
+      mutate(`/api/groups/${groupId}`);
+      startTransition(() => router.refresh());
       toast.success('Gruppenbild aktualisiert');
       setOpen(false);
     } catch (err) {
-      toast.error('Aktualisierung fehlgeschlagen');
+      toast.error('Aktualisierung fehlgeschlagen', {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setBusy(false);
     }

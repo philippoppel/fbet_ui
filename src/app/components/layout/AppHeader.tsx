@@ -70,8 +70,7 @@ export function AppHeader({
               >
                 <SheetHeader className='p-4 border-b'>
                   <SheetTitle className='flex items-center gap-2 text-base font-semibold'>
-                    <Users className='w-5 h-5 text-muted-foreground' /> Meine
-                    Gruppen
+                    <Users className='w-5 h-5 text-muted-foreground' />
                   </SheetTitle>
                 </SheetHeader>
                 <div className='flex-1 overflow-y-auto p-4'>

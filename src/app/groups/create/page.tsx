@@ -97,7 +97,7 @@ export default function CreateGroupPage() {
       const payload: GroupCreate = {
         name: values.name,
         description: values.description || null,
-        imageUrl,
+        imageUrl: imageUrl || undefined,
       };
 
       const newGroup = await createGroup(auth.token, payload);

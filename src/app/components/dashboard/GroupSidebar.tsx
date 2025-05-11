@@ -88,7 +88,7 @@ export function GroupSidebar({
           >
             <Users className='w-5 h-5 text-primary flex-shrink-0' />
             <CardTitle className='text-base sm:text-lg font-semibold tracking-tight truncate text-foreground'>
-              Meine Gruppen
+              Gruppen
             </CardTitle>
           </div>
           <div className='flex items-center flex-shrink-0'>

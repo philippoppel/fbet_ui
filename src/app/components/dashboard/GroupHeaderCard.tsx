@@ -184,52 +184,14 @@ export function GroupHeaderCard({
               </Button>
             </div>
 
-            {/* Mobile-Menü */}
-            <div className='sm:hidden'>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    aria-label='Weitere Aktionen'
-                    className='h-8 w-8 xs:h-9 xs:w-9'
-                  >
-                    <MoreHorizontal className='h-4 w-4 xs:h-5 xs:w-5' />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='end' sideOffset={5}>
-                  <DropdownMenuItem
-                    onClick={() => onSetAddEventDialogOpen(true)}
-                  >
-                    <PlusCircle className='mr-2 h-4 w-4' />
-                    <span>Event erstellen</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setIsInviteDialogOpen(true)}
-                    disabled={!group.inviteToken}
-                  >
-                    <Share2 className='mr-2 h-4 w-4' />
-                    <span>Einladen</span>
-                  </DropdownMenuItem>
-                  {isCreator && (
-                    <DropdownMenuItem
-                      onClick={() => onDeleteGroup(group)}
-                      className='text-destructive focus:text-destructive focus:bg-destructive/10'
-                    >
-                      Gruppe löschen
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {isCreator && (
-              <GroupActionsMenu
-                group={group}
-                onDelete={() => onDeleteGroup(group)}
-                onImageChanged={onImageChanged}
-              />
-            )}
+            <GroupActionsMenu
+              group={group}
+              onDelete={onDeleteGroup}
+              onImageChanged={onImageChanged}
+              isCreator={isCreator}
+              onAddEventClick={() => onSetAddEventDialogOpen(true)}
+              onInviteClick={() => setIsInviteDialogOpen(true)}
+            />
           </div>
         </CardHeader>
       </Card>
