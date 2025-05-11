@@ -1,7 +1,6 @@
-// src/components/AppHeader.tsx
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   LogOut,
@@ -41,7 +40,10 @@ interface AppHeaderProps {
   onSelectGroup?: (groupId: number) => void;
 }
 
-const REFRESH_OPEN_EVENTS_MS = 60_000; // 1Min –anpassen nach Bedarf
+const REFRESH_OPEN_EVENTS_MS = 60_000;
+const STORAGE_KEY = 'openEventNotificationSeenIds';
+
+type EventId = number | string;
 
 export function AppHeader({
   user,
@@ -60,61 +62,63 @@ export function AppHeader({
   >([]);
   const [isLoadingOpenEvents, setIsLoadingOpenEvents] = useState(false);
 
-  /**
-   * Statt nur eines Boolean speichern wir den zuletzt als gelesen
-   * bestätigten Event‑COUNT.  Sobald die tatsächliche Anzahl diesen Wert
-   * übersteigt, zeigen wir wieder eine Notification.
-   */
-  const [lastDismissedCount, setLastDismissedCount] = useState<number>(() => {
+  const [seenIds, setSeenIds] = useState<Set<EventId>>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('openEventNotificationLastCount');
-      return stored ? parseInt(stored, 10) : 0;
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        try {
+          const arr: EventId[] = JSON.parse(raw);
+          return new Set(arr);
+        } catch {}
+      }
     }
-    return 0;
+    return new Set();
   });
 
-  /**
-   * Holt die offenen Events (ein Aufruf, damit wir ihn mehrfach verwenden
-   * können).  useCallback verhindert bei jeder Render‑Schleife eine neue
-   * Funktions‑Instanz – wichtig für setInterval‑Cleanup.
-   */
   const fetchOpenEvents = useCallback(async () => {
-    if (!user) return; // Ohne User kein Token → kein Aufruf
+    console.trace('[DEBUG] fetchOpenEvents triggered');
+    console.log('[DEBUG] user:', user);
+
     const token =
-      typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-    if (!token) return;
+      typeof window !== 'undefined' ? localStorage.getItem('fbet_token') : null;
+    console.log('[DEBUG] token:', token);
+
+    if (!user || !token) {
+      console.warn('[DEBUG] no user or token, skipping fetch');
+      return;
+    }
+
     try {
-      // Beim Polling wollen wir keinen Spinner jedes Mal … nur beim allerersten
       setIsLoadingOpenEvents(
         (prev) => prev || groupsWithOpenEvents.length === 0
       );
       const data = await getGroupsWithOpenEvents(token);
+      console.log('[DEBUG] fetched groupsWithOpenEvents:', data);
       setGroupsWithOpenEvents(data);
     } catch (e) {
-      console.error('Fehler beim Laden offener Events', e);
+      console.error('[DEBUG] Fehler beim Laden offener Events', e);
     } finally {
       setIsLoadingOpenEvents(false);
     }
   }, [user, groupsWithOpenEvents.length]);
 
-  // Initial laden, wenn sich der User ändert (Login/Logout)
   useEffect(() => {
+    console.log('[DEBUG] useEffect triggered (initial fetch), user:', user);
     fetchOpenEvents();
   }, [fetchOpenEvents]);
 
-  // Wiederkehrendes Polling, bis der User ausloggt / Komponente unmountet
   useEffect(() => {
     if (!user) return;
+    console.log('[DEBUG] Polling setup for open events');
     const id = setInterval(fetchOpenEvents, REFRESH_OPEN_EVENTS_MS);
     return () => clearInterval(id);
   }, [user, fetchOpenEvents]);
 
-  const openEventCount = useMemo(
-    () => groupsWithOpenEvents.reduce((sum, g) => sum + g.openEvents.length, 0),
-    [groupsWithOpenEvents]
+  const openEventIds: EventId[] = groupsWithOpenEvents.flatMap((g) =>
+    g.openEvents.map((e) => e.id)
   );
-
-  const isNotificationActive = openEventCount > lastDismissedCount;
+  const unseenExists = openEventIds.some((id) => !seenIds.has(id));
+  const openEventCount = openEventIds.length;
 
   const handleSelectAndClose = (groupId: number) => {
     onSelectGroup?.(groupId);
@@ -122,12 +126,10 @@ export function AppHeader({
   };
 
   const handleMarkAsRead = () => {
-    setLastDismissedCount(openEventCount);
+    const newSeen = new Set([...seenIds, ...openEventIds]);
+    setSeenIds(newSeen);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(
-        'openEventNotificationLastCount',
-        String(openEventCount)
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(newSeen)));
     }
   };
 
@@ -183,7 +185,7 @@ export function AppHeader({
         </Link>
 
         <div className='ml-auto flex items-center space-x-2 sm:space-x-3'>
-          {openEventCount > 0 && isNotificationActive && (
+          {openEventCount > 0 && unseenExists && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
