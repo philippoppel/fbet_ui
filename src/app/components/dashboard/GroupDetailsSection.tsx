@@ -59,7 +59,7 @@ function SelectedGroupViewSkeleton() {
       {/* NEU: Submitted Open Events Skeleton (optional, aber konsistent) */}
       <Card className='rounded-xl border border-border bg-muted shadow-sm'>
         <CardHeader className='p-6'>
-          <Skeleton className='h-6 w-2/5 rounded-xl' />{' '}
+          <Skeleton className='h-6 w-2/5 rounded-xl' />
           {/* Angepasste Breite für längeren Titel */}
         </CardHeader>
         <CardContent className='space-y-4 p-6 pt-0'>

@@ -39,9 +39,8 @@ export default function SubmittedOpenEventsCard({
   return (
     <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
       <CardHeader className='flex flex-row items-center gap-2'>
-        {' '}
         {/* Geändert zu flex-row für bessere Ausrichtung von Icon und Titel */}
-        <Eye className='h-5 w-5 text-blue-500 dark:text-blue-300 flex-shrink-0' />{' '}
+        <Eye className='h-5 w-5 text-blue-500 dark:text-blue-300 flex-shrink-0' />
         {/* flex-shrink-0 hinzugefügt */}
         <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
           Meine Tipps für offene Wetten
@@ -76,28 +75,23 @@ export default function SubmittedOpenEventsCard({
               {/* Zeige "Tipps der anderen" nur, wenn es tatsächlich andere Tipps gibt */}
               {otherTipsForThisEvent.length > 0 && (
                 <div className='pt-3 border-t border-border/60 text-sm'>
-                  {' '}
                   {/* border-border/60 für etwas subtilere Linie */}
                   <p className='mb-1.5 text-muted-foreground font-medium text-xs uppercase tracking-wider'>
-                    {' '}
                     {/* Etwas kleiner und uppercase */}
                     Tipps der anderen:
                   </p>
                   <ul className='text-sm space-y-1.5'>
-                    {' '}
                     {/* Etwas mehr Abstand in der Liste */}
                     {otherTipsForThisEvent.map((t) => (
                       <li
                         key={t.userId}
                         className='flex justify-between items-center'
                       >
-                        {' '}
                         {/* items-center hinzugefügt */}
                         <span className='text-muted-foreground'>
                           {t.userName || `User ${t.userId}`}
                         </span>
                         <Badge variant='secondary' className='font-normal'>
-                          {' '}
                           {/* secondary und font-normal für subtileren Look */}
                           {t.selectedOption}
                         </Badge>

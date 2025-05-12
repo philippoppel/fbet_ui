@@ -134,3 +134,23 @@ export interface GroupWithOpenEvents {
   groupName: string;
   openEvents: { id: number; title: string }[];
 }
+
+export interface EventComment {
+  id: number;
+  text?: string | null; // Erlaube null, falls DB null speichert
+  gifUrl?: string | null;
+  createdAt: string; // ISO-String Datum
+  userId: number;
+  eventId: number;
+  user: {
+    // Eingebettete User-Infos
+    id: number;
+    name: string | null;
+    email: string;
+  };
+}
+
+export interface EventCommentCreate {
+  text?: string;
+  gifUrl?: string;
+}

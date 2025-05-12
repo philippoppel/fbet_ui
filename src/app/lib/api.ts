@@ -16,7 +16,9 @@ import type {
   EventResultSet,
   GroupMembershipCreate,
   UserTipSelection,
-  AllTipsPerEvent, // Wird ggf. nicht mehr so direkt verwendet
+  AllTipsPerEvent,
+  EventComment,
+  EventCommentCreate, // Wird ggf. nicht mehr so direkt verwendet
 } from './types'; // Stelle sicher, dass diese Typen mit den Server-Antworten übereinstimmen
 
 // Liest die Backend-URL aus Umgebungsvariablen.
@@ -428,4 +430,66 @@ export async function getMyTipsAcrossAllGroups(
     },
   });
   return handleResponse<UserTipSelection[]>(response);
+}
+
+export async function getEventComments(
+  token: string,
+  eventId: number
+): Promise<EventComment[]> {
+  // Server-Route: GET /api/events/{eventId}/comments
+  const response = await fetch(
+    `${API_BASE_URL}/api/events/${eventId}/comments`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  // Gibt ein Array von Kommentaren zurück
+  return handleResponse<EventComment[]>(response);
+}
+
+export async function postEventComment(
+  token: string,
+  eventId: number,
+  commentData: EventCommentCreate // Typ für die zu sendenden Daten
+): Promise<EventComment> {
+  // Server-Route: POST /api/events/{eventId}/comments
+  const response = await fetch(
+    `${API_BASE_URL}/api/events/${eventId}/comments`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(commentData),
+    }
+  );
+  // Gibt das neu erstellte Kommentar-Objekt zurück
+  return handleResponse<EventComment>(response);
+}
+
+// --- Datei-Upload Endpunkt (Beispiel) ---
+// Passt dies an, falls dein Upload-Endpunkt anders heißt oder eine andere Antwortstruktur hat
+
+// Definiere den erwarteten Rückgabetyp vom Upload-Endpunkt
+interface UploadResponse {
+  url: string;
+  // ggf. weitere Felder wie filename, size etc.
+}
+
+export async function uploadImage(
+  token: string,
+  fileData: FormData // Erwartet FormData
+): Promise<UploadResponse> {
+  // Annahme: Server-Route ist POST /api/upload
+  const response = await fetch(`${API_BASE_URL}/api/upload`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // KEIN 'Content-Type' Header hier setzen! Der Browser setzt ihn korrekt für FormData.
+    },
+    body: fileData,
+  });
+  return handleResponse<UploadResponse>(response);
 }

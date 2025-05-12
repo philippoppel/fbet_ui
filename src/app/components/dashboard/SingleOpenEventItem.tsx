@@ -11,6 +11,7 @@ import {
 import { Button } from '@/app/components/ui/button';
 import { MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
+import { CommentSection } from '@/app/components/dashboard/CommentSection';
 
 interface SingleOpenEventItemProps {
   event: GroupEvent;
@@ -73,7 +74,7 @@ export function SingleOpenEventItem({
   }, []);
 
   return (
-    <div className='rounded-xl border border-border bg-card p-4 sm:p-6 shadow-sm space-y-4 transition-colors hover:shadow-md'>
+    <div className='space-y-4'>
       <div className='flex justify-between items-start gap-4'>
         <div className='flex-1 space-y-1'>
           <h4 className='text-lg font-semibold text-foreground leading-tight'>
@@ -204,6 +205,9 @@ export function SingleOpenEventItem({
           )}
         </div>
       )}
+
+      {/* Kommentarbereich */}
+      {user && <CommentSection eventId={event.id} currentUser={user} />}
     </div>
   );
 }

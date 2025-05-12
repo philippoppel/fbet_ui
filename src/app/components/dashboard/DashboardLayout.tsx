@@ -114,7 +114,6 @@ export function DashboardLayout({
           {/* Rechte Spalte: Highscore */}
           {hasGroups && (
             <aside className={cn('col-span-12 lg:col-span-4')}>
-              {' '}
               {/* NEU: War vorher lg:col-span-3 */}
               {/* Logik zur Anzeige von HighscoreCard, Placeholder oder Fehler bleibt gleich */}
               {selectedGroupId && !errors.groupData && !isGroupDataLoading ? (

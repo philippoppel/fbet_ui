@@ -504,10 +504,8 @@ export function AddEventDialog({
         {/* Scrollbarer Hauptbereich */}
         {/* WICHTIG: padding-right anpassen, wenn Scrollbar im Div ist, oder overflow-y-auto auf DialogContent setzen */}
         <div className='flex-grow overflow-y-auto px-1 pr-3'>
-          {' '}
           {/* pr-3 für Scrollbar-Platz */}
           <div className='px-6 pt-2 pb-4'>
-            {' '}
             {/* Innerer Container für Padding */}
             <Form {...form}>
               <form
@@ -621,7 +619,7 @@ export function AddEventDialog({
             {/* NEU: Bereich für Event-Vorschläge */}
             <div className='mt-6 pt-6 border-t'>
               <h3 className='text-lg font-semibold mb-3 flex items-center gap-2'>
-                <Sparkles className='w-5 h-5 text-muted-foreground' />{' '}
+                <Sparkles className='w-5 h-5 text-muted-foreground' />
                 {/* Anderes Icon als AI */}
                 Event-Vorschläge übernehmen
               </h3>
@@ -689,9 +687,9 @@ export function AddEventDialog({
                   </div>
                 )}
             </div>
-          </div>{' '}
+          </div>
           {/* Ende innerer Container */}
-        </div>{' '}
+        </div>
         {/* Ende Scrollbarer Hauptbereich */}
         <DialogFooter className='flex-shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t mt-auto px-6 pb-6'>
           <DialogClose asChild>

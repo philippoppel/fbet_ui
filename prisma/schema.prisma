@@ -22,6 +22,7 @@ model User {
   createdEvents    Event[]           @relation("EventCreator")
   groupMemberships GroupMembership[]
   tips             Tip[]
+  comments         EventComment[]
 
   @@map("users")
 }
@@ -30,13 +31,13 @@ model Group {
   id          Int      @id @default(autoincrement())
   name        String
   description String?
-  imageUrl    String?  @map("image_url")   // ➊ NEU
+  imageUrl    String?  @map("image_url") // ➊ NEU
   inviteToken String?  @unique @map("invite_token")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  createdById Int      @map("created_by_id")
-  creator     User     @relation("GroupCreator", fields: [createdById], references: [id])
+  createdById Int  @map("created_by_id")
+  creator     User @relation("GroupCreator", fields: [createdById], references: [id])
 
   memberships GroupMembership[]
   events      Event[]
@@ -59,16 +60,16 @@ model GroupMembership {
 }
 
 model Event {
-  id            Int       @id @default(autoincrement())
-  title         String
-  description   String?
-  question      String
-  options       Json
-  winningOption String?   @map("winning_option")
-  eventDateTime DateTime? @map("event_datetime")
+  id              Int       @id @default(autoincrement())
+  title           String
+  description     String?
+  question        String
+  options         Json
+  winningOption   String?   @map("winning_option")
+  eventDateTime   DateTime? @map("event_datetime")
   tippingDeadline DateTime? @map("tipping_deadline")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   groupId Int   @map("group_id")
   group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade) // <-- HIER onDelete
@@ -76,7 +77,8 @@ model Event {
   createdById Int  @map("created_by_id")
   creator     User @relation("EventCreator", fields: [createdById], references: [id])
 
-  tips Tip[]
+  tips     Tip[]
+  comments EventComment[]
 
   @@map("events")
 }
@@ -96,4 +98,19 @@ model Tip {
 
   @@unique([eventId, userId], name: "unique_tip_per_user_per_event")
   @@map("tips")
+}
+
+model EventComment {
+  id        Int      @id @default(autoincrement())
+  text      String? // Optionaler Text
+  gifUrl    String? // Für Giphy oder Tenor GIFs
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  eventId Int
+  event   Event @relation(fields: [eventId], references: [id])
+
+  @@map("event_comments")
 }
