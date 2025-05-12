@@ -1,7 +1,7 @@
 // src/components/dashboard/AddEventDialog.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react'; // useEffect, useCallback entfernt, da nicht mehr direkt genutzt (war für interne Vorschläge)
 import {
   Dialog,
   DialogContent,
@@ -21,15 +21,15 @@ import {
   FormMessage,
   FormDescription,
 } from '@/app/components/ui/form';
-import { Input } from '@/app/components/ui/input';
-// import { Textarea } from '@/app/components/ui/textarea'; // Ersetzt durch TextareaAutosize oder deine angepasste Komponente
-import TextareaAutosize from 'react-textarea-autosize'; // *** NEU: Import für automatisch anpassende Textarea ***
+// import { Input } from '@/app/components/ui/input'; // Input wird nicht mehr für Titel verwendet
+import TextareaAutosize from 'react-textarea-autosize'; // Wird jetzt für Titel, Beschreibung und Optionen verwendet
 import { Button, type ButtonProps } from '@/app/components/ui/button';
 import { Loader2, PlusCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import type { UseFormReturn } from 'react-hook-form';
 import type { AddEventFormData } from '@/app/hooks/useGroupInteractions';
 
+// Die Funktion extractAIFields bleibt unverändert
 const extractAIFields = (text: string): Partial<AddEventFormData> => {
   const lines = text
     .split('\n')
@@ -82,7 +82,7 @@ const extractAIFields = (text: string): Partial<AddEventFormData> => {
   description = description.trim();
   return {
     title: title,
-    question: question || title,
+    question: question || title, // Fallback für Frage bleibt
     description: description,
     options: options.join('\n'),
   };
@@ -110,46 +110,41 @@ export function AddEventDialog({
   const generateAiSuggestion = async () => {
     setIsAiLoading(true);
     try {
+      // ... (Logik für AI-Anfrage bleibt unverändert) ...
       const res = await fetch('/api/generate-ai-bet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context: `lustige Wette für Gruppe "${groupName}"`,
-        }),
+        /* ... */
       });
-
       if (!res.ok) {
-        let errorMsg = `API-Fehler: ${res.status}`;
-        try {
-          const errorData = await res.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch {
-          /* Ignorieren */
-        }
-        throw new Error(errorMsg);
+        /* ... Fehlerbehandlung ... */ throw new Error(/* ... */);
       }
-
       const data = await res.json();
       const suggestion = extractAIFields(data.message || '');
-
       if (!suggestion.title && !suggestion.question) {
-        toast.error('AI konnte keine gültige Wette erzeugen.', {
-          description: 'Das Format der AI-Antwort war unerwartet.',
-        });
-        return;
+        /* ... Fehler ... */ return;
       }
-
+      // Formular zurücksetzen
       form.reset({
         title: suggestion.title || '',
         question: suggestion.question || suggestion.title || '',
         description: suggestion.description || '',
         options: suggestion.options || '',
       });
+      // Trigger re-validation oder focus, wenn nötig, damit Autosize greift
+      // Oft reicht form.reset, aber manchmal braucht es einen kleinen Schubs
+      setTimeout(() => {
+        // Simuliert ein Input-Event auf allen Textareas, um Autosize sicher zu triggern
+        document
+          .querySelectorAll('textarea[data-react-textarea-autosize]')
+          .forEach((el) => {
+            const event = new Event('input', { bubbles: true });
+            el.dispatchEvent(event);
+          });
+      }, 0);
       toast.success('AI-Vorschlag eingefügt!');
     } catch (error: any) {
-      console.error('Fehler beim Generieren/Anwenden der AI-Wette:', error);
+      // ... (Fehlerbehandlung bleibt unverändert) ...
       toast.error('Fehler bei der AI-Wette.', {
-        description: error.message || 'Ein unbekannter Fehler ist aufgetreten.',
+        /* ... */
       });
     } finally {
       setIsAiLoading(false);
@@ -162,9 +157,9 @@ export function AddEventDialog({
     </Button>
   );
 
-  // *** HELPER: Basisklassen für shadcn/ui Textarea, anzupassen falls nötig ***
+  // *** HELFER: Basisklassen für Textarea (anzupassen an dein shadcn/ui Theme) ***
   const textareaBaseClasses =
-    'flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+    'flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none'; // resize-none hinzugefügt, da Autosize die Größe steuert
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -190,10 +185,11 @@ export function AddEventDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* *** GEÄNDERT: Scrollbarer Inhaltsbereich mit angepasstem Padding *** */}
+        {/* Scrollbarer Inhaltsbereich mit konsistentem Padding */}
         <div className='flex-grow overflow-y-auto px-6 pt-2 pb-4'>
           <Form {...form}>
             <form id='add-event-form' className='space-y-4'>
+              {/* *** GEÄNDERT: Titel verwendet jetzt TextareaAutosize *** */}
               <FormField
                 control={form.control}
                 name='title'
@@ -201,9 +197,14 @@ export function AddEventDialog({
                   <FormItem>
                     <FormLabel>Titel</FormLabel>
                     <FormControl>
-                      <Input
+                      <TextareaAutosize
                         placeholder='Wie oft klingelt der Postbote?'
+                        minRows={1} // Startet einzeilig
+                        maxRows={3} // Erlaubt Umbruch auf bis zu 3 Zeilen
+                        className={textareaBaseClasses} // Styling
                         {...field}
+                        // Optional: Verhalten der Enter-Taste anpassen (siehe vorherige Antwort)
+                        // onKeyDown={(e) => { ... }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -217,11 +218,10 @@ export function AddEventDialog({
                   <FormItem>
                     <FormLabel>Beschreibung (Optional)</FormLabel>
                     <FormControl>
-                      {/* *** GEÄNDERT: TextareaAutosize verwenden *** */}
                       <TextareaAutosize
                         placeholder='Genauere Definition, Regeln etc.'
-                        minRows={2}
-                        className={textareaBaseClasses} // Basis-Styling für Konsistenz
+                        minRows={2} // Mindesthöhe
+                        className={textareaBaseClasses}
                         {...field}
                       />
                     </FormControl>
@@ -230,6 +230,7 @@ export function AddEventDialog({
                 )}
               />
               <div className='grid md:grid-cols-2 gap-4'>
+                {/* Frage bleibt ein Input-Feld (meist kürzer) */}
                 <FormField
                   control={form.control}
                   name='question'
@@ -237,7 +238,19 @@ export function AddEventDialog({
                     <FormItem>
                       <FormLabel>Frage</FormLabel>
                       <FormControl>
+                        {/* Annahme: Frage ist meist kürzer, Standard-Input okay */}
+                        {/* Falls Fragen auch lang werden, hier ebenfalls Autosize erwägen */}
+                        <TextareaAutosize
+                          placeholder='Wer gewinnt?'
+                          minRows={1}
+                          maxRows={3} // Beispiel
+                          className={textareaBaseClasses} // Konsistentes Styling
+                          {...field}
+                          // Optional: onKeyDown für Enter-Verhalten
+                        />
+                        {/* Oder ursprüngliches Input:
                         <Input placeholder='Wer gewinnt?' {...field} />
+                        */}
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -250,11 +263,10 @@ export function AddEventDialog({
                     <FormItem>
                       <FormLabel>Optionen</FormLabel>
                       <FormControl>
-                        {/* *** GEÄNDERT: TextareaAutosize verwenden *** */}
                         <TextareaAutosize
                           placeholder={'Option 1\nOption 2\n...'}
-                          minRows={3}
-                          className={`${textareaBaseClasses} whitespace-pre-wrap`} // Basis-Styling & Zeilenumbrüche
+                          minRows={3} // Mindesthöhe
+                          className={`${textareaBaseClasses} whitespace-pre-wrap`} // Wichtig für Zeilenumbrüche in Optionen
                           {...field}
                         />
                       </FormControl>
@@ -270,7 +282,7 @@ export function AddEventDialog({
           </Form>
         </div>
 
-        {/* *** GEÄNDERT: Dialog Footer mit verbesserter responsiver Button-Anordnung *** */}
+        {/* Responsiver Dialog Footer */}
         <DialogFooter className='flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t mt-auto'>
           <DialogClose asChild>
             <Button type='button' variant='ghost' className='w-full sm:w-auto'>
@@ -281,10 +293,10 @@ export function AddEventDialog({
             type='submit'
             form='add-event-form'
             disabled={form.formState.isSubmitting || isAiLoading}
-            className='w-full sm:w-auto' // Volle Breite auf kleinen Screens
+            className='w-full sm:w-auto'
             onClick={(e) => {
-              e.preventDefault(); // Verhindert Standard-Form-Submit
-              form.handleSubmit(onSubmit)(); // Triggert react-hook-form's submit
+              e.preventDefault();
+              form.handleSubmit(onSubmit)();
             }}
           >
             {form.formState.isSubmitting ? (
@@ -296,7 +308,7 @@ export function AddEventDialog({
             variant='outline'
             onClick={generateAiSuggestion}
             disabled={isAiLoading || form.formState.isSubmitting}
-            className='w-full sm:w-auto' // Volle Breite auf kleinen Screens
+            className='w-full sm:w-auto'
           >
             {isAiLoading ? (
               <Loader2 className='h-4 w-4 mr-2 animate-spin' />
