@@ -1,7 +1,7 @@
 // src/app/hooks/useGroupInteractions.ts
 'use client';
 
-import { useState, useCallback, useEffect } from 'react'; // useEffect hinzugefügt
+import { useState, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -70,12 +70,10 @@ export interface UseGroupInteractionsReturn {
   handleAddEventSubmit: (values: AddEventFormData) => Promise<void>;
   handleClearSelectedTip: (eventId: number) => void;
   eventToDelete: GroupEvent | null;
-  // isDeleteEventDialogOpen: boolean; // Wird durch eventToDelete gesteuert
   isDeletingSpecificEvent: boolean;
   handleInitiateDeleteEvent: (event: GroupEvent) => void;
   handleConfirmDeleteEvent: (eventId: number) => Promise<void>;
   resetDeleteEventDialog: () => void;
-  // setIsDeleteEventDialogOpen: (open: boolean) => void; // Wird durch eventToDelete gesteuert
 }
 
 /* -------------------------------------------------------------------------- */
@@ -94,7 +92,6 @@ export function useGroupInteractions({
     selectedGroupId
   );
 
-  // --- States ---
   const [selectedTips, setSelectedTips] = useState<Record<number, string>>({});
   const [resultInputs, setResultInputs] = useState<Record<number, string>>({});
   const [isSubmittingTip, setIsSubmittingTip] = useState<
@@ -105,10 +102,8 @@ export function useGroupInteractions({
   >({});
   const [isAddEventDialogOpen, setIsAddEventDialogOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<GroupEvent | null>(null);
-  // const [isDeleteEventDialogOpen, setIsDeleteEventDialogOpen] = useState(false); // Nicht mehr benötigt, wenn eventToDelete steuert
   const [isDeletingSpecificEvent, setIsDeletingSpecificEvent] = useState(false);
 
-  // --- Forms ---
   const addEventForm = useForm<AddEventFormData>({
     resolver: zodResolver(addEventFormSchema),
     defaultValues: {
@@ -119,7 +114,6 @@ export function useGroupInteractions({
     },
   });
 
-  // DEBUGGING: Effekt, um Änderungen an eventToDelete zu loggen
   useEffect(() => {
     console.log(
       `${LOG_PREFIX} useEffect[eventToDelete] - Wert geändert:`,
@@ -137,7 +131,6 @@ export function useGroupInteractions({
     }
   }, [eventToDelete]);
 
-  // --- Tipp Handling ---
   const handleOptionSelect = (eventId: number, option: string) => {
     console.log(
       `${LOG_PREFIX} handleOptionSelect - Event ID: ${eventId}, Option: "${option}"`
@@ -181,7 +174,7 @@ export function useGroupInteractions({
         toast.success('Tipp gespeichert!', {
           description: `Dein Tipp „${savedTip.selectedOption}“ für „${eventTitle}“ wurde gespeichert.`,
         });
-        handleClearSelectedTip(eventId); // Hier wird bereits geloggt
+        handleClearSelectedTip(eventId);
         updateUserTipState(savedTip.eventId, savedTip.selectedOption);
         console.log(
           `${LOG_PREFIX} handleSubmitTip - Rufe refreshGroupData auf...`
@@ -217,7 +210,6 @@ export function useGroupInteractions({
     ]
   );
 
-  // --- Admin: Ergebnis setzen ---
   const handleResultInputChange = (eventId: number, value: string) => {
     console.log(
       `${LOG_PREFIX} handleResultInputChange - Event ID: ${eventId}, Wert: "${value}"`
@@ -278,7 +270,6 @@ export function useGroupInteractions({
     [token, selectedGroupId, refreshGroupData]
   );
 
-  // --- Event anlegen ---
   const handleAddEventSubmit = useCallback(
     async (values: AddEventFormData) => {
       console.log(`${LOG_PREFIX} handleAddEventSubmit - Werte:`, values);
@@ -316,7 +307,7 @@ export function useGroupInteractions({
         await createEvent(token, eventData);
         toast.success('Event erfolgreich erstellt!');
         addEventForm.reset();
-        setIsAddEventDialogOpen(false); // Stellt sicher, dass der Dialog geschlossen wird
+        setIsAddEventDialogOpen(false);
         console.log(
           `${LOG_PREFIX} handleAddEventSubmit - Rufe refreshGroupData auf...`
         );
@@ -341,14 +332,13 @@ export function useGroupInteractions({
     [token, selectedGroupId, addEventForm, refreshGroupData]
   );
 
-  // --- Event löschen ---
   const handleInitiateDeleteEvent = useCallback((event: GroupEvent) => {
     console.log(
       `${LOG_PREFIX} handleInitiateDeleteEvent - Event wird zum Löschen vorgemerkt:`,
       event
     );
-    setEventToDelete(event); // Wieder ohne Timeout
-  }, []); // Abhängigkeiten prüfen, setEventToDelete ist stabil von useState
+    setEventToDelete(event);
+  }, []);
 
   const resetDeleteEventDialog = useCallback(() => {
     console.log(
@@ -366,7 +356,7 @@ export function useGroupInteractions({
         return;
       }
 
-      const currentEventToDelete = eventToDelete; // Kopie für den Fall, dass sich der State ändert
+      const currentEventToDelete = eventToDelete;
       const title = currentEventToDelete?.title ?? `Event ID ${eventId}`;
       console.log(
         `${LOG_PREFIX} handleConfirmDeleteEvent - Gestartet für Event ID: ${eventId}, Titel: "${title}"`
@@ -402,7 +392,7 @@ export function useGroupInteractions({
           `${LOG_PREFIX} handleConfirmDeleteEvent - Finally Block gestartet für Event ID: ${eventId}.`
         );
         setIsDeletingSpecificEvent(false);
-        resetDeleteEventDialog(); // Ruft die Funktion auf, die eventToDelete auf null setzt
+        resetDeleteEventDialog();
         console.log(
           `${LOG_PREFIX} handleConfirmDeleteEvent - Rufe refreshGroupData auf nach dem Löschen von Event ID: ${eventId}.`
         );
@@ -431,15 +421,12 @@ export function useGroupInteractions({
     [
       token,
       selectedGroupId,
-      eventToDelete, // Wichtig, um den Titel korrekt zu loggen und weil es Teil des Zustands ist
+      eventToDelete,
       refreshGroupData,
-      resetDeleteEventDialog, // Da es ein useCallback ist
+      resetDeleteEventDialog,
     ]
   );
 
-  // --- Return ---
-  // Die Return-Struktur sollte die oben definierte UseGroupInteractionsReturn-Schnittstelle erfüllen.
-  // 'isDeleteEventDialogOpen' und 'setIsDeleteEventDialogOpen' sind nicht mehr nötig, wenn 'eventToDelete' den Dialog steuert.
   return {
     selectedTips,
     resultInputs,

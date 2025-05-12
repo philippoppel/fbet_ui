@@ -15,7 +15,8 @@ import type {
   TipOut,
   EventResultSet,
   GroupMembershipCreate,
-  UserTipSelection, // Wird ggf. nicht mehr so direkt verwendet
+  UserTipSelection,
+  AllTipsPerEvent, // Wird ggf. nicht mehr so direkt verwendet
 } from './types'; // Stelle sicher, dass diese Typen mit den Server-Antworten übereinstimmen
 
 // Liest die Backend-URL aus Umgebungsvariablen.
@@ -399,4 +400,32 @@ export async function getGroupsWithOpenEvents(
     headers: { Authorization: `Bearer ${token}` },
   });
   return handleResponse<GroupWithOpenEvents[]>(response);
+}
+
+export async function getAllTipsForOpenGroupEvents(
+  token: string,
+  groupId: number
+): Promise<AllTipsPerEvent> {
+  const endpointUrl = `${API_BASE_URL}/api/tips/group-all?groupId=${groupId}`;
+  const response = await fetch(endpointUrl, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // Für GET-Anfragen ist 'Content-Type': 'application/json' normalerweise nicht nötig,
+      // da kein Body gesendet wird. Der Server sollte die Antwort trotzdem als JSON senden.
+    },
+  });
+  return handleResponse<AllTipsPerEvent>(response);
+}
+
+export async function getMyTipsAcrossAllGroups(
+  token: string
+): Promise<UserTipSelection[]> {
+  const response = await fetch(`${API_BASE_URL}/api/tips/all`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return handleResponse<UserTipSelection[]>(response);
 }

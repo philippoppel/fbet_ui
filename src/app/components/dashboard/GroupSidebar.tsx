@@ -1,4 +1,3 @@
-// src/app/components/dashboard/GroupSidebar.tsx
 'use client';
 
 import Link from 'next/link';
@@ -60,15 +59,29 @@ export function GroupSidebar({
     return 0;
   });
 
+  // Direkt nach Mount: Gruppe auswählen, falls noch keine ausgewählt ist
+  useEffect(() => {
+    if (sortedGroups.length > 0 && selectedGroupId == null) {
+      const lastSelected = localStorage.getItem('selectedGroupId');
+      const fallbackId =
+        lastSelected &&
+        sortedGroups.find((g) => g.id === parseInt(lastSelected))
+          ? parseInt(lastSelected)
+          : sortedGroups[0].id;
+      onSelectGroup(fallbackId);
+    }
+  }, [sortedGroups, selectedGroupId, onSelectGroup]);
+
   return (
     <TooltipProvider delayDuration={100}>
       <div
         className={cn(
-          'flex flex-col h-full transition-all duration-300 ease-in-out',
+          'flex flex-col transition-all duration-300 ease-in-out',
           'bg-muted/30 border border-border rounded-xl shadow-sm',
           isCollapsed ? 'w-full lg:w-[72px]' : 'w-full md:w-64 lg:w-72 xl:w-80'
         )}
       >
+        {/* Header */}
         <div
           className={cn(
             'flex flex-row items-center gap-2 px-3 sm:px-4 py-3 border-b border-border',
@@ -89,6 +102,7 @@ export function GroupSidebar({
             </CardTitle>
           </div>
           <div className='flex items-center flex-shrink-0'>
+            {/* Erstellen Button */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -127,6 +141,7 @@ export function GroupSidebar({
                 </TooltipContent>
               )}
             </Tooltip>
+            {/* Collapse Button */}
             {onToggleCollapse && !isCollapsed && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -148,27 +163,28 @@ export function GroupSidebar({
           </div>
         </div>
 
+        {/* Inhalt */}
         <div
           className={cn(
-            'flex-1 overflow-y-auto',
+            'overflow-y-auto',
             isCollapsed ? 'lg:hidden px-0' : 'py-2 px-2 sm:px-3 space-y-1'
           )}
         >
           {isLoading && (
-            <div className='flex flex-col items-center justify-center h-full text-sm text-muted-foreground p-4'>
+            <div className='flex flex-col items-center justify-center text-sm text-muted-foreground p-4'>
               <Loader2 className='h-8 w-8 animate-spin mb-3 opacity-50' />
               <span className='text-xs'>Gruppen laden...</span>
             </div>
           )}
           {error && !isLoading && (
-            <div className='flex flex-col items-center justify-center h-full text-destructive px-4 text-center py-10'>
+            <div className='flex flex-col items-center justify-center text-destructive px-4 text-center py-10'>
               <TriangleAlert className='h-10 w-10 mb-3 opacity-70' />
               <p className='text-sm font-semibold'>Fehler:</p>
               <p className='text-xs text-destructive/80 mt-1'>{error}</p>
             </div>
           )}
           {!isLoading && !error && groups.length === 0 && !isCollapsed && (
-            <div className='flex flex-col items-center justify-center h-full text-center px-3 py-6 text-muted-foreground text-sm'>
+            <div className='flex flex-col items-center justify-center text-center px-3 py-6 text-muted-foreground text-sm'>
               <Users className='mx-auto h-12 w-12 opacity-40 mb-4' />
               <p className='mb-1 text-sm'>Du bist noch in keiner Gruppe.</p>
               <p className='text-xs'>
@@ -233,6 +249,7 @@ export function GroupSidebar({
           )}
         </div>
 
+        {/* Ausklappen Button bei Collapsed */}
         {onToggleCollapse && isCollapsed && (
           <div className='hidden lg:flex justify-center items-center py-2.5 border-t border-border'>
             <Tooltip>

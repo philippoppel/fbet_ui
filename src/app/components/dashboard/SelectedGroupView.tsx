@@ -1,13 +1,19 @@
 'use client';
 
 import { useCallback } from 'react';
-import type { Group, Event as GroupEvent, UserOut } from '@/app/lib/types';
+import type {
+  Group,
+  Event as GroupEvent,
+  UserOut,
+  AllTipsPerEvent,
+} from '@/app/lib/types'; // NEU: AllTipsPerEvent importieren
 import type { UseGroupInteractionsReturn } from '@/app/hooks/useGroupInteractions';
 
 import { ClosedEventsCard } from './ClosedEventsCard';
 import DeleteEventDialog from './DeleteEventDialog';
 import { GroupHeaderCard } from '@/app/components/dashboard/GroupHeaderCard';
 import OpenEventsCard from '@/app/components/dashboard/OpenEventsCard';
+import SubmittedOpenEventsCard from './SubmittedOpenEventsCard'; // NEU: Importieren
 
 type SelectedGroupViewProps = {
   group: Group;
@@ -15,6 +21,7 @@ type SelectedGroupViewProps = {
   user: UserOut;
   interactions: UseGroupInteractionsReturn;
   userSubmittedTips: Record<number, string>;
+  allTipsPerEvent: AllTipsPerEvent; // NEU: Prop hinzugefügt
   onDeleteGroup: (group: Group) => void;
   onImageChanged: () => void;
 };
@@ -25,6 +32,7 @@ export function SelectedGroupView({
   user,
   interactions,
   userSubmittedTips,
+  allTipsPerEvent, // NEU: Prop empfangen
   onDeleteGroup,
   onImageChanged,
 }: SelectedGroupViewProps) {
@@ -65,7 +73,15 @@ export function SelectedGroupView({
         onSetResult={interactions.handleSetResult}
         onClearSelectedTip={interactions.handleClearSelectedTip}
         onInitiateDeleteEvent={interactions.handleInitiateDeleteEvent}
-        onOpenAddEventDialog={() => interactions.setIsAddEventDialogOpen(true)} // 🔧 Wichtig: Neues Prop übergeben!
+        onOpenAddEventDialog={() => interactions.setIsAddEventDialogOpen(true)}
+      />
+
+      {/* NEU: Wetten mit abgegebenem Tipp (zeigt auch Tipps der anderen) */}
+      <SubmittedOpenEventsCard
+        events={events}
+        user={user}
+        userSubmittedTips={userSubmittedTips}
+        allTipsPerEvent={allTipsPerEvent} // Prop weitergeben
       />
 
       {/* ───────── Geschlossene Events ───────── */}

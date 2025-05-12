@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
   LogOut,
@@ -13,7 +13,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
-import { UserOut, Group } from '@/app/lib/types';
+import { UserOut, Group as GroupType } from '@/app/lib/types';
 import {
   Sheet,
   SheetContent,
@@ -30,20 +30,13 @@ import {
 } from '@/app/components/ui/dropdown-menu';
 import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar';
 import { useAppRefresh } from '@/app/hooks/useAppRefresh';
-import { getGroupsWithOpenEvents, GroupWithOpenEvents } from '@/app/lib/api';
+import {
+  getGroupsWithOpenEvents,
+  getMyTipsAcrossAllGroups,
+  GroupWithOpenEvents,
+} from '@/app/lib/api';
 
-interface AppHeaderProps {
-  user: UserOut | null;
-  onLogout?: () => void;
-  myGroups?: Group[];
-  selectedGroupId?: number | null;
-  onSelectGroup?: (groupId: number) => void;
-}
-
-const REFRESH_OPEN_EVENTS_MS = 60_000;
-const STORAGE_KEY = 'openEventNotificationSeenIds';
-
-type EventId = number | string;
+const STORAGE_KEY_SEEN_NOTIFICATIONS = 'fbet_openEventNotificationSeenIds_v2';
 
 export function AppHeader({
   user,
@@ -51,131 +44,155 @@ export function AppHeader({
   myGroups = [],
   selectedGroupId = null,
   onSelectGroup,
-}: AppHeaderProps) {
+}: {
+  user: UserOut | null;
+  onLogout?: () => void;
+  myGroups?: GroupType[];
+  selectedGroupId?: number | null;
+  onSelectGroup?: (groupId: number) => void;
+}) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const hasGroups = myGroups.length > 0;
-  const displayName = user?.name?.split(' ')[0] || user?.email || '';
   const { refresh, updateAvailable, online } = useAppRefresh();
+  const displayName = user?.name?.split(' ')[0] || user?.email || '';
 
-  const [groupsWithOpenEvents, setGroupsWithOpenEvents] = useState<
+  const [groupsWithOpenEventsData, setGroupsWithOpenEventsData] = useState<
     GroupWithOpenEvents[]
   >([]);
   const [isLoadingOpenEvents, setIsLoadingOpenEvents] = useState(false);
-
-  const [seenIds, setSeenIds] = useState<Set<EventId>>(() => {
+  const [userTippedEventIdsAll, setUserTippedEventIdsAll] = useState<
+    Set<number>
+  >(new Set());
+  const [seenNotificationEventIds, setSeenNotificationEventIds] = useState<
+    Set<number>
+  >(() => {
     if (typeof window !== 'undefined') {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY_SEEN_NOTIFICATIONS);
       if (raw) {
         try {
-          const arr: EventId[] = JSON.parse(raw);
-          return new Set(arr);
-        } catch {}
+          const arr: number[] = JSON.parse(raw);
+          if (Array.isArray(arr) && arr.every((id) => typeof id === 'number')) {
+            return new Set(arr);
+          }
+        } catch (e) {
+          console.error(
+            'Error parsing seenNotificationEventIds from localStorage',
+            e
+          );
+        }
       }
     }
     return new Set();
   });
 
-  const fetchOpenEvents = useCallback(async () => {
-    console.trace('[DEBUG] fetchOpenEvents triggered');
-    console.log('[DEBUG] user:', user);
-
+  const fetchOpenEventsForHeader = useCallback(async () => {
+    if (!user) return;
     const token =
       typeof window !== 'undefined' ? localStorage.getItem('fbet_token') : null;
-    console.log('[DEBUG] token:', token);
-
-    if (!user || !token) {
-      console.warn('[DEBUG] no user or token, skipping fetch');
-      return;
-    }
-
+    if (!token) return;
+    setIsLoadingOpenEvents(true);
     try {
-      setIsLoadingOpenEvents(
-        (prev) => prev || groupsWithOpenEvents.length === 0
-      );
       const data = await getGroupsWithOpenEvents(token);
-      console.log('[DEBUG] fetched groupsWithOpenEvents:', data);
-      setGroupsWithOpenEvents(data);
-    } catch (e) {
-      console.error('[DEBUG] Fehler beim Laden offener Events', e);
+      setGroupsWithOpenEventsData(data || []);
+    } catch (error) {
+      console.error(
+        'Fehler beim Laden der offenen Events für den Header:',
+        error
+      );
+      setGroupsWithOpenEventsData([]);
     } finally {
       setIsLoadingOpenEvents(false);
     }
-  }, [user, groupsWithOpenEvents.length]);
+  }, [user]);
 
   useEffect(() => {
-    console.log('[DEBUG] useEffect triggered (initial fetch), user:', user);
-    fetchOpenEvents();
-  }, [fetchOpenEvents]);
+    fetchOpenEventsForHeader();
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('fbet_token') : null;
+    if (!token) return;
+    getMyTipsAcrossAllGroups(token)
+      .then((allTips) => {
+        const tipIds = new Set<number>(allTips.map((tip) => tip.eventId));
+        setUserTippedEventIdsAll(tipIds);
+      })
+      .catch((err) => {
+        console.error(
+          '[AppHeader] Fehler beim Laden der Tipps über alle Gruppen:',
+          err
+        );
+      });
+  }, [user?.id]);
 
-  useEffect(() => {
-    if (!user) return;
-    console.log('[DEBUG] Polling setup for open events');
-    const id = setInterval(fetchOpenEvents, REFRESH_OPEN_EVENTS_MS);
-    return () => clearInterval(id);
-  }, [user, fetchOpenEvents]);
+  const untippedOpenEventsByGroup = useMemo(() => {
+    return groupsWithOpenEventsData
+      .map((group) => {
+        const untippedEvents = group.openEvents.filter(
+          (event) => !userTippedEventIdsAll.has(Number(event.id))
+        );
+        return {
+          ...group,
+          openEvents: untippedEvents,
+          untippedEventCountInGroup: untippedEvents.length,
+        };
+      })
+      .filter((group) => group.untippedEventCountInGroup > 0);
+  }, [groupsWithOpenEventsData, userTippedEventIdsAll]);
 
-  const openEventIds: EventId[] = groupsWithOpenEvents.flatMap((g) =>
-    g.openEvents.map((e) => e.id)
-  );
-  const unseenExists = openEventIds.some((id) => !seenIds.has(id));
-  const openEventCount = openEventIds.length;
+  const notificationCount = useMemo(() => {
+    let count = 0;
+    untippedOpenEventsByGroup.forEach((group) => {
+      group.openEvents.forEach((event) => {
+        if (!seenNotificationEventIds.has(Number(event.id))) {
+          count++;
+        }
+      });
+    });
+    return count;
+  }, [untippedOpenEventsByGroup, seenNotificationEventIds]);
 
-  const handleSelectAndClose = (groupId: number) => {
+  const handleSelectAndCloseSheet = (groupId: number) => {
     onSelectGroup?.(groupId);
     setIsSheetOpen(false);
   };
 
-  const handleMarkAsRead = () => {
-    const newSeen = new Set([...seenIds, ...openEventIds]);
-    setSeenIds(newSeen);
+  const handleMarkNotificationsAsRead = () => {
+    const newSeenIdsSet = new Set(seenNotificationEventIds);
+    untippedOpenEventsByGroup.forEach((group) => {
+      group.openEvents.forEach((event) => {
+        newSeenIdsSet.add(Number(event.id));
+      });
+    });
+    setSeenNotificationEventIds(newSeenIdsSet);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(newSeen)));
+      localStorage.setItem(
+        STORAGE_KEY_SEEN_NOTIFICATIONS,
+        JSON.stringify(Array.from(newSeenIdsSet))
+      );
     }
   };
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOpenEventsForHeader();
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('fbet_token')
+          : null;
+      if (!token) return;
+      getMyTipsAcrossAllGroups(token)
+        .then((allTips) => {
+          const tipIds = new Set<number>(allTips.map((tip) => tip.eventId));
+          setUserTippedEventIdsAll(tipIds);
+        })
+        .catch((err) => {
+          console.error('[AppHeader] Fehler beim Tipp-Reload:', err);
+        });
+    }, 60_000); // alle 60 Sekunden
+
+    return () => clearInterval(interval);
+  }, [fetchOpenEventsForHeader, user?.id]);
 
   return (
     <header className='sticky top-0 z-50 w-full border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6 lg:px-8'>
-      <div className='flex h-14 items-center'>
-        {user && hasGroups && onSelectGroup && (
-          <div className='mr-2 lg:hidden'>
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  aria-label='Gruppen anzeigen'
-                >
-                  <Menu className='h-5 w-5' />
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side='left'
-                className='w-[280px] sm:w-[320px] p-0 flex flex-col'
-              >
-                <SheetHeader className='p-4 border-b'>
-                  <SheetTitle className='flex items-center gap-2 text-base font-semibold'>
-                    <Users className='w-5 h-5 text-muted-foreground' />
-                  </SheetTitle>
-                </SheetHeader>
-                <div className='flex-1 overflow-y-auto p-4'>
-                  <GroupSidebar
-                    groups={myGroups}
-                    selectedGroupId={selectedGroupId}
-                    onSelectGroup={handleSelectAndClose}
-                    isLoading={false}
-                    error={null}
-                    isCollapsed={false}
-                    currentUserId={user?.id}
-                    onDeleteGroup={async () => {
-                      console.warn('onDeleteGroup nicht implementiert');
-                    }}
-                  />
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-        )}
-
+      <div className='flex h-14 items-center justify-between'>
         <Link
           href={user ? '/dashboard' : '/'}
           className='flex items-center space-x-2 hover:opacity-80 transition-opacity'
@@ -184,8 +201,8 @@ export function AppHeader({
           <span className='text-lg font-bold tracking-tight'>fbet</span>
         </Link>
 
-        <div className='ml-auto flex items-center space-x-2 sm:space-x-3'>
-          {openEventCount > 0 && unseenExists && (
+        <div className='flex items-center space-x-2 sm:space-x-3'>
+          {user && myGroups.length > 0 && onSelectGroup && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -195,9 +212,11 @@ export function AppHeader({
                   className='relative'
                 >
                   <Flame className='h-5 w-5 text-orange-500' />
-                  <span className='absolute -top-1 -right-1 text-xs bg-red-500 text-white rounded-full px-1.5'>
-                    {openEventCount}
-                  </span>
+                  {notificationCount > 0 && (
+                    <span className='absolute -top-1 -right-1 text-xs bg-red-500 text-white rounded-full px-1.5'>
+                      {notificationCount}
+                    </span>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align='end'>
@@ -205,13 +224,13 @@ export function AppHeader({
                   Offene Wetten
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={handleMarkAsRead}
+                  onSelect={handleMarkNotificationsAsRead}
                   className='text-xs text-muted-foreground flex items-center gap-2'
                 >
                   <EyeOff className='w-3 h-3' /> Als gelesen markieren
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {groupsWithOpenEvents.map((g) => (
+                {untippedOpenEventsByGroup.map((g) => (
                   <DropdownMenuItem
                     key={g.groupId}
                     onSelect={() => onSelectGroup?.(g.groupId)}
