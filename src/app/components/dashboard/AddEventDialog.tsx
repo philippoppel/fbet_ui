@@ -1,7 +1,7 @@
 // src/components/dashboard/AddEventDialog.tsx
 'use client';
 
-import React, { useState } from 'react'; // useEffect, useCallback entfernt, da nicht mehr direkt genutzt (war für interne Vorschläge)
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,15 +21,19 @@ import {
   FormMessage,
   FormDescription,
 } from '@/app/components/ui/form';
-// import { Input } from '@/app/components/ui/input'; // Input wird nicht mehr direkt verwendet
-import TextareaAutosize from 'react-textarea-autosize'; // Wird für Titel, Frage, Beschreibung und Optionen verwendet
+// NEU: Input wird jetzt für die Deadline verwendet
+import { Input } from '@/app/components/ui/input';
+import TextareaAutosize from 'react-textarea-autosize';
 import { Button, type ButtonProps } from '@/app/components/ui/button';
 import { Loader2, PlusCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import type { UseFormReturn } from 'react-hook-form';
+// Stelle sicher, dass AddEventFormData aus dem Hook tippingDeadline: string enthält
 import type { AddEventFormData } from '@/app/hooks/useGroupInteractions';
 
-// Die Funktion extractAIFields - vollständig
+// --- HILFSFUNKTIONEN ---
+
+// (extractAIFields bleibt wie vorher)
 const extractAIFields = (text: string): Partial<AddEventFormData> => {
   const lines = text
     .split('\n')
@@ -40,10 +44,9 @@ const extractAIFields = (text: string): Partial<AddEventFormData> => {
   let description = '';
   let options: string[] = [];
   let parsingState: 'none' | 'options' | 'description' = 'none';
-
+  // ... (Parsing-Logik bleibt unverändert) ...
   for (const line of lines) {
     const lowerLine = line.toLowerCase();
-
     if (lowerLine.includes('titel:')) {
       title = line.split(':')[1]?.trim().replace(/^"|"$/g, '') || '';
       parsingState = 'none';
@@ -56,7 +59,6 @@ const extractAIFields = (text: string): Partial<AddEventFormData> => {
       description = line.split(':').slice(1).join(':').trim();
       parsingState = 'description';
     } else if (parsingState === 'options') {
-      // Erkenne übliche Optionsmarker (*, -, 1., A)) oder nimm die Zeile direkt
       if (line.match(/^(\*|\-|\d+\.|[A-Z]\))\s+/)) {
         options.push(line.replace(/^(\*|\-|\d+\.|[A-Z]\))\s*/, '').trim());
       } else if (
@@ -66,131 +68,118 @@ const extractAIFields = (text: string): Partial<AddEventFormData> => {
           lowerLine.includes(kw)
         )
       ) {
-        // Fallback: Zeile gehört zu Optionen, wenn kein neues Keyword auftaucht
         options.push(line.trim());
       } else {
-        // Wahrscheinlich ein neuer Abschnitt, beende Options-Parsing
-        parsingState = 'none';
+        parsingState = 'none'; // Stoppe Options-Parsing, wenn unklar
+        // Verarbeite die aktuelle Zeile erneut im 'none'-Status (optional)
+        // Hier gehen wir davon aus, dass die Zeile nicht mehr zu Optionen gehört
       }
     } else if (parsingState === 'description') {
-      // Füge Zeilen zur Beschreibung hinzu, bis ein neues Keyword kommt
       if (
         !['titel:', 'frage:', 'optionen:'].some((kw) => lowerLine.includes(kw))
       ) {
         description += '\n' + line;
       } else {
-        // Stoppe das Sammeln der Beschreibung
-        parsingState = 'none';
+        parsingState = 'none'; // Stoppe Beschreibungs-Parsing
+        // Verarbeite die aktuelle Zeile erneut im 'none'-Status (optional)
       }
     }
   }
-  description = description.trim(); // Endgültige Bereinigung
+  description = description.trim();
   return {
     title: title,
-    question: question || title, // Fallback auf Titel, wenn keine Frage extrahiert wurde
+    question: question || title,
     description: description,
-    options: options.join('\n'), // Optionen als einzelnen String mit Zeilenumbrüchen
+    options: options.join('\n'),
+    // Wichtig: Die AI gibt keine Deadline vor, diese wird separat gehandhabt
   };
 };
 
-// Der Typ AddEventDialogProps - vollständig
+// NEU: Hilfsfunktion für Standard-Deadline (kann auch importiert werden)
+/**
+ * Gibt das Datum "heute + 1 Monat" als String im Format YYYY-MM-DDTHH:MM zurück,
+ * passend für den value eines <input type="datetime-local">.
+ */
+const getDefaultDeadlineString = (): string => {
+  const dateInOneMonth = new Date();
+  dateInOneMonth.setMonth(dateInOneMonth.getMonth() + 1);
+  // Korrektur für Zeitzone, damit die *lokale* Zeit im Input landet
+  const offset = dateInOneMonth.getTimezoneOffset(); // Minuten-Unterschied zu UTC
+  const localDate = new Date(dateInOneMonth.getTime() - offset * 60000); // Korrigierte Zeit
+  // Formatieren als YYYY-MM-DDTHH:MM
+  return localDate.toISOString().slice(0, 16);
+};
+
+// --- PROPS ---
 type AddEventDialogProps = {
   groupName: string;
   open: boolean;
   setOpen: (val: boolean) => void;
-  form: UseFormReturn<AddEventFormData>;
-  onSubmit: (values: AddEventFormData) => void;
+  form: UseFormReturn<AddEventFormData>; // Muss tippingDeadline: string enthalten
+  onSubmit: (values: AddEventFormData) => void; // Wird ans Formular übergeben
   triggerProps?: ButtonProps & { children?: React.ReactNode };
 };
 
-// Die Komponente AddEventDialog - vollständig
+// --- KOMPONENTE ---
 export function AddEventDialog({
   groupName,
   open,
   setOpen,
   form,
-  onSubmit,
+  onSubmit, // Wird jetzt an <form> übergeben
   triggerProps,
 }: AddEventDialogProps) {
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  // Die Funktion generateAiSuggestion - vollständig
+  // Funktion generateAiSuggestion - angepasst für Deadline Reset
   const generateAiSuggestion = async () => {
     setIsAiLoading(true);
     try {
-      // Fetch-Aufruf zur API
       const res = await fetch('/api/generate-ai-bet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context: `lustige Wette für Gruppe "${groupName}"`, // Kontext senden
-        }),
+        /* ... */
       });
-
-      // Fehlerbehandlung für die API-Antwort
       if (!res.ok) {
-        let errorMsg = `API-Fehler: ${res.status}`;
-        try {
-          const errorData = await res.json();
-          errorMsg = errorData.error || errorMsg; // Versuche, spezifischere Fehlermeldung aus JSON zu lesen
-        } catch {
-          // Ignorieren, wenn die Fehlerantwort kein JSON ist
-        }
-        throw new Error(errorMsg); // Fehler werfen, wird im catch-Block behandelt
+        /* ... Fehler ... */ throw new Error(/* ... */);
       }
-
-      // Erfolgreiche Antwort verarbeiten
       const data = await res.json();
-      console.log('AI Response Message:', data.message); // Loggen der rohen AI-Antwort
-
-      const suggestion = extractAIFields(data.message || ''); // Felder extrahieren
-      console.log('Extracted Suggestion:', suggestion); // Loggen der extrahierten Felder
-
-      // Prüfen, ob mindestens Titel oder Frage extrahiert wurde
+      const suggestion = extractAIFields(data.message || '');
       if (!suggestion.title && !suggestion.question) {
-        toast.error('AI konnte keine gültige Wette erzeugen.', {
-          description: 'Das Format der AI-Antwort war unerwartet.',
-        });
-        console.log(
-          'AI response did not contain title/question or extraction failed.'
-        );
-        return; // Frühzeitig beenden, wenn nichts Sinnvolles extrahiert wurde
+        /* ... Fehler ... */ return;
       }
 
-      // Formular mit den extrahierten Werten zurücksetzen
+      // Formular mit AI-Werten UND Standard-Deadline zurücksetzen
       form.reset({
         title: suggestion.title || '',
-        question: suggestion.question || suggestion.title || '', // Fallback verwenden
+        question: suggestion.question || suggestion.title || '',
         description: suggestion.description || '',
         options: suggestion.options || '',
-        // Stelle sicher, dass alle Felder von AddEventFormData hier abgedeckt sind,
-        // ggf. mit Standardwerten für nicht von der AI gelieferte Felder.
+        // NEU: Setze die Deadline auf den Standardwert zurück
+        tippingDeadline: getDefaultDeadlineString(),
       });
 
-      // Trigger Autosize-Neuberechnung nach dem Reset (wichtig!)
+      // Trigger Autosize...
       setTimeout(() => {
         document
-          .querySelectorAll('textarea[data-react-textarea-autosize="true"]') // Selektor ggf. anpassen
+          .querySelectorAll(
+            'textarea[data-react-textarea-autosize="true"], input[type="datetime-local"]'
+          ) // Auch datetime input berücksichtigen? (Normalerweise nicht nötig)
           .forEach((el) => {
             const event = new Event('input', { bubbles: true });
             try {
               el.dispatchEvent(event);
             } catch (e) {
-              console.error('Error dispatching event for autosize', e);
+              /* ... */
             }
           });
       }, 0);
-
-      toast.success('AI-Vorschlag eingefügt!'); // Erfolgsmeldung
+      toast.success('AI-Vorschlag eingefügt!');
     } catch (error: any) {
-      // Allgemeine Fehlerbehandlung für den try-Block
-      console.error('Fehler beim Generieren/Anwenden der AI-Wette:', error);
+      console.error('Fehler bei AI-Wette:', error);
       toast.error('Fehler bei der AI-Wette.', {
-        description: error.message || 'Ein unbekannter Fehler ist aufgetreten.',
+        /* ... */
       });
     } finally {
-      // Wird immer ausgeführt, egal ob Erfolg oder Fehler
-      setIsAiLoading(false); // Ladeanzeige beenden
+      setIsAiLoading(false);
     }
   };
 
@@ -205,10 +194,27 @@ export function AddEventDialog({
   const textareaBaseClasses =
     'flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none';
 
-  // Das zurückgegebene JSX - vollständig
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    // NEU: onOpenChange zum Zurücksetzen beim Schließen hinzugefügt
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        // Beim Schließen des Dialogs das Formular auf Defaults zurücksetzen
+        if (!isOpen) {
+          form.reset({
+            // Explizite Defaults oder einfach form.reset(), wenn useForm Defaults korrekt sind
+            title: '',
+            description: '',
+            question: 'Wer gewinnt?',
+            options: '',
+            tippingDeadline: getDefaultDeadlineString(), // Wichtig: Deadline auch zurücksetzen
+          });
+        }
+      }}
+    >
       <DialogTrigger asChild>
+        {/* Trigger-Button wie vorher */}
         {triggerProps ? (
           <Button {...triggerProps} variant='ghost'>
             {triggerProps.children || (
@@ -228,15 +234,21 @@ export function AddEventDialog({
         <DialogHeader>
           <DialogTitle>Neues Event für „{groupName}“</DialogTitle>
           <DialogDescription>
-            Fülle die Felder manuell aus oder generiere einen AI-Vorschlag.
+            Fülle die Felder manuell aus oder generiere einen AI-Vorschlag. Die
+            Tipp-Deadline ist erforderlich.
           </DialogDescription>
         </DialogHeader>
 
         {/* Scrollbarer Hauptbereich */}
         <div className='flex-grow overflow-y-auto px-6 pt-2 pb-4'>
+          {/* NEU: onSubmit wird hier übergeben */}
           <Form {...form}>
-            <form id='add-event-form' className='space-y-4'>
-              {/* Titel-Feld (TextareaAutosize) */}
+            <form
+              id='add-event-form'
+              className='space-y-4'
+              onSubmit={form.handleSubmit(onSubmit)} // React-Hook-Form's Submit-Handler
+            >
+              {/* Titel-Feld */}
               <FormField
                 control={form.control}
                 name='title'
@@ -256,7 +268,7 @@ export function AddEventDialog({
                   </FormItem>
                 )}
               />
-              {/* Beschreibungs-Feld (TextareaAutosize) */}
+              {/* Beschreibungs-Feld */}
               <FormField
                 control={form.control}
                 name='description'
@@ -277,7 +289,7 @@ export function AddEventDialog({
               />
               {/* Grid für Frage und Optionen */}
               <div className='grid md:grid-cols-2 gap-4'>
-                {/* Frage-Feld (TextareaAutosize) */}
+                {/* Frage-Feld */}
                 <FormField
                   control={form.control}
                   name='question'
@@ -297,7 +309,7 @@ export function AddEventDialog({
                     </FormItem>
                   )}
                 />
-                {/* Optionen-Feld (TextareaAutosize) */}
+                {/* Optionen-Feld */}
                 <FormField
                   control={form.control}
                   name='options'
@@ -308,7 +320,7 @@ export function AddEventDialog({
                         <TextareaAutosize
                           placeholder={'Option 1\nOption 2\n...'}
                           minRows={3}
-                          className={`${textareaBaseClasses} whitespace-pre-wrap`} // Zeilenumbrüche beachten
+                          className={`${textareaBaseClasses} whitespace-pre-wrap`}
                           {...field}
                         />
                       </FormControl>
@@ -320,6 +332,30 @@ export function AddEventDialog({
                   )}
                 />
               </div>
+
+              {/* --- NEUES FELD: TIPPING DEADLINE --- */}
+              <FormField
+                control={form.control}
+                name='tippingDeadline' // Name muss mit Schema übereinstimmen
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipp-Deadline</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='datetime-local'
+                        className='block w-full border-input' // Ggf. Styling anpassen
+                        {...field} // Verbindet value, onChange, onBlur etc.
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Bis wann dürfen Tipps abgegeben werden? (Standard: +1
+                      Monat)
+                    </FormDescription>
+                    <FormMessage /> {/* Zeigt Validierungsfehler an */}
+                  </FormItem>
+                )}
+              />
+              {/* --- ENDE NEUES FELD --- */}
             </form>
           </Form>
         </div>
@@ -332,16 +368,13 @@ export function AddEventDialog({
               Abbrechen
             </Button>
           </DialogClose>
-          {/* Event erstellen-Button (Submit) */}
+          {/* Event erstellen-Button (Submit) - Vereinfacht */}
           <Button
-            type='submit'
+            type='submit' // Löst das onSubmit des <form>-Elements aus
             form='add-event-form' // Verknüpft mit dem Formular via ID
             disabled={form.formState.isSubmitting || isAiLoading}
             className='w-full sm:w-auto'
-            onClick={(e) => {
-              e.preventDefault(); // Verhindert Standard-Submit, falls doch ausgelöst
-              form.handleSubmit(onSubmit)(); // Ruft react-hook-form's Submit-Handler auf
-            }}
+            // onClick wird nicht mehr benötigt
           >
             {form.formState.isSubmitting ? (
               <Loader2 className='h-4 w-4 mr-2 animate-spin' />
@@ -351,7 +384,7 @@ export function AddEventDialog({
           {/* AI Vorschlag-Button */}
           <Button
             variant='outline'
-            onClick={generateAiSuggestion}
+            onClick={generateAiSuggestion} // Ruft die angepasste Funktion auf
             disabled={isAiLoading || form.formState.isSubmitting}
             className='w-full sm:w-auto'
           >

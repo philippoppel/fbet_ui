@@ -63,9 +63,10 @@ model Event {
   title         String
   description   String?
   question      String
-  options       Json // Behalte Json bei, wenn Prisma und DB es unterstützen
+  options       Json
   winningOption String?   @map("winning_option")
   eventDateTime DateTime? @map("event_datetime")
+  tippingDeadline DateTime? @map("tipping_deadline")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 

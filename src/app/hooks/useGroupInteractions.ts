@@ -23,6 +23,22 @@ const LOG_PREFIX = '[useGroupInteractions]';
 /* Schemas                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Gibt das Datum "heute + 1 Monat" als String im Format<y_bin_46>-MM-DDTHH:MM zurück,
+ * passend für den value eines <input type="datetime-local">.
+ */
+const getDefaultDeadlineString = (): string => {
+  const dateInOneMonth = new Date();
+  dateInOneMonth.setMonth(dateInOneMonth.getMonth() + 1);
+
+  // Korrektur für Zeitzone, damit die *lokale* Zeit im Input landet
+  const offset = dateInOneMonth.getTimezoneOffset(); // Minuten-Unterschied zu UTC
+  const localDate = new Date(dateInOneMonth.getTime() - offset * 60000); // Korrigierte Zeit
+
+  // Formatieren als<y_bin_46>-MM-DDTHH:MM
+  return localDate.toISOString().slice(0, 16);
+};
+
 const addEventFormSchema = z.object({
   title: z.string().min(5, { message: 'Titel min. 5 Zeichen.' }),
   description: z.string().optional(),
@@ -33,7 +49,24 @@ const addEventFormSchema = z.object({
     .refine((v) => v.split('\n').filter((o) => o.trim()).length >= 2, {
       message: 'Min. 2 gültige Optionen.',
     }),
+  tippingDeadline: z
+    .string()
+    .min(1, 'Tipp-Deadline ist erforderlich.') // Verpflichtend (nicht leer)
+    .refine(
+      (val) => {
+        // Prüft ob Datum in der Zukunft liegt
+        try {
+          // Der String aus datetime-local ("YYYY-MM-DDTHH:MM") wird als lokale Zeit geparsed
+          return new Date(val) > new Date();
+        } catch {
+          return false; // Ungültiges Format
+        }
+      },
+      { message: 'Die Deadline muss in der Zukunft liegen.' }
+    ),
 });
+
+// Der Typ wird automatisch aktualisiert, da er von addEventFormSchema abgeleitet wird
 export type AddEventFormData = z.infer<typeof addEventFormSchema>;
 
 /* -------------------------------------------------------------------------- */
@@ -111,6 +144,7 @@ export function useGroupInteractions({
       description: '',
       question: 'Wer gewinnt?',
       options: '',
+      tippingDeadline: getDefaultDeadlineString(),
     },
   });
 
@@ -299,6 +333,7 @@ export function useGroupInteractions({
         group_id: selectedGroupId,
         question: values.question,
         options: optionsArray,
+        tippingDeadline: values.tippingDeadline,
       };
       try {
         console.log(

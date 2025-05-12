@@ -1,8 +1,15 @@
 // src/app/components/dashboard/OpenEventsCard.tsx
 'use client';
 
-import React, { useState, useCallback } from 'react'; // useCallback importiert, falls noch nicht geschehen
-import type { Event as GroupEvent, UserOut } from '@/app/lib/types';
+import React, { useState, useCallback } from 'react';
+// Optional: date-fns importieren, wenn für Formatierung verwendet
+// import { format, differenceInHours } from 'date-fns'; // differenceInHours für Zeitvergleich
+// import { de } from 'date-fns/locale';
+import {
+  // Stelle sicher, dass GroupEvent aus types.ts tippingDeadline enthält
+  Event as GroupEvent,
+  UserOut,
+} from '@/app/lib/types';
 import {
   Card,
   CardContent,
@@ -22,20 +29,22 @@ import {
   MoreHorizontal,
   Trash2,
   Loader2,
+  Clock, // Icon für Deadline
+  AlertTriangle, // Icon für nahende Deadline
 } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
 
 /* -------------------------------------------------------------------------- */
-/* SingleOpenEventItem                             */
-/* (Diese Komponente bleibt für diese Anforderung unverändert, da die Filterung in OpenEventsCard erfolgt) */
+/* SingleOpenEventItem (Intern, mit Deadline-Logik & "Bald"-Anzeige)          */
 /* -------------------------------------------------------------------------- */
 interface SingleOpenEventItemProps {
-  event: GroupEvent;
+  // Typ muss tippingDeadline zulassen
+  event: GroupEvent & { tippingDeadline?: Date | string | null };
   user: UserOut | null | undefined;
   groupCreatedBy: number | null | undefined;
   onInitiateDeleteEvent: (event: GroupEvent) => void;
   selectedTips: Record<number, string>;
-  userSubmittedTips: Record<number, string>; // Wird hier nicht direkt für die Filterung benötigt, aber für die Anzeige innerhalb des Items
+  userSubmittedTips: Record<number, string>; // Hier immer leer wegen Filterung
   resultInputs: Record<number, string>;
   isSubmittingTip: Record<number, boolean>;
   isSettingResult: Record<number, boolean>;
@@ -46,19 +55,36 @@ interface SingleOpenEventItemProps {
   onClearSelectedTip: (eventId: number) => void;
 }
 
-// Die Definition von SingleOpenEventItem bleibt wie in deinem Code,
-// da die Logik "Tipp abgeben", "Auswahl löschen" etc. weiterhin für Events gilt,
-// die hier (nach der Filterung) angezeigt werden.
-// Der Zustand userHasSubmittedTip innerhalb von SingleOpenEventItem wird für diese gefilterte Liste immer false sein.
-export function SingleOpenEventItem({
-  // Stellen sicher, dass dies die korrekte SingleOpenEventItem ist
+// Hilfsfunktion zum Formatieren der Deadline
+const formatDeadline = (date: Date | null): string | null => {
+  if (!date) return null;
+  try {
+    // Verwendung von toLocaleString für einfache, lokale Formatierung
+    return (
+      date.toLocaleString('de-DE', {
+        // Passe Locale an
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }) + ' Uhr'
+    );
+    // Alternative mit date-fns:
+    // return format(date, "dd.MM.yyyy HH:mm 'Uhr'", { locale: de });
+  } catch {
+    return 'Ungültiges Datum'; // Fallback
+  }
+};
+
+// Diese Komponente wird nur *innerhalb* von OpenEventsCard verwendet
+function SingleOpenEventItem({
   event,
   user,
   groupCreatedBy,
   onInitiateDeleteEvent,
   selectedTips,
-  userSubmittedTips, // Diese Prop wird übergeben, aber für die Anzeige in der gefilterten Liste
-  // wird userHasSubmittedTip in diesem Item immer false sein.
+  userSubmittedTips,
   resultInputs,
   isSubmittingTip,
   isSettingResult,
@@ -74,15 +100,35 @@ export function SingleOpenEventItem({
   const canDeleteEvent =
     user?.id === groupCreatedBy || user?.id === event.createdById;
 
-  // Für die hier angezeigten Events sollte userHasSubmittedTip immer false sein,
-  // da wir in OpenEventsCard bereits danach filtern.
-  // Die Anzeige "(Dein Tipp)" und das Deaktivieren der Buttons wird also nicht greifen, was korrekt ist.
-  const userHasSubmittedTip = !!userSubmittedTips[event.id]; // Bleibt zur Konsistenz, aber sollte hier false sein.
+  // --- Deadline Logik ---
+  const now = new Date();
+  // Sicherstellen, dass event.tippingDeadline ein Date-Objekt wird, falls es ein String ist
+  const deadline = event.tippingDeadline
+    ? new Date(event.tippingDeadline)
+    : null;
+  // Prüfen ob Deadline existiert und in der Vergangenheit liegt
+  const deadlinePassed = deadline ? now >= deadline : false;
+  const formattedDeadline = deadline ? formatDeadline(deadline) : null;
+
+  // Prüfen, ob Deadline bald erreicht ist (z.B. weniger als 24 Stunden)
+  const hoursUntilDeadline =
+    deadline && !deadlinePassed
+      ? (deadline.getTime() - now.getTime()) / (1000 * 60 * 60)
+      : null;
+  const isDeadlineSoon = hoursUntilDeadline !== null && hoursUntilDeadline < 24;
+
+  // --- Tipp-Zustand Logik ---
   const selected = selectedTips[event.id];
   const submitting = isSubmittingTip[event.id];
   const settingResult = isSettingResult[event.id];
   const resultInput = resultInputs[event.id];
+  // Da diese Komponente nur für Events gerendert wird, auf die der User noch nicht getippt hat,
+  // können wir userHasSubmittedTip hier als false annehmen.
+  const userHasSubmittedTip = false;
+  // Tippen ist erlaubt, wenn der User *nicht* getippt hat UND die Deadline *nicht* überschritten ist.
+  const isTippingAllowed = !userHasSubmittedTip && !deadlinePassed;
 
+  // --- Callbacks ---
   const handleDropdownOpenChange = useCallback(
     (open: boolean) => {
       setIsDropdownOpen(open);
@@ -100,6 +146,7 @@ export function SingleOpenEventItem({
 
   return (
     <div className='rounded-xl border border-border bg-card p-4 sm:p-6 space-y-4 shadow-sm sm:hover:shadow-md transition-shadow'>
+      {/* Header mit Titel, Beschreibung, Frage, Admin-Optionen */}
       <div className='flex items-start justify-between gap-4'>
         <div className='flex-1 space-y-1'>
           <h4 className='text-base sm:text-lg font-semibold text-foreground leading-tight'>
@@ -115,8 +162,36 @@ export function SingleOpenEventItem({
               {event.question}
             </p>
           )}
+          {/* Deadline Anzeige (ANGEPASST für "Bald"-Status) */}
+          {formattedDeadline && (
+            <div
+              className={cn(
+                'flex items-center gap-1.5 mt-2',
+                // Styling-Priorität: Abgelaufen (rot) > Bald (orange) > Normal (grau)
+                deadlinePassed
+                  ? 'text-destructive'
+                  : isDeadlineSoon
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-muted-foreground'
+              )}
+            >
+              {/* Optional anderes Icon, wenn bald fällig */}
+              {isDeadlineSoon && !deadlinePassed ? (
+                <AlertTriangle className='h-3.5 w-3.5 flex-shrink-0' />
+              ) : (
+                <Clock className='h-3.5 w-3.5 flex-shrink-0' />
+              )}
+              <p className='text-xs font-medium'>
+                Tipp-Deadline: {formattedDeadline}
+                {deadlinePassed && ' (Abgelaufen)'}
+                {/* Optionaler Textzusatz für "bald" */}
+                {isDeadlineSoon && !deadlinePassed && ' (Endet bald!)'}
+              </p>
+            </div>
+          )}
         </div>
 
+        {/* Admin Dropdown */}
         {canDeleteEvent && (
           <DropdownMenu
             open={isDropdownOpen}
@@ -144,36 +219,39 @@ export function SingleOpenEventItem({
         )}
       </div>
 
+      {/* Optionen-Buttons */}
       <div className='space-y-2'>
         {event.options?.map((option, i) => (
           <Button
             key={`${event.id}-option-${i}`}
-            variant={
-              // Da userHasSubmittedTip hier false sein sollte, wird dieser Zweig nicht erreicht
-              // userSubmittedTips[event.id] === option ? 'default' :
-              selected === option ? 'secondary' : 'outline'
-            }
-            onClick={() =>
-              // !userHasSubmittedTip ist hier immer true
-              onSelectTip(event.id, option)
-            }
-            // disabled={userHasSubmittedTip || submitting} ist hier effektiv disabled={submitting}
-            disabled={submitting}
-            className='flex w-full items-center justify-between rounded-md px-4 py-3 text-sm transition-colors'
+            variant={selected === option ? 'secondary' : 'outline'}
+            onClick={() => {
+              if (isTippingAllowed) onSelectTip(event.id, option);
+            }}
+            // Verwende isTippingAllowed für die Deaktivierung
+            disabled={!isTippingAllowed || submitting}
+            className={cn(
+              'flex w-full items-center justify-start rounded-md px-4 py-3 text-sm transition-colors',
+              // Style für deaktiviert, wenn Tippen nicht (mehr) erlaubt ist
+              !isTippingAllowed &&
+                'opacity-60 cursor-not-allowed hover:bg-transparent'
+            )}
           >
             <span>{option}</span>
-            {/* Dieser Teil wird nicht angezeigt, da userHasSubmittedTip false sein sollte
-            {userSubmittedTips[event.id] === option && (
-              <span className='text-xs text-muted-foreground'>(Dein Tipp)</span>
-            )} */}
           </Button>
         ))}
       </div>
 
-      {/* Da userHasSubmittedTip hier false sein sollte, wird dieser Teil nicht angezeigt */}
-      {/*!userHasSubmittedTip && selected && ( ... )*/}
-      {/* Stattdessen immer anzeigen, wenn etwas ausgewählt ist, da noch nicht getippt wurde */}
-      {selected && (
+      {/* Nachricht, wenn Deadline vorbei ist */}
+      {deadlinePassed && (
+        <p className='text-sm text-destructive font-medium text-center px-2 py-1 bg-destructive/10 rounded-md border border-destructive/30'>
+          Die Tipp-Deadline für diese Wette ist abgelaufen.
+        </p>
+      )}
+
+      {/* Tipp abgeben / Auswahl löschen Buttons */}
+      {/* Nur anzeigen, wenn etwas ausgewählt ist UND Tippen noch erlaubt ist */}
+      {selected && isTippingAllowed && (
         <div className='flex flex-col gap-2 sm:flex-row'>
           <Button
             onClick={() => onSubmitTip(event.id)}
@@ -184,7 +262,6 @@ export function SingleOpenEventItem({
             {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
             Tipp abgeben
           </Button>
-
           <Button
             variant='ghost'
             size='sm'
@@ -196,13 +273,8 @@ export function SingleOpenEventItem({
           </Button>
         </div>
       )}
-      {/* Dieser Block wird nicht mehr angezeigt, da wir nur Events anzeigen, auf die noch nicht getippt wurde
-      {userHasSubmittedTip && (
-        <p className='text-sm text-muted-foreground'>
-          Dein Tipp: „{userSubmittedTips[event.id]}“
-        </p>
-      )}*/}
 
+      {/* Ergebnis festlegen (Admin) */}
       {user?.id === groupCreatedBy && !event.winningOption && (
         <div className='mt-6 space-y-3 border-t border-muted/30 pt-4'>
           <h5 className='text-xs font-semibold uppercase tracking-wide text-muted-foreground'>
@@ -226,7 +298,7 @@ export function SingleOpenEventItem({
               onClick={() => onSetResult(event.id, resultInput)}
               disabled={settingResult}
               size='sm'
-              className='text-sm'
+              className='mt-3 text-sm' // mt-3 hinzugefügt für Abstand
             >
               {settingResult && (
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -241,16 +313,15 @@ export function SingleOpenEventItem({
 }
 
 /* -------------------------------------------------------------------------- */
-/* OpenEventsCard                               */
+/* OpenEventsCard (Container) - Unverändert                                   */
 /* -------------------------------------------------------------------------- */
-
 interface OpenEventsCardProps {
-  events: GroupEvent[];
+  events: GroupEvent[]; // Sollte Events mit tippingDeadline enthalten
   user: UserOut | null | undefined;
   groupCreatedBy: number | null | undefined;
   onInitiateDeleteEvent: (event: GroupEvent) => void;
   selectedTips: Record<number, string>;
-  userSubmittedTips: Record<number, string>; // Wichtig für die Filterung!
+  userSubmittedTips: Record<number, string>;
   resultInputs: Record<number, string>;
   isSubmittingTip: Record<number, boolean>;
   isSettingResult: Record<number, boolean>;
@@ -268,7 +339,7 @@ export default function OpenEventsCard({
   groupCreatedBy,
   onInitiateDeleteEvent,
   selectedTips,
-  userSubmittedTips, // Wird jetzt für die Filterung verwendet
+  userSubmittedTips,
   resultInputs,
   isSubmittingTip,
   isSettingResult,
@@ -279,7 +350,7 @@ export default function OpenEventsCard({
   onClearSelectedTip,
   onOpenAddEventDialog,
 }: OpenEventsCardProps) {
-  // NEUER FILTER: Zeige nur offene Events, auf die der aktuelle User NOCH NICHT getippt hat.
+  // Filter: Zeige nur offene Events, auf die der User NOCH NICHT getippt hat.
   const eventsToDisplay = events.filter(
     (event) =>
       event &&
@@ -290,8 +361,6 @@ export default function OpenEventsCard({
   return (
     <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
       <CardHeader className='flex flex-row items-center justify-between gap-2 pb-3'>
-        {' '}
-        {/* flex-row für bessere Ausrichtung */}
         <div className='flex items-center gap-2'>
           <Flame className='h-5 w-5 text-orange-500 dark:text-orange-300 flex-shrink-0' />
           <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
@@ -311,15 +380,17 @@ export default function OpenEventsCard({
 
       <CardContent
         className={cn(
-          'space-y-6',
-          eventsToDisplay.length === 0 &&
-            'py-8 flex justify-center items-center flex-col text-center' // items-center und flex-col für bessere Zentrierung der Nachricht
+          // Wenn keine Events da sind, zentrierten Text anzeigen
+          eventsToDisplay.length === 0
+            ? 'py-8 flex justify-center items-center flex-col text-center'
+            : // Sonst Padding und Abstände für die Event-Items
+              'space-y-6 p-4 sm:p-6'
         )}
       >
         {eventsToDisplay.length === 0 ? (
+          // Leerer Zustand
           <>
-            <Flame className='w-12 h-12 text-muted-foreground/30 mb-2' />{' '}
-            {/* Icon für leeren Zustand */}
+            <Flame className='w-12 h-12 text-muted-foreground/30 mb-2' />
             <p className='max-w-xs text-sm text-muted-foreground'>
               Keine Wetten offen, auf die du noch tippen musst.
               <br />
@@ -327,15 +398,16 @@ export default function OpenEventsCard({
             </p>
           </>
         ) : (
+          // Liste der offenen Event-Items rendern
           eventsToDisplay.map((event) => (
-            <SingleOpenEventItem
+            <SingleOpenEventItem // Die angepasste interne Komponente
               key={event.id}
               event={event}
               user={user}
               groupCreatedBy={groupCreatedBy}
               onInitiateDeleteEvent={onInitiateDeleteEvent}
               selectedTips={selectedTips}
-              userSubmittedTips={userSubmittedTips} // Weitergeben, obwohl SingleOpenEventItem es für die Anzeige in dieser Liste nicht mehr braucht
+              userSubmittedTips={userSubmittedTips} // Wird hier nicht wirklich genutzt
               resultInputs={resultInputs}
               isSubmittingTip={isSubmittingTip}
               isSettingResult={isSettingResult}
@@ -351,9 +423,3 @@ export default function OpenEventsCard({
     </Card>
   );
 }
-
-// Die zweite Definition von SingleOpenEventItem wurde hier entfernt,
-// da die erste innerhalb von OpenEventsCard.tsx genutzt und angepasst wurde.
-// Wenn du die zweite, exportierte Version verwendest, musst du die Anpassungen
-// (insbesondere das Entfernen der Logik für `userHasSubmittedTip`, da diese Info jetzt
-// durch die Filterung in der übergeordneten Komponente abgedeckt wird) dort ebenfalls vornehmen.

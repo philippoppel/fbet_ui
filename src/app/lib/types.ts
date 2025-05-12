@@ -81,6 +81,7 @@ export interface EventCreate {
   group_id: number;
   question: string;
   options: string[];
+  tippingDeadline?: string;
 }
 
 export interface EventResultSet {
