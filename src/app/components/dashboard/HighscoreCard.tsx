@@ -197,11 +197,7 @@ export function HighscoreCard({
                         {/* Mehr Gap */}
                         {entry.isNameFallback && (
                           <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className='cursor-help'>
-                                <User className='w-3.5 h-3.5 text-muted-foreground/70 hover:text-muted-foreground' />
-                              </span>
-                            </TooltipTrigger>
+                            <TooltipTrigger asChild></TooltipTrigger>
                             <TooltipContent>
                               <p>Name nicht verfügbar (ID: {entry.user_id})</p>
                             </TooltipContent>

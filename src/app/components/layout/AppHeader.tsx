@@ -7,13 +7,11 @@ import {
   LogIn,
   UserPlus,
   Menu,
-  Users,
   RefreshCw,
   Flame,
   EyeOff,
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
-import { UserOut, Group as GroupType } from '@/app/lib/types';
 import {
   Sheet,
   SheetContent,
@@ -28,8 +26,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
-import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar';
 import { useAppRefresh } from '@/app/hooks/useAppRefresh';
+import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar';
+import { UserOut, Group as GroupType } from '@/app/lib/types';
 import {
   getGroupsWithOpenEvents,
   getMyTipsAcrossAllGroups,
@@ -66,19 +65,14 @@ export function AppHeader({
     Set<number>
   >(() => {
     if (typeof window !== 'undefined') {
-      const raw = localStorage.getItem(STORAGE_KEY_SEEN_NOTIFICATIONS);
-      if (raw) {
-        try {
-          const arr: number[] = JSON.parse(raw);
-          if (Array.isArray(arr) && arr.every((id) => typeof id === 'number')) {
-            return new Set(arr);
-          }
-        } catch (e) {
-          console.error(
-            'Error parsing seenNotificationEventIds from localStorage',
-            e
-          );
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_SEEN_NOTIFICATIONS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return new Set(parsed);
         }
+      } catch (e) {
+        console.error('Fehler beim Parsen der Notification-IDs:', e);
       }
     }
     return new Set();
@@ -86,19 +80,14 @@ export function AppHeader({
 
   const fetchOpenEventsForHeader = useCallback(async () => {
     if (!user) return;
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('fbet_token') : null;
+    const token = localStorage.getItem('fbet_token');
     if (!token) return;
     setIsLoadingOpenEvents(true);
     try {
       const data = await getGroupsWithOpenEvents(token);
       setGroupsWithOpenEventsData(data || []);
     } catch (error) {
-      console.error(
-        'Fehler beim Laden der offenen Events für den Header:',
-        error
-      );
-      setGroupsWithOpenEventsData([]);
+      console.error('Fehler beim Laden offener Events:', error);
     } finally {
       setIsLoadingOpenEvents(false);
     }
@@ -106,47 +95,34 @@ export function AppHeader({
 
   useEffect(() => {
     fetchOpenEventsForHeader();
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('fbet_token') : null;
+    const token = localStorage.getItem('fbet_token');
     if (!token) return;
     getMyTipsAcrossAllGroups(token)
       .then((allTips) => {
-        const tipIds = new Set<number>(allTips.map((tip) => tip.eventId));
+        const tipIds = new Set(allTips.map((tip) => tip.eventId));
         setUserTippedEventIdsAll(tipIds);
       })
-      .catch((err) => {
-        console.error(
-          '[AppHeader] Fehler beim Laden der Tipps über alle Gruppen:',
-          err
-        );
-      });
+      .catch((err) => console.error('Fehler beim Laden der Tipps:', err));
   }, [user?.id]);
 
   const untippedOpenEventsByGroup = useMemo(() => {
     return groupsWithOpenEventsData
       .map((group) => {
-        const untippedEvents = group.openEvents.filter(
-          (event) => !userTippedEventIdsAll.has(Number(event.id))
+        const untipped = group.openEvents.filter(
+          (e) => !userTippedEventIdsAll.has(Number(e.id))
         );
-        return {
-          ...group,
-          openEvents: untippedEvents,
-          untippedEventCountInGroup: untippedEvents.length,
-        };
+        return { ...group, openEvents: untipped };
       })
-      .filter((group) => group.untippedEventCountInGroup > 0);
+      .filter((g) => g.openEvents.length > 0);
   }, [groupsWithOpenEventsData, userTippedEventIdsAll]);
 
   const notificationCount = useMemo(() => {
-    let count = 0;
-    untippedOpenEventsByGroup.forEach((group) => {
-      group.openEvents.forEach((event) => {
-        if (!seenNotificationEventIds.has(Number(event.id))) {
-          count++;
-        }
-      });
-    });
-    return count;
+    return untippedOpenEventsByGroup.reduce(
+      (count, g) =>
+        count +
+        g.openEvents.filter((e) => !seenNotificationEventIds.has(e.id)).length,
+      0
+    );
   }, [untippedOpenEventsByGroup, seenNotificationEventIds]);
 
   const handleSelectAndCloseSheet = (groupId: number) => {
@@ -155,52 +131,76 @@ export function AppHeader({
   };
 
   const handleMarkNotificationsAsRead = () => {
-    const newSeenIdsSet = new Set(seenNotificationEventIds);
-    untippedOpenEventsByGroup.forEach((group) => {
-      group.openEvents.forEach((event) => {
-        newSeenIdsSet.add(Number(event.id));
-      });
-    });
-    setSeenNotificationEventIds(newSeenIdsSet);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(
-        STORAGE_KEY_SEEN_NOTIFICATIONS,
-        JSON.stringify(Array.from(newSeenIdsSet))
-      );
-    }
+    const newSet = new Set(seenNotificationEventIds);
+    untippedOpenEventsByGroup.forEach((g) =>
+      g.openEvents.forEach((e) => newSet.add(e.id))
+    );
+    setSeenNotificationEventIds(newSet);
+    localStorage.setItem(
+      STORAGE_KEY_SEEN_NOTIFICATIONS,
+      JSON.stringify(Array.from(newSet))
+    );
   };
+
   useEffect(() => {
     const interval = setInterval(() => {
       fetchOpenEventsForHeader();
-      const token =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('fbet_token')
-          : null;
+      const token = localStorage.getItem('fbet_token');
       if (!token) return;
       getMyTipsAcrossAllGroups(token)
         .then((allTips) => {
-          const tipIds = new Set<number>(allTips.map((tip) => tip.eventId));
+          const tipIds = new Set(allTips.map((tip) => tip.eventId));
           setUserTippedEventIdsAll(tipIds);
         })
-        .catch((err) => {
-          console.error('[AppHeader] Fehler beim Tipp-Reload:', err);
-        });
-    }, 60_000); // alle 60 Sekunden
-
+        .catch((err) => console.error('Fehler beim Reload der Tipps:', err));
+    }, 60_000);
     return () => clearInterval(interval);
   }, [fetchOpenEventsForHeader, user?.id]);
 
   return (
     <header className='sticky top-0 z-50 w-full border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6 lg:px-8'>
       <div className='flex h-14 items-center justify-between'>
-        <Link
-          href={user ? '/dashboard' : '/'}
-          className='flex items-center space-x-2 hover:opacity-80 transition-opacity'
-        >
-          <img src='/icon0.svg' alt='Fbet Logo' className='h-8 w-auto' />
-          <span className='text-lg font-bold tracking-tight'>fbet</span>
-        </Link>
+        {/* LINKS: Burger + Logo */}
+        <div className='flex items-center gap-2'>
+          {user && myGroups.length > 0 && onSelectGroup && (
+            <div className='block lg:hidden'>
+              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant='ghost' size='icon' aria-label='Menü öffnen'>
+                    <Menu className='w-5 h-5' />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side='left' className='w-[80vw] max-w-xs p-0'>
+                  <SheetHeader>
+                    <SheetTitle className='sr-only'>
+                      Gruppenübersicht
+                    </SheetTitle>
+                  </SheetHeader>
+                  <GroupSidebar
+                    groups={myGroups}
+                    selectedGroupId={selectedGroupId}
+                    onSelectGroup={handleSelectAndCloseSheet}
+                    isLoading={false}
+                    error={null}
+                    isCollapsed={false}
+                    currentUserId={user.id}
+                    onDeleteGroup={() => Promise.resolve()}
+                  />
+                </SheetContent>
+              </Sheet>
+            </div>
+          )}
 
+          <Link
+            href={user ? '/dashboard' : '/'}
+            className='flex items-center space-x-2 hover:opacity-80 transition-opacity'
+          >
+            <img src='/icon0.svg' alt='Fbet Logo' className='h-8 w-auto' />
+            <span className='text-lg font-bold tracking-tight'>fbet</span>
+          </Link>
+        </div>
+
+        {/* RECHTS: Buttons */}
         <div className='flex items-center space-x-2 sm:space-x-3'>
           {user && myGroups.length > 0 && onSelectGroup && (
             <DropdownMenu>
