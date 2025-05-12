@@ -4,10 +4,10 @@ import { useCallback } from 'react';
 import type { Group, Event as GroupEvent, UserOut } from '@/app/lib/types';
 import type { UseGroupInteractionsReturn } from '@/app/hooks/useGroupInteractions';
 
-import { OpenEventsCard } from './OpenEventsCard';
 import { ClosedEventsCard } from './ClosedEventsCard';
 import DeleteEventDialog from './DeleteEventDialog';
 import { GroupHeaderCard } from '@/app/components/dashboard/GroupHeaderCard';
+import OpenEventsCard from '@/app/components/dashboard/OpenEventsCard';
 
 type SelectedGroupViewProps = {
   group: Group;
