@@ -1,12 +1,11 @@
-// src/components/dashboard/ClosedEventsCard.tsx
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import type { Event as GroupEvent, EventPointDetail } from '@/app/lib/types';
+import type { Event as GroupEvent, UserOut } from '@/app/lib/types';
 import {
   Card,
-  CardContent, // Wieder eingeführt für konsistentes Padding
-  CardHeader, // Wieder eingeführt
+  CardContent,
+  CardHeader,
   CardTitle,
 } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
@@ -36,14 +35,16 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
+import { CommentSection } from '@/app/components/dashboard/CommentSection';
 
 type ClosedEventsCardProps = {
   events: GroupEvent[];
+  user: UserOut;
 };
 
 const STORAGE_KEY = 'closedEventsArchivedEventIds';
 
-export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
+export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [archivedEventIds, setArchivedEventIds] = useState<Set<number>>(() => {
     if (typeof window !== 'undefined') {
@@ -59,7 +60,7 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
           }
         } catch (e) {
           console.warn(
-            '[ClosedEventsCard] Fehler beim initialen Parsen von archivedEventIds:',
+            '[ClosedEventsCard] Fehler beim Parsen von archivedEventIds:',
             e
           );
         }
@@ -97,67 +98,35 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
     });
   };
 
-  const {
-    activeClosedEvents,
-    archivedClosedEvents,
-    hasAnyClosedEventsToShow,
-    hasArchivedEventsToShow,
-    totalArchivedCount,
-    totalClosedEventCount,
-  } = useMemo(() => {
-    const baseAllClosedEvents = Array.isArray(events)
-      ? events
-          .filter(
-            (event): event is GroupEvent =>
-              !!event &&
-              typeof event.id === 'number' &&
-              typeof event.winningOption === 'string'
-          )
-          .sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )
-      : [];
+  const filteredEvents = useMemo(() => {
+    const base = events
+      .filter((e): e is GroupEvent => !!e && e.winningOption !== null)
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
 
-    const filteredBySearchTerm =
-      searchTerm.trim() === ''
-        ? baseAllClosedEvents
-        : baseAllClosedEvents.filter((event) => {
-            const lowerSearchTerm = searchTerm.toLowerCase();
-            return (
-              event.title?.toLowerCase().includes(lowerSearchTerm) ||
-              event.description?.toLowerCase().includes(lowerSearchTerm) ||
-              event.question?.toLowerCase().includes(lowerSearchTerm) ||
-              event.winningOption?.toLowerCase().includes(lowerSearchTerm)
-            );
-          });
+    const search = searchTerm.trim().toLowerCase();
+    const filtered = search
+      ? base.filter(
+          (e) =>
+            e.title?.toLowerCase().includes(search) ||
+            e.question?.toLowerCase().includes(search) ||
+            e.winningOption?.toLowerCase().includes(search)
+        )
+      : base;
 
-    const active = filteredBySearchTerm.filter(
-      (event) => !archivedEventIds.has(event.id)
-    );
-    const archived = filteredBySearchTerm.filter((event) =>
-      archivedEventIds.has(event.id)
-    );
-    const allArchivedFromBase = baseAllClosedEvents.filter((event) =>
-      archivedEventIds.has(event.id)
-    );
+    const active = filtered.filter((e) => !archivedEventIds.has(e.id));
+    const archived = filtered.filter((e) => archivedEventIds.has(e.id));
 
-    return {
-      activeClosedEvents: active,
-      archivedClosedEvents: archived,
-      hasAnyClosedEventsToShow: filteredBySearchTerm.length > 0,
-      hasArchivedEventsToShow: archived.length > 0,
-      totalArchivedCount: allArchivedFromBase.length,
-      totalClosedEventCount: baseAllClosedEvents.length,
-    };
-  }, [events, archivedEventIds, searchTerm]);
+    return { active, archived, total: base.length };
+  }, [events, searchTerm, archivedEventIds]);
 
-  // Hilfsfunktion zum Rendern der Event-Liste
   const renderEventItem = (event: GroupEvent, isArchived: boolean) => (
     <div
       key={event.id}
       className={cn(
-        'rounded-xl bg-card border border-border p-4 sm:p-5 shadow-sm transition-colors', // Angelehnt an SingleOpenEventItem
+        'rounded-xl bg-card border border-border p-4 sm:p-5 shadow-sm transition-colors',
         isArchived && 'opacity-70 hover:opacity-100'
       )}
     >
@@ -170,19 +139,19 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
             <p className='text-sm text-muted-foreground'>{event.question}</p>
           )}
           <Badge
-            variant={isArchived ? 'outline' : 'default'} // Unterschiedliche Badge für Archiv
+            variant={isArchived ? 'outline' : 'default'}
             className={cn(
               'text-xs font-normal mt-1',
               isArchived
                 ? 'border-border/50'
-                : 'border-primary/30 text-primary-foreground bg-primary/90' // Primäre Farbe für aktive
+                : 'border-primary/30 text-primary-foreground bg-primary/90'
             )}
           >
             Gewinner: {event.winningOption}
           </Badge>
         </div>
-        <div className='flex items-center flex-shrink-0 gap-1'>
-          {event.awardedPoints && event.awardedPoints.length > 0 && (
+        <div className='flex items-center gap-1'>
+          {!!event.awardedPoints?.length && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -196,7 +165,6 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                   ) : (
                     <ChevronRight className='h-4 w-4' />
                   )}
-                  <span className='sr-only'>Punktedetails</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -217,9 +185,6 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                 ) : (
                   <Archive className='h-4 w-4' />
                 )}
-                <span className='sr-only'>
-                  {isArchived ? 'Wiederherstellen' : 'Archivieren'}
-                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -229,35 +194,37 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
         </div>
       </div>
 
-      {expandedEvents.has(event.id) &&
-        event.awardedPoints &&
-        event.awardedPoints.length > 0 && (
-          <div className='mt-3 ml-1 pl-3 py-2 bg-muted/50 dark:bg-black/20 rounded-md text-sm border-l-2 border-primary/50'>
-            <h5 className='font-semibold mb-1.5 text-xs text-foreground/90 uppercase tracking-wide'>
-              Punkteverteilung:
-            </h5>
-            <ul className='space-y-1 text-xs'>
-              {event.awardedPoints.map((detail) => (
-                <li
-                  key={detail.userId}
-                  className='flex justify-between text-muted-foreground'
-                >
-                  <span>{detail.userName || `User ${detail.userId}`}:</span>
-                  <span className='font-medium text-foreground/80'>
-                    {detail.points ?? 0} Pkt.
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+      {expandedEvents.has(event.id) && (
+        <div className='mt-3 ml-1 pl-3 py-2 bg-muted/50 dark:bg-black/20 rounded-md text-sm border-l-2 border-primary/50'>
+          <h5 className='font-semibold mb-1.5 text-xs text-foreground/90 uppercase tracking-wide'>
+            Punkteverteilung:
+          </h5>
+          <ul className='space-y-1 text-xs'>
+            {event.awardedPoints?.map((p) => (
+              <li
+                key={p.userId}
+                className='flex justify-between text-muted-foreground'
+              >
+                <span>{p.userName || `User ${p.userId}`}</span>
+                <span className='font-medium text-foreground/80'>
+                  {p.points ?? 0} Pkt.
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className='pt-4 mt-3 border-t border-border'>
+        <CommentSection eventId={event.id} currentUser={user} />
+      </div>
     </div>
   );
 
   return (
     <TooltipProvider delayDuration={100}>
       <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
-        <Collapsible open={isOpen} onOpenChange={setIsOpen} className='w-full'>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
           <CardHeader className='flex flex-row items-center justify-between gap-2 pb-3 pr-3 sm:pr-4'>
             <div className='flex items-center gap-2'>
               <CheckCircle2 className='h-5 w-5 text-green-500 dark:text-green-400' />
@@ -271,51 +238,35 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                   <Button
                     variant='ghost'
                     size='icon'
-                    className='h-8 w-8 text-muted-foreground hover:text-foreground data-[state=on]:bg-accent data-[state=on]:text-accent-foreground'
+                    className='h-8 w-8 text-muted-foreground hover:text-foreground'
                     onClick={() => setIsSearchVisible(!isSearchVisible)}
-                    data-state={isSearchVisible ? 'on' : 'off'}
                   >
                     <Search className='h-4 w-4' />
-                    <span className='sr-only'>
-                      {isSearchVisible ? 'Suche ausblenden' : 'Suchen'}
-                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>
-                    {isSearchVisible
-                      ? 'Suche ausblenden'
-                      : 'Wetten durchsuchen'}
-                  </p>
+                  <p>Wetten durchsuchen</p>
                 </TooltipContent>
               </Tooltip>
-              {totalArchivedCount > 0 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant='ghost'
-                      size='icon'
-                      className='h-8 w-8 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground text-muted-foreground hover:text-foreground'
-                      onClick={() => setShowArchived(!showArchived)}
-                      data-state={showArchived ? 'on' : 'off'}
-                    >
-                      {showArchived ? (
-                        <EyeOff className='h-4 w-4' />
-                      ) : (
-                        <Eye className='h-4 w-4' />
-                      )}
-                      <span className='sr-only'>
-                        {showArchived ? 'Archiv ausblenden' : 'Archiv anzeigen'}
-                      </span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      {showArchived ? 'Archiv ausblenden' : 'Archiv anzeigen'}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    onClick={() => setShowArchived(!showArchived)}
+                    className='h-8 w-8 text-muted-foreground hover:text-foreground'
+                  >
+                    {showArchived ? (
+                      <EyeOff className='h-4 w-4' />
+                    ) : (
+                      <Eye className='h-4 w-4' />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Archiv anzeigen/ausblenden</p>
+                </TooltipContent>
+              </Tooltip>
               <CollapsibleTrigger asChild>
                 <Button
                   variant='ghost'
@@ -323,7 +274,6 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                   className='h-8 w-8 text-muted-foreground hover:text-foreground'
                 >
                   <ChevronsUpDown className='h-4 w-4' />
-                  <span className='sr-only'>Toggle</span>
                 </Button>
               </CollapsibleTrigger>
             </div>
@@ -337,7 +287,7 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                   placeholder='Titel, Frage, Gewinner durchsuchen...'
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className='w-full pr-10 h-9 text-sm bg-background/70 dark:bg-black/30 border-border/70 focus:border-primary/70 focus:ring-primary/30 rounded-md'
+                  className='w-full pr-10 h-9 text-sm'
                 />
                 {searchTerm && (
                   <Button
@@ -345,7 +295,6 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
                     size='icon'
                     className='absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-destructive'
                     onClick={() => setSearchTerm('')}
-                    aria-label='Suche löschen'
                   >
                     <X className='h-4 w-4' />
                   </Button>
@@ -356,96 +305,9 @@ export function ClosedEventsCard({ events }: ClosedEventsCardProps) {
 
           <CollapsibleContent>
             <CardContent className='space-y-6 pt-2 pb-4'>
-              {!totalClosedEventCount && (
-                <div className='py-8 text-center text-sm text-muted-foreground'>
-                  <div className='flex flex-col items-center gap-4'>
-                    <CheckCircle2 className='mx-auto h-12 w-12 opacity-30 mb-2' />
-                    <p className='text-xs sm:text-sm'>
-                      Es gibt noch keine abgeschlossenen Wetten.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {totalClosedEventCount > 0 &&
-                !hasAnyClosedEventsToShow &&
-                searchTerm && (
-                  <div className='py-8 text-center text-sm text-muted-foreground'>
-                    <div className='flex flex-col items-center gap-4'>
-                      <Search className='mx-auto h-12 w-12 opacity-30 mb-2' />
-                      <p className='text-xs sm:text-sm'>
-                        Keine abgeschlossenen Wetten entsprechen deiner Suche
-                        &#34;
-                        {searchTerm}&#34;.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-              {activeClosedEvents.length === 0 &&
-                totalArchivedCount > 0 &&
-                !showArchived &&
-                !searchTerm &&
-                totalClosedEventCount > 0 && ( // Sicherstellen, dass es überhaupt Events gibt
-                  <p className='text-muted-foreground text-sm text-center italic py-6'>
-                    Alle abgeschlossenen Wetten sind archiviert.
-                    <Button
-                      variant='link'
-                      className='p-0 h-auto text-xs italic ml-1'
-                      onClick={() => {
-                        setShowArchived(true);
-                      }}
-                    >
-                      Archiv anzeigen ({totalArchivedCount})
-                    </Button>
-                  </p>
-                )}
-
-              {activeClosedEvents.length > 0 && (
-                <div className='space-y-4'>
-                  {/* Container für aktive Events */}
-                  {activeClosedEvents.map((event) =>
-                    renderEventItem(event, false)
-                  )}
-                </div>
-              )}
-
-              {showArchived && archivedClosedEvents.length > 0 && (
-                <div className='mt-6 pt-6 border-t border-border/70'>
-                  <h3 className='text-sm font-semibold text-muted-foreground mb-4 px-1'>
-                    Archiv ({archivedClosedEvents.length}
-                    {searchTerm &&
-                    archivedClosedEvents.length !== totalArchivedCount
-                      ? ` von ${totalArchivedCount} passend zum Filter`
-                      : ''}
-                    )
-                  </h3>
-                  <div className='space-y-4'>
-                    {/* Container für archivierte Events */}
-                    {archivedClosedEvents.map((event) =>
-                      renderEventItem(event, true)
-                    )}
-                  </div>
-                </div>
-              )}
+              {filteredEvents.active.map((e) => renderEventItem(e, false))}
               {showArchived &&
-                archivedClosedEvents.length === 0 &&
-                searchTerm &&
-                totalArchivedCount > 0 && (
-                  <p className='text-muted-foreground text-sm italic text-center py-6 mt-4 border-t border-border/70'>
-                    Keine archivierten Wetten entsprechen deiner Suche &#34;
-                    {searchTerm}&#34;.
-                  </p>
-                )}
-              {showArchived &&
-                archivedClosedEvents.length === 0 &&
-                !searchTerm &&
-                totalArchivedCount > 0 && (
-                  <p className='text-muted-foreground text-sm italic text-center py-6 mt-4 border-t border-border/70'>
-                    Das Archiv ist leer oder alle archivierten Events wurden
-                    durch Filter ausgeblendet.
-                  </p>
-                )}
+                filteredEvents.archived.map((e) => renderEventItem(e, true))}
             </CardContent>
           </CollapsibleContent>
         </Collapsible>

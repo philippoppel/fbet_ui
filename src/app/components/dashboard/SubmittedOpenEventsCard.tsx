@@ -12,7 +12,7 @@ import {
   CardContent,
 } from '@/app/components/ui/card';
 import { Badge } from '@/app/components/ui/badge';
-import { Eye, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Eye, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,15 +20,20 @@ import {
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
 import { Button } from '@/app/components/ui/button';
+import { CommentSection } from '@/app/components/dashboard/CommentSection';
 
-type SubmittedOpenEventsCardProps = {
+interface SubmittedOpenEventsCardProps {
   events: GroupEvent[];
   user: UserOut;
   groupCreatedBy: number | null | undefined;
   onInitiateDeleteEvent: (event: GroupEvent) => void;
   userSubmittedTips: Record<number, string>;
   allTipsPerEvent: AllTipsPerEvent;
-};
+  resultInputs: Record<number, string>;
+  isSettingResult: Record<number, boolean>;
+  onResultInputChange: (eventId: number, value: string) => void;
+  onSetResult: (eventId: number, winningOption: string) => Promise<void>;
+}
 
 export default function SubmittedOpenEventsCard({
   events,
@@ -37,6 +42,10 @@ export default function SubmittedOpenEventsCard({
   onInitiateDeleteEvent,
   userSubmittedTips,
   allTipsPerEvent,
+  resultInputs,
+  isSettingResult,
+  onResultInputChange,
+  onSetResult,
 }: SubmittedOpenEventsCardProps) {
   const submittedEvents = events.filter(
     (e) => e && !e.winningOption && userSubmittedTips[e.id] !== undefined
@@ -61,13 +70,15 @@ export default function SubmittedOpenEventsCard({
             allTipsPerEvent[event.id]?.filter((t) => t.userId !== user.id) ||
             [];
 
+          const canDeleteEvent =
+            user?.id === groupCreatedBy || user?.id === event.createdById;
+
           return (
             <div
               key={event.id}
               className='rounded-lg border border-border bg-card p-4 sm:p-5 space-y-3 shadow-sm hover:shadow-md transition-shadow relative'
             >
-              {/* Admin Menü */}
-              {user.id === groupCreatedBy && (
+              {canDeleteEvent && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -96,7 +107,6 @@ export default function SubmittedOpenEventsCard({
                   <h4 className='text-sm font-semibold text-foreground break-words flex-1'>
                     {event.title}
                   </h4>
-                  {/* Das Dropdown-Menü ist bereits absolut, daher genügt Platz rechts */}
                 </div>
                 {event.question && (
                   <p className='text-xs text-muted-foreground italic'>
@@ -128,6 +138,55 @@ export default function SubmittedOpenEventsCard({
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {/* Kommentarbereich */}
+              {user && (
+                <div className='pt-4 border-t border-border'>
+                  <CommentSection eventId={event.id} currentUser={user} />
+                </div>
+              )}
+
+              {/* Admin-Funktion: Ergebnis setzen */}
+              {user?.id === groupCreatedBy && !event.winningOption && (
+                <div className='mt-4 border-t pt-4 border-muted/30'>
+                  <h5 className='text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2'>
+                    Ergebnis festlegen (Admin)
+                  </h5>
+                  <div className='flex flex-wrap gap-2'>
+                    {event.options?.map((option, i) => (
+                      <Button
+                        key={`result-${event.id}-${i}`}
+                        variant={
+                          resultInputs[event.id] === option
+                            ? 'default'
+                            : 'outline'
+                        }
+                        size='sm'
+                        className='text-sm'
+                        onClick={() => onResultInputChange(event.id, option)}
+                        disabled={isSettingResult[event.id]}
+                      >
+                        {option}
+                      </Button>
+                    ))}
+                  </div>
+                  {resultInputs[event.id] && (
+                    <Button
+                      onClick={() =>
+                        onSetResult(event.id, resultInputs[event.id])
+                      }
+                      disabled={isSettingResult[event.id]}
+                      size='sm'
+                      className='mt-3 text-sm'
+                    >
+                      {isSettingResult[event.id] && (
+                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                      )}
+                      Ergebnis „{resultInputs[event.id]}“ bestätigen
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

@@ -171,40 +171,42 @@ export function SingleOpenEventItem({
         </p>
       )}
 
-      {user?.id === groupCreatedBy && !event.winningOption && (
-        <div className='mt-6 border-t pt-4 border-muted/30'>
-          <h5 className='text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2'>
-            Ergebnis festlegen (Admin)
-          </h5>
-          <div className='flex flex-wrap gap-2'>
-            {event.options?.map((option, i) => (
+      {user?.id === groupCreatedBy &&
+        !event.winningOption &&
+        userSubmittedTips[event.id] !== undefined && (
+          <div className='mt-6 border-t pt-4 border-muted/30'>
+            <h5 className='text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2'>
+              Ergebnis festlegen (Admin)
+            </h5>
+            <div className='flex flex-wrap gap-2'>
+              {event.options?.map((option, i) => (
+                <Button
+                  key={`result-${event.id}-${i}`}
+                  variant={resultInput === option ? 'default' : 'outline'}
+                  size='sm'
+                  className='text-sm'
+                  onClick={() => onResultInputChange(event.id, option)}
+                  disabled={settingResult}
+                >
+                  {option}
+                </Button>
+              ))}
+            </div>
+            {resultInput && (
               <Button
-                key={`result-${event.id}-${i}`}
-                variant={resultInput === option ? 'default' : 'outline'}
-                size='sm'
-                className='text-sm'
-                onClick={() => onResultInputChange(event.id, option)}
+                onClick={() => onSetResult(event.id, resultInput)}
                 disabled={settingResult}
+                size='sm'
+                className='mt-3 text-sm'
               >
-                {option}
+                {settingResult && (
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                )}
+                Ergebnis „{resultInput}“ bestätigen
               </Button>
-            ))}
+            )}
           </div>
-          {resultInput && (
-            <Button
-              onClick={() => onSetResult(event.id, resultInput)}
-              disabled={settingResult}
-              size='sm'
-              className='mt-3 text-sm'
-            >
-              {settingResult && (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              )}
-              Ergebnis „{resultInput}“ bestätigen
-            </Button>
-          )}
-        </div>
-      )}
+        )}
 
       {/* Kommentarbereich */}
       {user && <CommentSection eventId={event.id} currentUser={user} />}

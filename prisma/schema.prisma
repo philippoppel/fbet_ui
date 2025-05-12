@@ -110,7 +110,7 @@ model EventComment {
   user   User @relation(fields: [userId], references: [id])
 
   eventId Int
-  event   Event @relation(fields: [eventId], references: [id])
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("event_comments")
 }

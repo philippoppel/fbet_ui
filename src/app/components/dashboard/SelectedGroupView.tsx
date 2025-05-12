@@ -84,10 +84,14 @@ export function SelectedGroupView({
         onInitiateDeleteEvent={interactions.handleInitiateDeleteEvent}
         userSubmittedTips={userSubmittedTips}
         allTipsPerEvent={allTipsPerEvent}
+        resultInputs={interactions.resultInputs}
+        isSettingResult={interactions.isSettingResult}
+        onResultInputChange={interactions.handleResultInputChange}
+        onSetResult={interactions.handleSetResult}
       />
 
       {/* ───────── Geschlossene Events ───────── */}
-      <ClosedEventsCard events={events} />
+      <ClosedEventsCard events={events} user={user} />
 
       {/* ───────── Delete-Event-Dialog ───────── */}
       {interactions.eventToDelete && (
