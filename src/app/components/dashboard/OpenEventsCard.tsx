@@ -53,7 +53,7 @@ export default function OpenEventsCard({
   );
 
   return (
-    <Card className='bg-card border border-border rounded-xl shadow-sm'>
+    <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
       <CardHeader className='flex flex-row items-center justify-between gap-2 pb-4 px-4 sm:px-6 pt-4 sm:pt-5'>
         <div className='flex items-center gap-2.5'>
           <Flame className='h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0' />

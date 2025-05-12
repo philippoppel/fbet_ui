@@ -1,16 +1,11 @@
 // src/app/api/events/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-// Passe die Pfade an deine Struktur an
 import { prisma } from '../lib/prisma';
 import { getCurrentUserFromRequest, AuthenticatedUser } from '../lib/auth';
-import { isUserMemberOfGroup } from '../services/groupService'; // Importieren!
-// Optional: Event Service importieren, falls Logik ausgelagert wird
-// import * as eventService from '../services/eventService';
-// Typ EventCreate wird ggf. nicht mehr benötigt, da Zod den Typ ableitet
-// import type { EventCreate } from '../../lib/types';
+import { isUserMemberOfGroup } from '../services/groupService';
 
-// --- Zod Schema für die Validierung (ANGEPASST für Tipping Deadline) ---
+// --- Zod Schema für die Validierung (robust gegen fehlende Zeitzone) ---
 const eventCreateSchema = z.object({
   title: z.string().min(1, 'Titel erforderlich').max(255),
   description: z.string().max(1000).nullable().optional(),
@@ -19,34 +14,25 @@ const eventCreateSchema = z.object({
   options: z
     .array(z.string().min(1))
     .min(2, 'Mindestens 2 Optionen erforderlich'),
-  // NEU: Tipping Deadline als optionaler ISO 8601 String
   tippingDeadline: z
     .string()
-    .datetime({
-      offset: true, // Erfordert Zeitzoneninformation (Z oder +/-HH:MM)
-      message:
-        'Muss ein gültiger ISO 8601 Datumsstring sein (z.B. 2025-05-13T10:00:00Z oder 2025-05-13T12:00:00+02:00)',
+    .refine((val) => !val || !isNaN(Date.parse(val)), {
+      message: 'Ungültige Deadline: Muss ein gültiges ISO-Datum sein.',
     })
-    .optional() // Macht das Feld optional
-    .nullable() // Erlaubt explizit null
-    .refine(
-      (val) => !val || new Date(val) > new Date(), // Nur prüfen wenn Wert gesetzt ist
-      {
-        message: 'Tipp-Deadline muss in der Zukunft liegen.',
-      }
-    )
-    .transform((val) => (val ? new Date(val) : null)), // In Date-Objekt oder null umwandeln
-  // event_datetime: z.string().datetime().optional(), // Altes Feld (auskommentiert im Original)
+    .optional()
+    .nullable()
+    .transform((val) => (val ? new Date(val) : null))
+    .refine((val) => !val || val > new Date(), {
+      message: 'Tipp-Deadline muss in der Zukunft liegen.',
+    }),
 });
 
-// Abgeleiteter Typ aus dem Zod Schema
 type ValidatedEventCreateData = z.infer<typeof eventCreateSchema>;
 
 export async function POST(req: NextRequest) {
   const routeName = '/api/events';
   console.log(`[ROUTE ${routeName}] POST request received.`);
 
-  // 1. Authentifizierung
   let currentUser: AuthenticatedUser | null = null;
   try {
     currentUser = await getCurrentUserFromRequest(req);
@@ -58,18 +44,14 @@ export async function POST(req: NextRequest) {
       `[ROUTE ${routeName}] Auth success: User ID ${currentUser.id}.`
     );
   } catch (authCatchError) {
-    console.error(
-      `[ROUTE ${routeName}] CRITICAL: Error during auth:`,
-      authCatchError
-    );
+    console.error(`[ROUTE ${routeName}] Error during auth:`, authCatchError);
     return NextResponse.json(
       { error: 'Authentication service error' },
       { status: 500 }
     );
   }
 
-  // 2. Request Body lesen und validieren (angepasst für Zod)
-  let parsedData: ValidatedEventCreateData; // Verwende den abgeleiteten Typ
+  let parsedData: ValidatedEventCreateData;
   try {
     const json = await req.json();
     console.log(
@@ -88,7 +70,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    // Zod stellt sicher, dass parsed.data dem Typ ValidatedEventCreateData entspricht
     parsedData = parsed.data;
     console.log(`[ROUTE ${routeName}] Payload validated successfully.`);
   } catch (parseError) {
@@ -99,38 +80,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // --- 3. AUTORISIERUNG: Prüfen, ob User Mitglied der Gruppe ist ---
   try {
-    // Stelle sicher, dass die Gruppe überhaupt existiert (optional, aber gut)
     const groupExists = await prisma.group.findUnique({
       where: { id: parsedData.group_id },
-      select: { id: true }, // Nur prüfen, ob es sie gibt
+      select: { id: true },
     });
     if (!groupExists) {
       console.log(
-        `[ROUTE ${routeName}] Group not found: ${parsedData.group_id}. Returning 404.`
+        `[ROUTE ${routeName}] Group not found: ${parsedData.group_id}.`
       );
       return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    // Prüfe die Mitgliedschaft
     const isMember = await isUserMemberOfGroup(
       currentUser.id,
       parsedData.group_id
     );
-
     if (!isMember) {
       console.log(
-        `[ROUTE ${routeName}] Forbidden: User ${currentUser.id} is not member of group ${parsedData.group_id}. Returning 403.`
+        `[ROUTE ${routeName}] Forbidden: User ${currentUser.id} is not member of group ${parsedData.group_id}.`
       );
       return NextResponse.json(
         { error: 'Only members of the group can add events.' },
         { status: 403 }
       );
     }
-    console.log(
-      `[ROUTE ${routeName}] Authorization successful (is member) for user ${currentUser.id} in group ${parsedData.group_id}.`
-    );
+    console.log(`[ROUTE ${routeName}] Authorization successful.`);
   } catch (authzError) {
     console.error(
       `[ROUTE ${routeName}] Authorization check error:`,
@@ -141,41 +116,29 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-  // ---------------------------------------------------------------------
 
-  // 4. Event in der Datenbank erstellen (angepasst für Tipping Deadline)
   try {
-    console.log(`[ROUTE ${routeName}] Attempting to create event in DB.`);
+    console.log(`[ROUTE ${routeName}] Creating event in DB.`);
     const newEvent = await prisma.event.create({
       data: {
         title: parsedData.title,
         description: parsedData.description,
         question: parsedData.question,
-        options: parsedData.options, // Prisma speichert dies als JSON
+        options: parsedData.options,
         groupId: parsedData.group_id,
         createdById: currentUser.id,
-        // NEU: Füge die validierte und transformierte Deadline hinzu (ist Date | null)
         tippingDeadline: parsedData.tippingDeadline,
       },
     });
     console.log(
       `[ROUTE ${routeName}] Event created successfully with ID: ${newEvent.id}.`
     );
-    // Prisma gibt standardmäßig alle Felder zurück, inklusive der neuen tippingDeadline
     return NextResponse.json(newEvent, { status: 201 });
   } catch (dbError) {
-    console.error(
-      `[ROUTE ${routeName}] Database error during event creation:`,
-      dbError
-    );
-    // Hier könnten spezifischere Fehlerprüfungen sinnvoll sein (z.B. unique constraints)
+    console.error(`[ROUTE ${routeName}] Database error:`, dbError);
     return NextResponse.json(
       { error: 'Could not create event.' },
       { status: 500 }
     );
   }
 }
-
-// Optional: GET Handler, falls benötigt (wird von diesem Pfad normalerweise nicht erwartet,
-// da GET für Listen und POST für Erstellung ist. GET für spezifische Events wäre /api/events/[eventId])
-// export async function GET(req: NextRequest) { ... }

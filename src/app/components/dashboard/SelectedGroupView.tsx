@@ -80,8 +80,10 @@ export function SelectedGroupView({
       <SubmittedOpenEventsCard
         events={events}
         user={user}
+        groupCreatedBy={group.createdById}
+        onInitiateDeleteEvent={interactions.handleInitiateDeleteEvent}
         userSubmittedTips={userSubmittedTips}
-        allTipsPerEvent={allTipsPerEvent} // Prop weitergeben
+        allTipsPerEvent={allTipsPerEvent}
       />
 
       {/* ───────── Geschlossene Events ───────── */}
