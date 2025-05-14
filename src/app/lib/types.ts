@@ -34,10 +34,11 @@ export interface UfcEventItem {
 }
 
 export interface BoxingScheduleItem {
-  date: string | null;
+  date: string | null; // Der ursprüngliche Datumsstring, z.B. "June 8"
   location: string | null;
   broadcaster: string | null;
   details: string | null;
+  parsedDate?: string | null; // Der hinzugefügte ISO-Datumsstring
 }
 
 export type Group = PrismaGroup;

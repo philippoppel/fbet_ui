@@ -36,7 +36,8 @@ import type {
   BoxingScheduleItem,
 } from '@/app/lib/types';
 import { getUfcSchedule, getBoxingSchedule } from '@/app/lib/api'; // NEU: API-Funktionen importieren
-import { EventList } from '@/app/components/dashboard/EventList'; // NEU: Komponente für Event-Vorschläge
+import { EventList } from '@/app/components/dashboard/EventList';
+import { useDashboardData } from '@/app/hooks/useDashboardData'; // NEU: Komponente für Event-Vorschläge
 
 // --- HILFSFUNKTIONEN ---
 
@@ -267,16 +268,34 @@ export function AddEventDialog({
       });
 
       const boxingMapped: MixedEvent[] = boxingEventsData.map((e, i) => {
-        const parsedDate = parseDateForSuggestions(e.date);
+        // e ist BoxingScheduleItem. e.date ist z.B. "June 8", e.parsedDate ist "2025-06-08..."
+
+        let parsedDateObject: Date;
+        // Priorisiere e.parsedDate (ISO-String), da dieser bereits korrekt geparst wurde
+        if (e.parsedDate && typeof e.parsedDate === 'string') {
+          parsedDateObject = new Date(e.parsedDate);
+        } else {
+          // Fallback, falls e.parsedDate nicht vorhanden oder kein String ist
+          // (obwohl es für BoxingEvents immer vorhanden sein sollte)
+          parsedDateObject = parseDateForSuggestions(e.date);
+        }
+
         const stableId =
           e.details?.substring(0, 50).replace(/\s+/g, '-').toLowerCase() ||
           `boxing-${i}`;
         return {
           id: `boxing-${stableId}`,
           title: e.details || 'Unbekannter Boxkampf',
-          subtitle: `${parsedDate.getFullYear() > 1970 ? parsedDate.toLocaleDateString('de-DE', { dateStyle: 'medium' }) : '?'} – ${e.location || '?'} ${e.broadcaster ? `(${e.broadcaster})` : ''}`,
+          subtitle: `${
+            parsedDateObject.getFullYear() > 1970 // Benutze das korrigierte parsedDateObject
+              ? parsedDateObject.toLocaleString('de-DE', {
+                  dateStyle: 'medium',
+                  timeStyle: 'short', // Stellen Sie sicher, dass timeStyle auch gewünscht ist
+                })
+              : '?'
+          } – ${e.location || '?'}${e.broadcaster ? ` (${e.broadcaster})` : ''}`,
           sport: 'boxing' as const,
-          date: parsedDate,
+          date: parsedDateObject, // Speichere das korrekte Date-Objekt
           original: e,
         };
       });
@@ -303,23 +322,20 @@ export function AddEventDialog({
       setIsLoadingSuggestions(false);
     }
   }, [isLoadingSuggestions, internalSuggestions.length, suggestionsError]); // Abhängigkeiten aktualisiert
+  const { retrievedCombinedEvents, loadCombinedEvents } = useDashboardData();
 
-  // NEU: useEffect zum Laden der Vorschläge, wenn der Dialog geöffnet wird
   useEffect(() => {
-    if (
-      open &&
-      (internalSuggestions.length === 0 || suggestionsError) &&
-      !isLoadingSuggestions
-    ) {
-      loadSuggestions();
+    if (!open) return;
+
+    if (retrievedCombinedEvents.length === 0) {
+      loadCombinedEvents(); // <-- Hier wurde die Funktion nicht gefunden
+    } else {
+      const sorted = retrievedCombinedEvents.filter(
+        (e) => e.date.getFullYear() > 1970
+      );
+      setInternalSuggestions(sorted);
     }
-  }, [
-    open,
-    loadSuggestions,
-    internalSuggestions.length,
-    suggestionsError,
-    isLoadingSuggestions,
-  ]);
+  }, [open, retrievedCombinedEvents, loadCombinedEvents]);
 
   // Funktion generateAiSuggestion - angepasst für Deadline Reset
   const generateAiSuggestion = async () => {

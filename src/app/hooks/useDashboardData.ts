@@ -11,11 +11,11 @@ import {
   getGroupMembers,
   getMyTipsForGroup,
   getAllTipsForOpenGroupEvents,
-  ApiError,
+  // ApiError, // ApiError wird im Code nicht explizit verwendet, kann ggf. entfernt werden, wenn nicht anderweitig benötigt
 } from '@/app/lib/api';
 import type {
   UfcEventItem,
-  BoxingScheduleItem,
+  BoxingScheduleItem, // Stellen Sie sicher, dass diese Schnittstelle parsedDate enthält
   Group,
   MixedEvent,
   Event as GroupEvent,
@@ -59,8 +59,8 @@ export interface UseDashboardDataReturn {
     options?: LoadGroupDataOptions
   ) => Promise<void>;
   updateUserTipState: (eventId: number, selectedOption: string) => void;
-  loadCombinedEvents: () => Promise<void>; // Gibt Promise<void> zurück
-  refreshMyGroups: () => Promise<Group[]>; // Gibt Promise<Group[]> zurück
+  loadCombinedEvents: () => Promise<void>;
+  refreshMyGroups: () => Promise<Group[]>;
 }
 
 // Der Custom Hook
@@ -70,10 +70,15 @@ export function useDashboardData(): UseDashboardDataReturn {
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [errors, setErrors] = useState<UseDashboardDataReturn['errors']>({});
-  const initialSelectedGroupId =
-    typeof window !== 'undefined'
-      ? parseInt(localStorage.getItem('selectedGroupId') || '', 10) || null
-      : null;
+
+  // Initial selectedGroupId from localStorage
+  const initialSelectedGroupId = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const storedId = localStorage.getItem('selectedGroupId');
+      return storedId ? parseInt(storedId, 10) : null;
+    }
+    return null;
+  }, []);
 
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(
     initialSelectedGroupId
@@ -95,8 +100,10 @@ export function useDashboardData(): UseDashboardDataReturn {
   const [allTipsPerEvent, setAllTipsPerEvent] = useState<AllTipsPerEvent>({});
   const [isGroupDataLoading, setIsGroupDataLoading] = useState(false);
   const [isLoadingCombinedEvents, setIsLoadingCombinedEvents] = useState(false);
+
+  // State für externe Event-Daten
   const [ufcEvents, setUfcEvents] = useState<UfcEventItem[]>([]);
-  const [boxingEvents, setBoxingEvents] = useState<BoxingScheduleItem[]>([]);
+  const [boxingEvents, setBoxingEvents] = useState<BoxingScheduleItem[]>([]); // Annahme: BoxingScheduleItem enthält parsedDate
 
   const groupDetailsRef = useRef<Group | null>(null);
   useEffect(() => {
@@ -113,11 +120,10 @@ export function useDashboardData(): UseDashboardDataReturn {
     []
   );
 
-  // Holt die Gruppenliste des Benutzers vom Server
   const fetchMyGroups = useCallback(async (): Promise<Group[]> => {
     if (!token || !user) {
       setMyGroups([]);
-      return Promise.resolve([]); // Explizit ein Promise mit leerem Array zurückgeben
+      return Promise.resolve([]);
     }
     setErrors((prev) => ({ ...prev, groups: undefined }));
     try {
@@ -126,7 +132,7 @@ export function useDashboardData(): UseDashboardDataReturn {
         new Map(fetchedGroups.map((g) => [g.id, g])).values()
       );
       setMyGroups(uniqueGroups);
-      return uniqueGroups; // Gibt Group[] zurück, async macht es zu Promise<Group[]>
+      return uniqueGroups;
     } catch (groupError: any) {
       console.error(
         '[useDashboardData] fetchMyGroups Load Failed:',
@@ -137,23 +143,18 @@ export function useDashboardData(): UseDashboardDataReturn {
         groups: groupError.message || 'Fehler beim Laden der Gruppen.',
       }));
       setMyGroups([]);
-      return Promise.resolve([]); // Im Fehlerfall explizit ein Promise mit leerem Array
+      return Promise.resolve([]);
     }
   }, [token, user]);
 
   const loadSelectedGroupData = useCallback(
     async (groupId: number, options?: LoadGroupDataOptions): Promise<void> => {
-      // Expliziter Rückgabetyp Promise<void>
       const {
         showLoadingSpinner = true,
         keepExistingDetailsWhileRefreshingSubData = false,
       } = options || {};
 
-      const loadingOperationId = Date.now();
-      // console.log(`[useDashboardData] loadSelectedGroupData START - GroupID: ${groupId}`);
-
       if (!token) {
-        // console.warn('[useDashboardData] loadSelectedGroupData: No token, aborting.');
         setErrors((prev) => ({ ...prev, groupData: 'Nicht eingeloggt.' }));
         setIsGroupDataLoading(false);
         setSelectedGroupDetails(null);
@@ -162,7 +163,7 @@ export function useDashboardData(): UseDashboardDataReturn {
         setSelectedGroupMembers([]);
         setUserSubmittedTips({});
         setAllTipsPerEvent({});
-        return; // Wichtig: Funktion hier beenden
+        return;
       }
 
       let wasLoadingSet = false;
@@ -189,7 +190,7 @@ export function useDashboardData(): UseDashboardDataReturn {
         shouldFetchDetails = false;
         initialDetailsForPromise = currentGroupDetailsFromState;
       } else {
-        setSelectedGroupDetails(null);
+        setSelectedGroupDetails(null); // Reset details if not keeping or different group
       }
 
       if (!keepExistingDetailsWhileRefreshingSubData) {
@@ -222,7 +223,6 @@ export function useDashboardData(): UseDashboardDataReturn {
           allGroupTipsRes,
         ] = results;
 
-        // Details
         if (detailsRes.status === 'fulfilled') {
           setSelectedGroupDetails(detailsRes.value as Group | null);
         } else if (shouldFetchDetails) {
@@ -232,7 +232,6 @@ export function useDashboardData(): UseDashboardDataReturn {
           );
         }
 
-        // Events
         if (eventsRes.status === 'fulfilled') {
           setSelectedGroupEvents(eventsRes.value as GroupEvent[]);
         } else {
@@ -242,7 +241,6 @@ export function useDashboardData(): UseDashboardDataReturn {
           );
         }
 
-        // Highscore
         if (highscoreRes.status === 'fulfilled') {
           setSelectedGroupHighscore(highscoreRes.value as HighscoreEntry[]);
         } else {
@@ -252,7 +250,6 @@ export function useDashboardData(): UseDashboardDataReturn {
           );
         }
 
-        // Members
         if (membersRes.status === 'fulfilled') {
           setSelectedGroupMembers(membersRes.value as UserOut[]);
         } else {
@@ -262,7 +259,6 @@ export function useDashboardData(): UseDashboardDataReturn {
           );
         }
 
-        // MyTips (UserSubmittedTips)
         if (myTipsRes.status === 'fulfilled') {
           const tipsArray = myTipsRes.value as UserTipSelection[] | null;
           const tipsRecord: Record<number, string> = {};
@@ -276,11 +272,6 @@ export function useDashboardData(): UseDashboardDataReturn {
                 tipsRecord[tip.eventId] = tip.selectedOption;
               }
             });
-          } else if (tipsArray !== null) {
-            console.warn(
-              '[useDashboardData] getMyTipsForGroup did not return an array or null:',
-              tipsArray
-            );
           }
           setUserSubmittedTips(tipsRecord);
         } else {
@@ -297,7 +288,6 @@ export function useDashboardData(): UseDashboardDataReturn {
           setUserSubmittedTips({});
         }
 
-        // AllGroupTips
         if (allGroupTipsRes.status === 'fulfilled') {
           setAllTipsPerEvent(allGroupTipsRes.value as AllTipsPerEvent);
         } else {
@@ -313,7 +303,7 @@ export function useDashboardData(): UseDashboardDataReturn {
           }));
           setAllTipsPerEvent({});
         }
-        // Fehlerbehandlung für groupData (Beispiel)
+
         let fetchErrorOccurredForCoreData = false;
         if (
           (shouldFetchDetails && detailsRes.status === 'rejected') ||
@@ -341,6 +331,7 @@ export function useDashboardData(): UseDashboardDataReturn {
           ...prev,
           groupData: 'Unerwarteter Systemfehler.',
         }));
+        // Reset all group specific data on critical error
         setSelectedGroupDetails(null);
         setSelectedGroupEvents([]);
         setSelectedGroupHighscore([]);
@@ -351,43 +342,60 @@ export function useDashboardData(): UseDashboardDataReturn {
         if (wasLoadingSet) {
           setIsGroupDataLoading(false);
         }
-        // console.log(`[useDashboardData] loadSelectedGroupData END - GroupID: ${groupId}`);
       }
     },
-    [token] // Nur token als Abhängigkeit, da andere Werte (wie groupDetailsRef) sich nicht ändern sollten, um die Funktion neu zu definieren
+    [token]
   );
 
   useEffect(() => {
     if (isAuthLoading) return;
+    let isMounted = true;
+
     const loadInitialDashboardData = async () => {
       setLoadingInitial(true);
       if (token && user) {
         const groups = await fetchMyGroups();
-        if (groups.length > 0 && selectedGroupId === null) {
-          let initialGroupId: number | null = null;
-
+        if (isMounted && groups.length > 0 && selectedGroupId === null) {
+          let initialGroupIdToSet: number | null = null;
           const stored = localStorage.getItem('selectedGroupId');
           if (stored && groups.some((g) => g.id === parseInt(stored))) {
-            initialGroupId = parseInt(stored);
+            initialGroupIdToSet = parseInt(stored);
           } else {
             const favorite = localStorage.getItem('favoriteGroupId');
             if (favorite && groups.some((g) => g.id === parseInt(favorite))) {
-              initialGroupId = parseInt(favorite);
+              initialGroupIdToSet = parseInt(favorite);
             } else {
-              initialGroupId = groups[0].id;
+              initialGroupIdToSet = groups[0].id; // Default to the first group
             }
           }
-
-          setSelectedGroupId(initialGroupId);
+          if (initialGroupIdToSet !== null) {
+            setSelectedGroupId(initialGroupIdToSet);
+            // Persist this initial choice if it was derived and not directly from localStorage['selectedGroupId']
+            if (
+              localStorage.getItem('selectedGroupId') !==
+              initialGroupIdToSet.toString()
+            ) {
+              localStorage.setItem(
+                'selectedGroupId',
+                initialGroupIdToSet.toString()
+              );
+            }
+          }
         }
       } else {
+        // No token or user
         setMyGroups([]);
         setSelectedGroupId(null);
       }
-      setLoadingInitial(false);
+      if (isMounted) {
+        setLoadingInitial(false);
+      }
     };
     loadInitialDashboardData();
-  }, [token, user, isAuthLoading, fetchMyGroups, selectedGroupId]); // selectedGroupId hinzugefügt, um auf Änderungen zu reagieren, falls es extern gesetzt wird
+    return () => {
+      isMounted = false;
+    };
+  }, [token, user, isAuthLoading, fetchMyGroups, selectedGroupId]);
 
   useEffect(() => {
     if (selectedGroupId !== null && token) {
@@ -396,6 +404,7 @@ export function useDashboardData(): UseDashboardDataReturn {
         keepExistingDetailsWhileRefreshingSubData: false,
       });
     } else if (selectedGroupId === null) {
+      // Clear group specific data if no group is selected
       setSelectedGroupDetails(null);
       setSelectedGroupEvents([]);
       setSelectedGroupHighscore([]);
@@ -403,8 +412,10 @@ export function useDashboardData(): UseDashboardDataReturn {
       setUserSubmittedTips({});
       setAllTipsPerEvent({});
       if (isGroupDataLoading) {
+        // Stop loading indicator if it was running
         setIsGroupDataLoading(false);
       }
+      // Clear related errors
       setErrors((prev) => ({
         ...prev,
         groupData: undefined,
@@ -412,29 +423,29 @@ export function useDashboardData(): UseDashboardDataReturn {
         allGroupTips: undefined,
       }));
     }
-  }, [selectedGroupId, token, loadSelectedGroupData]);
+  }, [selectedGroupId, token, loadSelectedGroupData]); // loadSelectedGroupData is a dependency
 
   const handleSelectGroup = useCallback(
     (groupId: number | null) => {
       if (groupId !== selectedGroupId) {
+        // Only update if the ID actually changed
+        setSelectedGroupId(groupId); // Update state first
         if (groupId !== null) {
           localStorage.setItem('selectedGroupId', groupId.toString());
         } else {
           localStorage.removeItem('selectedGroupId');
         }
-        setSelectedGroupId(groupId);
       }
     },
-    [selectedGroupId]
+    [selectedGroupId] // Dependency on selectedGroupId to correctly compare
   );
 
-  // Funktion zum Laden der externen Events
   const loadCombinedEvents = useCallback(async (): Promise<void> => {
     if (
       isLoadingCombinedEvents ||
       (ufcEvents.length > 0 && boxingEvents.length > 0)
     ) {
-      return; // Nicht laden, wenn schon geladen oder Ladevorgang läuft
+      return;
     }
     setIsLoadingCombinedEvents(true);
     setErrors((prev) => ({
@@ -460,7 +471,7 @@ export function useDashboardData(): UseDashboardDataReturn {
       }
 
       if (boxingResult.status === 'fulfilled') {
-        setBoxingEvents(boxingResult.value);
+        setBoxingEvents(boxingResult.value); // boxingResult.value should be BoxingScheduleItem[] (incl. parsedDate)
       } else {
         console.error('Boxing Load Failed:', boxingResult.reason);
         setErrors((p) => ({
@@ -489,124 +500,144 @@ export function useDashboardData(): UseDashboardDataReturn {
     } finally {
       setIsLoadingCombinedEvents(false);
     }
-  }, [isLoadingCombinedEvents, ufcEvents.length, boxingEvents.length]); // Abhängigkeiten präzisiert
+  }, [isLoadingCombinedEvents, ufcEvents.length, boxingEvents.length]);
 
+  // General purpose date parser, used for UFC dtstart and as fallback
   const parseDate = useCallback((dateStr: string | null | undefined): Date => {
-    // ... (Implementierung bleibt gleich)
-    if (!dateStr) return new Date(0);
+    if (!dateStr) return new Date(0); // Return an invalid date marker (epoch)
+
+    // Try to parse as ISO string or other directly supported formats first
     try {
       const parsedTimestamp = Date.parse(dateStr);
       if (!isNaN(parsedTimestamp)) return new Date(parsedTimestamp);
     } catch (e) {
-      /* Ignorieren */
+      /* Ignore */
     }
+
     const now = new Date();
-    const year = now.getFullYear();
+    // For "Month Day" formats, assume current year. This is a common convention.
+    // Current date: Wednesday, May 14, 2025 at 9:16 PM CEST
+    const year = now.getFullYear(); // Will be 2025
     let processedDateStr = dateStr;
+
+    // Regex for "Mon Day" (e.g., "Aug 25", "June 8")
     const monthDayMatch = dateStr.match(
-      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})$/i
+      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})$/i
     );
     if (monthDayMatch) {
+      // monthDayMatch[0] is full match e.g. "June 8"
+      // monthDayMatch[1] is month e.g. "Jun"
+      // monthDayMatch[2] is day e.g. "8"
+      // Reconstruct with full month name for better new Date() compatibility if needed, or use as is.
+      // Using dateStr (which is "Month Day") and appending year is usually robust.
       processedDateStr = `${dateStr}, ${year}`;
-    }
-    const dayMonthMatch = dateStr.match(
-      /^(\d{1,2})\.\s+(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)/i
-    );
-    if (dayMonthMatch) {
-      const monthMap: { [key: string]: string } = {
-        januar: 'Jan',
-        februar: 'Feb',
-        märz: 'Mar',
-        april: 'Apr',
-        mai: 'May',
-        juni: 'Jun',
-        juli: 'Jul',
-        august: 'Aug',
-        september: 'Sep',
-        oktober: 'Oct',
-        november: 'Nov',
-        dezember: 'Dec',
-      };
-      const monthName = dayMonthMatch[2].toLowerCase();
-      if (monthMap[monthName]) {
-        processedDateStr = `${monthMap[monthName]} ${dayMonthMatch[1]}, ${year}`;
+    } else {
+      // Regex for "DD. MonthName" (German, e.g., "25. August", "08. Juni")
+      const dayMonthMatch = dateStr.match(
+        /^(\d{1,2})\.\s+(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)/i
+      );
+      if (dayMonthMatch) {
+        const monthMap: { [key: string]: string } = {
+          januar: 'January',
+          februar: 'February',
+          märz: 'March',
+          april: 'April',
+          mai: 'May',
+          juni: 'June',
+          juli: 'July',
+          august: 'August',
+          september: 'September',
+          oktober: 'October',
+          november: 'November',
+          dezember: 'December',
+        };
+        const monthName = dayMonthMatch[2].toLowerCase();
+        if (monthMap[monthName]) {
+          // Construct as "Month Day, Year" for robust parsing
+          processedDateStr = `${monthMap[monthName]} ${dayMonthMatch[1]}, ${year}`;
+        }
       }
     }
+
     try {
       const parsed = new Date(processedDateStr);
       if (!isNaN(parsed.getTime())) return parsed;
     } catch (e) {
-      /* Ignorieren */
+      /* Ignore */
     }
+
     console.warn(
-      `[parseDate] Konnte Datum nicht zuverlässig parsen: "${dateStr}". Gebe Epoch zurück.`
+      `[useDashboardData - parseDate] Konnte Datum nicht zuverlässig parsen: "${dateStr}" (verarbeitet als "${processedDateStr}"). Gebe Epoch zurück.`
     );
-    return new Date(0);
+    return new Date(0); // Fallback to epoch
   }, []);
 
   const retrievedCombinedEvents: MixedEvent[] = useMemo(() => {
-    // ... (Implementierung bleibt gleich)
-    const ufcMapped = ufcEvents.map((e, i) => {
-      const parsedDate = parseDate(e.dtstart);
+    const ufcMapped: MixedEvent[] = ufcEvents.map((e, i) => {
+      const parsedUfcDate = parseDate(e.dtstart); // Use the hook's parseDate for UFC
       return {
-        id: e.uid || `${e.summary?.replace(/\s+/g, '-')}-${e.dtstart || i}`,
+        id:
+          e.uid ||
+          `ufc-${e.summary?.replace(/\s+/g, '-') || 'event'}-${e.dtstart || i}`,
         title: e.summary || 'Unbekanntes UFC Event',
-        subtitle: `${parsedDate.getFullYear() > 1970 ? parsedDate.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) : '?'} – ${e.location || '?'}`,
+        subtitle: `${parsedUfcDate.getFullYear() > 1970 ? parsedUfcDate.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) : '?'} – ${e.location || '?'}`,
         sport: 'ufc' as const,
-        date: parsedDate,
+        date: parsedUfcDate,
         original: e,
       };
     });
-    const boxingMapped = boxingEvents.map((e, i) => {
-      const parsedDate = parseDate(e.date);
-      const stableId =
+
+    const boxingMapped: MixedEvent[] = boxingEvents.map((e, i) => {
+      let parsedBoxingDateObject: Date;
+
+      if (e.parsedDate && typeof e.parsedDate === 'string') {
+        // Prioritize the ISO string from scraping
+        parsedBoxingDateObject = new Date(e.parsedDate);
+      } else {
+        parsedBoxingDateObject = parseDate(e.date); // Fallback to parsing the original date string
+      }
+
+      // Robust ID generation for boxing events
+      const baseId =
         e.details
           ?.substring(0, 50)
-          .replace(/[^a-z0-9]/gi, '-')
-          .toLowerCase() || `boxing-${i}`;
+          .replace(/[^a-z0-9_.\-]/gi, '-') // Allow alphanumeric, underscore, dot, hyphen
+          .replace(/-+/g, '-') // Replace multiple hyphens with a single one
+          .replace(/^-|-$/g, '') // Trim leading/trailing hyphens
+          .toLowerCase() || `event-${i}`;
+      const uniqueBoxingId = `boxing-${baseId || `unknown-${i}`}`; // Ensure baseId is not empty
+
       return {
-        id: stableId,
+        id: uniqueBoxingId,
         title: e.details || 'Unbekannter Boxkampf',
-        subtitle: `${parsedDate.getFullYear() > 1970 ? parsedDate.toLocaleDateString('de-DE', { dateStyle: 'medium' }) : '?'} – ${e.location || '?'} ${e.broadcaster ? `(${e.broadcaster})` : ''}`,
+        subtitle: `${parsedBoxingDateObject.getFullYear() > 1970 ? parsedBoxingDateObject.toLocaleDateString('de-DE', { dateStyle: 'medium' }) : '?'} – ${e.location || '?'} ${e.broadcaster ? `(${e.broadcaster})` : ''}`,
         sport: 'boxing' as const,
-        date: parsedDate,
+        date: parsedBoxingDateObject,
         original: e,
       };
     });
-    const validEvents = [...ufcMapped, ...boxingMapped].filter(
-      (event) => event.date.getFullYear() > 1970
+
+    const combinedEvents = [...ufcMapped, ...boxingMapped];
+    const validEvents = combinedEvents.filter(
+      (event) => event.date.getFullYear() > 1970 // Ensure date is valid (not epoch)
     );
     return validEvents.sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [ufcEvents, boxingEvents, parseDate]);
+  }, [ufcEvents, boxingEvents, parseDate]); // parseDate is a dependency
 
-  // Funktion zum expliziten Neuladen der Gruppenliste
   const refreshMyGroups = useCallback(async (): Promise<Group[]> => {
     if (!token || !user) {
-      // console.warn('[useDashboardData] refreshMyGroups: No token or user, returning empty array.');
-      return Promise.resolve([]); // Explizit ein Promise zurückgeben
+      return Promise.resolve([]);
     }
-    try {
-      // Ruft die innere fetchMyGroups auf, die bereits Promise<Group[]> zurückgibt
-      return await fetchMyGroups();
-    } catch (error) {
-      console.error(
-        '[useDashboardData] refreshMyGroups: Error calling fetchMyGroups:',
-        error
-      );
-      return Promise.resolve([]); // Im Fehlerfall auch ein leeres Array als Promise
-    }
-  }, [fetchMyGroups, token, user]); // fetchMyGroups ist eine Abhängigkeit
+    // Directly call fetchMyGroups which handles state updates and errors
+    return fetchMyGroups();
+  }, [fetchMyGroups, token, user]);
 
-  useEffect(() => {
-    // console.log('[useDashboardData] State Snapshot:', { /* ... */ });
-  }, [
-    selectedGroupId,
-    userSubmittedTips,
-    allTipsPerEvent,
-    errors.userTips,
-    loadingInitial,
-    isGroupDataLoading,
-  ]);
+  // Optional: useEffect for logging state changes for debugging
+  // useEffect(() => {
+  //   console.log('[useDashboardData] State Snapshot:', {
+  //     selectedGroupId, userSubmittedTips, errors, loadingInitial, isGroupDataLoading, myGroups, retrievedCombinedEvents
+  //   });
+  // }, [selectedGroupId, userSubmittedTips, errors, loadingInitial, isGroupDataLoading, myGroups, retrievedCombinedEvents]);
 
   return {
     myGroups,

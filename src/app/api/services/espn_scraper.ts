@@ -6,6 +6,7 @@ export type BoxingEvent = {
   location: string | null;
   broadcaster: string | null;
   details: string;
+  parsedDate?: string | null; // ISO-String für maschinelle Nutzung
 };
 
 const ESPN_BOXING_URL =
@@ -15,6 +16,52 @@ const HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
 };
+
+// Unterstützt auch Abkürzungen wie "Sept."
+const MONTHS: Record<string, number> = {
+  January: 0,
+  February: 1,
+  March: 2,
+  April: 3,
+  May: 4,
+  June: 5,
+  July: 6,
+  August: 7,
+  September: 8,
+  October: 9,
+  November: 10,
+  December: 11,
+  Jan: 0,
+  Feb: 1,
+  Mar: 2,
+  Apr: 3,
+  Jun: 5,
+  Jul: 6,
+  Aug: 7,
+  Sep: 8,
+  Sept: 8,
+  Oct: 9,
+  Nov: 10,
+  Dec: 11,
+};
+
+/**
+ * Wandelt ESPN-Datumsformat wie "Sept. 12" in einen ISO-String um
+ */
+function parseBoxingDate(
+  raw: string,
+  fallbackYear = new Date().getFullYear()
+): string | null {
+  const parts = raw.trim().replace('.', '').split(' ');
+  if (parts.length !== 2) return null;
+
+  const month = MONTHS[parts[0]];
+  const day = parseInt(parts[1], 10);
+  if (month === undefined || isNaN(day)) return null;
+
+  const date = new Date(fallbackYear, month, day, 12, 0); // 12:00 Uhr lokale Zeit
+  return isNaN(date.getTime()) ? null : date.toISOString();
+}
 
 /**
  * Parsiert eine Textzeile zu einem BoxingEvent
@@ -28,7 +75,6 @@ function parseEventText(raw: string): BoxingEvent | null {
 
   const date = datePart?.trim() ?? '';
   const details = detailsRaw?.trim() ?? '';
-
   if (!date || !details) return null;
 
   let location: string | null = null;
@@ -44,7 +90,13 @@ function parseEventText(raw: string): BoxingEvent | null {
     }
   }
 
-  return { date, location, broadcaster, details };
+  return {
+    date,
+    location,
+    broadcaster,
+    details,
+    parsedDate: parseBoxingDate(date),
+  };
 }
 
 /**
