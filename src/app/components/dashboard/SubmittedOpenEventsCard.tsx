@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type {
   Event as GroupEvent,
   UserOut,
@@ -12,7 +13,13 @@ import {
   CardContent,
 } from '@/app/components/ui/card';
 import { Badge } from '@/app/components/ui/badge';
-import { Eye, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
+import {
+  Eye,
+  MoreHorizontal,
+  Trash2,
+  Loader2,
+  ChevronsUpDown,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +27,11 @@ import {
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
 import { Button } from '@/app/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@/app/components/ui/collapsible';
 import { CommentSection } from '@/app/components/dashboard/CommentSection';
 
 interface SubmittedOpenEventsCardProps {
@@ -47,152 +59,169 @@ export default function SubmittedOpenEventsCard({
   onResultInputChange,
   onSetResult,
 }: SubmittedOpenEventsCardProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
   const submittedEvents = events.filter(
     (e) => e && !e.winningOption && userSubmittedTips[e.id] !== undefined
   );
 
-  if (submittedEvents.length === 0) {
-    return null;
-  }
+  if (submittedEvents.length === 0) return null;
 
   return (
     <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
-      <CardHeader className='flex flex-row items-center gap-2'>
-        <Eye className='h-5 w-5 text-blue-500 dark:text-blue-300 flex-shrink-0' />
-        <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
-          Meine Tipps für offene Wetten
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className='space-y-6'>
-        {submittedEvents.map((event) => {
-          const otherTips =
-            allTipsPerEvent[event.id]?.filter((t) => t.userId !== user.id) ||
-            [];
-
-          const canDeleteEvent =
-            user?.id === groupCreatedBy || user?.id === event.createdById;
-
-          return (
-            <div
-              key={event.id}
-              className='rounded-lg border border-border bg-card p-4 sm:p-5 space-y-3 shadow-sm hover:shadow-md transition-shadow relative'
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader className='flex flex-row items-center justify-between gap-2'>
+          <div className='flex items-center gap-2'>
+            <Eye className='h-5 w-5 text-blue-500 dark:text-blue-300 flex-shrink-0' />
+            <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
+              Meine Tipps für offene Wetten
+            </CardTitle>
+          </div>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant='ghost'
+              size='icon'
+              className='h-8 w-8 text-muted-foreground hover:text-foreground'
             >
-              {canDeleteEvent && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant='ghost'
-                      size='icon'
-                      className='absolute top-2 right-2 text-muted-foreground hover:text-foreground'
-                    >
-                      <MoreHorizontal className='h-4 w-4' />
-                      <span className='sr-only'>Optionen</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align='end'>
-                    <DropdownMenuItem
-                      onClick={() => onInitiateDeleteEvent(event)}
-                      className='text-red-600 focus:text-red-600'
-                    >
-                      <Trash2 className='w-4 h-4 mr-2' />
-                      Event löschen
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              <ChevronsUpDown className='h-4 w-4' />
+            </Button>
+          </CollapsibleTrigger>
+        </CardHeader>
 
-              <div className='space-y-1 pr-8'>
-                <div className='flex justify-between gap-2 items-start'>
-                  <h4 className='text-sm font-semibold text-foreground break-words flex-1'>
-                    {event.title}
-                  </h4>
-                </div>
-                {event.question && (
-                  <p className='text-xs text-muted-foreground italic'>
-                    {event.question}
-                  </p>
-                )}
-                <p className='text-sm text-muted-foreground pt-1'>
-                  Deine Antwort: <strong>{userSubmittedTips[event.id]}</strong>
-                </p>
-              </div>
+        <CollapsibleContent>
+          <CardContent className='space-y-6'>
+            {submittedEvents.map((event) => {
+              const otherTips =
+                allTipsPerEvent[event.id]?.filter(
+                  (t) => t.userId !== user.id
+                ) || [];
 
-              {otherTips.length > 0 && (
-                <div className='pt-3 border-t border-border/60 text-sm'>
-                  <p className='mb-1.5 text-muted-foreground font-medium text-xs uppercase tracking-wider'>
-                    Tipps der anderen:
-                  </p>
-                  <ul className='text-sm space-y-1.5'>
-                    {otherTips.map((t) => (
-                      <li
-                        key={t.userId}
-                        className='flex justify-between items-center'
-                      >
-                        <span className='text-muted-foreground'>
-                          {t.userName || `User ${t.userId}`}
-                        </span>
-                        <Badge variant='secondary' className='font-normal'>
-                          {t.selectedOption}
-                        </Badge>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              const canDeleteEvent =
+                user?.id === groupCreatedBy || user?.id === event.createdById;
 
-              {/* Kommentarbereich */}
-              {user && (
-                <div className='pt-4 border-t border-border'>
-                  <CommentSection eventId={event.id} currentUser={user} />
-                </div>
-              )}
+              return (
+                <div
+                  key={event.id}
+                  className='rounded-lg border border-border bg-card p-4 sm:p-5 space-y-3 shadow-sm hover:shadow-md transition-shadow relative'
+                >
+                  {canDeleteEvent && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant='ghost'
+                          size='icon'
+                          className='absolute top-2 right-2 text-muted-foreground hover:text-foreground'
+                        >
+                          <MoreHorizontal className='h-4 w-4' />
+                          <span className='sr-only'>Optionen</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align='end'>
+                        <DropdownMenuItem
+                          onClick={() => onInitiateDeleteEvent(event)}
+                          className='text-red-600 focus:text-red-600'
+                        >
+                          <Trash2 className='w-4 h-4 mr-2' />
+                          Event löschen
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
 
-              {/* Admin-Funktion: Ergebnis setzen */}
-              {user?.id === groupCreatedBy && !event.winningOption && (
-                <div className='mt-4 border-t pt-4 border-muted/30'>
-                  <h5 className='text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2'>
-                    Ergebnis festlegen (Admin)
-                  </h5>
-                  <div className='flex flex-wrap gap-2'>
-                    {event.options?.map((option, i) => (
-                      <Button
-                        key={`result-${event.id}-${i}`}
-                        variant={
-                          resultInputs[event.id] === option
-                            ? 'default'
-                            : 'outline'
-                        }
-                        size='sm'
-                        className='text-sm'
-                        onClick={() => onResultInputChange(event.id, option)}
-                        disabled={isSettingResult[event.id]}
-                      >
-                        {option}
-                      </Button>
-                    ))}
+                  <div className='space-y-1 pr-8'>
+                    <div className='flex justify-between gap-2 items-start'>
+                      <h4 className='text-sm font-semibold text-foreground break-words flex-1'>
+                        {event.title}
+                      </h4>
+                    </div>
+                    {event.question && (
+                      <p className='text-xs text-muted-foreground italic'>
+                        {event.question}
+                      </p>
+                    )}
+                    <p className='text-sm text-muted-foreground pt-1'>
+                      Deine Antwort:{' '}
+                      <strong>{userSubmittedTips[event.id]}</strong>
+                    </p>
                   </div>
-                  {resultInputs[event.id] && (
-                    <Button
-                      onClick={() =>
-                        onSetResult(event.id, resultInputs[event.id])
-                      }
-                      disabled={isSettingResult[event.id]}
-                      size='sm'
-                      className='mt-3 text-sm'
-                    >
-                      {isSettingResult[event.id] && (
-                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+
+                  {otherTips.length > 0 && (
+                    <div className='pt-3 border-t border-border/60 text-sm'>
+                      <p className='mb-1.5 text-muted-foreground font-medium text-xs uppercase tracking-wider'>
+                        Tipps der anderen:
+                      </p>
+                      <ul className='text-sm space-y-1.5'>
+                        {otherTips.map((t) => (
+                          <li
+                            key={t.userId}
+                            className='flex justify-between items-center'
+                          >
+                            <span className='text-muted-foreground'>
+                              {t.userName || `User ${t.userId}`}
+                            </span>
+                            <Badge variant='secondary' className='font-normal'>
+                              {t.selectedOption}
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {user && (
+                    <div className='pt-4 border-t border-border'>
+                      <CommentSection eventId={event.id} currentUser={user} />
+                    </div>
+                  )}
+
+                  {user?.id === groupCreatedBy && !event.winningOption && (
+                    <div className='mt-4 border-t pt-4 border-muted/30'>
+                      <h5 className='text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2'>
+                        Ergebnis festlegen (Admin)
+                      </h5>
+                      <div className='flex flex-wrap gap-2'>
+                        {event.options?.map((option, i) => (
+                          <Button
+                            key={`result-${event.id}-${i}`}
+                            variant={
+                              resultInputs[event.id] === option
+                                ? 'default'
+                                : 'outline'
+                            }
+                            size='sm'
+                            className='text-sm'
+                            onClick={() =>
+                              onResultInputChange(event.id, option)
+                            }
+                            disabled={isSettingResult[event.id]}
+                          >
+                            {option}
+                          </Button>
+                        ))}
+                      </div>
+                      {resultInputs[event.id] && (
+                        <Button
+                          onClick={() =>
+                            onSetResult(event.id, resultInputs[event.id])
+                          }
+                          disabled={isSettingResult[event.id]}
+                          size='sm'
+                          className='mt-3 text-sm'
+                        >
+                          {isSettingResult[event.id] && (
+                            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                          )}
+                          Ergebnis „{resultInputs[event.id]}“ bestätigen
+                        </Button>
                       )}
-                      Ergebnis „{resultInputs[event.id]}“ bestätigen
-                    </Button>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </CardContent>
+              );
+            })}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
