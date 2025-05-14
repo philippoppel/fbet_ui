@@ -214,10 +214,7 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           </ul>
         </div>
       )}
-
-      <div className='pt-4 mt-3 border-t border-border'>
-        <CommentSection eventId={event.id} currentUser={user} />
-      </div>
+      <CommentSection eventId={event.id} currentUser={user} />
     </div>
   );
 

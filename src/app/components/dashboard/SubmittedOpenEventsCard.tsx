@@ -169,9 +169,7 @@ export default function SubmittedOpenEventsCard({
                   )}
 
                   {user && (
-                    <div className='pt-4 border-t border-border'>
-                      <CommentSection eventId={event.id} currentUser={user} />
-                    </div>
+                    <CommentSection eventId={event.id} currentUser={user} />
                   )}
 
                   {user?.id === groupCreatedBy && !event.winningOption && (

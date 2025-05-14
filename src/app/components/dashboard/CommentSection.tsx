@@ -74,7 +74,7 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
   const gf = useGiphyFetch();
   // --- ANNAHME: Token holen ---
   // const { token } = useAuth(); // Alternative: Context
-  const token = getAuthToken(); // Verwendung des Helpers am Ende der Datei
+  const token = localStorage.getItem('fbet_token');
 
   // --- Kommentare laden ---
   useEffect(() => {
@@ -227,36 +227,34 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
   // Eingeklappter Zustand
   if (!isExpanded) {
     return (
-      <div className='pt-4 border-t'>
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={() => setIsExpanded(true)}
-          className='flex items-center gap-2 text-sm'
-          // Deaktivieren, während der allererste Ladevorgang läuft.
-          disabled={isLoading && !initialLoadDone}
-        >
-          {/* Icon: Loader während initialem Laden, sonst Kommentar-Icon */}
-          {isLoading && !initialLoadDone ? (
-            <Loader2 className='h-4 w-4 animate-spin' />
-          ) : (
-            <MessageCircleMore className='h-4 w-4' />
-          )}
+      <Button
+        variant='outline'
+        size='sm'
+        onClick={() => setIsExpanded(true)}
+        className='flex items-center gap-2 text-sm'
+        // Deaktivieren, während der allererste Ladevorgang läuft.
+        disabled={isLoading && !initialLoadDone}
+      >
+        {/* Icon: Loader während initialem Laden, sonst Kommentar-Icon */}
+        {isLoading && !initialLoadDone ? (
+          <Loader2 className='h-4 w-4 animate-spin' />
+        ) : (
+          <MessageCircleMore className='h-4 w-4' />
+        )}
 
-          {/* Text: "Lade..." während initialem Laden, sonst "Kommentare" */}
-          {isLoading && !initialLoadDone ? 'Lade...' : 'Kommentare'}
+        {/* Text: "Lade..." während initialem Laden, sonst "Kommentare" */}
+        {isLoading && !initialLoadDone ? 'Lade...' : 'Kommentare'}
 
-          {/* Counter: Wird angezeigt, sobald der initiale Ladevorgang abgeschlossen ist.
+        {/* Counter: Wird angezeigt, sobald der initiale Ladevorgang abgeschlossen ist.
               Zeigt (0) an, wenn keine Kommentare vorhanden sind. */}
-          {initialLoadDone && ` (${comments.length})`}
-        </Button>
-      </div>
+        {initialLoadDone && ` (${comments.length})`}
+      </Button>
     );
   }
 
   // Ausgeklappter Zustand
   return (
-    <div className='mt-6 space-y-4 border-t pt-4'>
+    <div>
       {/* Header */}
       <div className='flex justify-between items-center mb-2'>
         <h3 className='text-lg font-semibold'>
@@ -510,16 +508,4 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
       </div>
     </div>
   );
-}
-
-// --- ANNAHME: Beispiel Token Helper ---
-// Stelle sicher, dass diese Funktion existiert und korrekt implementiert ist!
-// Sie sollte den Token zurückgeben, wenn der User eingeloggt ist, sonst null.
-function getAuthToken(): string | null {
-  // Nur im Browser ausführen, da localStorage nicht serverseitig verfügbar ist
-  if (typeof window !== 'undefined') {
-    // Den Key anpassen, unter dem der Token gespeichert wird!
-    return localStorage.getItem('fbet_token');
-  }
-  return null;
 }
