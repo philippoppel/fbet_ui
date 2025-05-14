@@ -7,7 +7,7 @@ import { Button } from '@/app/components/ui/button';
 import {
   Loader2,
   ImagePlus,
-  MessageCircleMore,
+  MessageCircleMore, // Beibehalten für das Icon
   X,
   AlertTriangle,
   Send,
@@ -63,12 +63,13 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
   const [gifUrl, setGifUrl] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Startet als true für den initialen Ladevorgang
   const [apiError, setApiError] = useState<string | null>(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [gifSearchTerm, setGifSearchTerm] = useState('');
-  // --- Änderung: Standardmäßig geschlossen ---
   const [isExpanded, setIsExpanded] = useState(false);
+  // Neuer State, um zu verfolgen, ob die Kommentare initial geladen wurden.
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const gf = useGiphyFetch();
   // --- ANNAHME: Token holen ---
@@ -79,59 +80,56 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
   useEffect(() => {
     const loadComments = async () => {
       if (!token) {
-        // Fehler nur setzen, wenn Komponente sichtbar ist
-        if (isExpanded) {
-          setApiError('Nicht eingeloggt oder Token fehlt.');
-        }
+        // Fehler wird erst relevant, wenn der Nutzer versucht, Kommentare anzuzeigen oder zu posten.
+        // Für die reine Zählung bei fehlendem Token, werden einfach keine Kommentare geladen.
         setIsLoading(false);
-        setComments([]);
+        setInitialLoadDone(true);
+        setComments([]); // Kommentare bei fehlendem Token leeren
+        // Optional: Setze hier einen apiError, falls der Token generell fehlt und Aktionen blockiert werden sollen.
+        // setApiError('Nicht eingeloggt oder Token fehlt.');
         return;
       }
 
-      // Nur laden, wenn ausgeklappt
-      if (isExpanded) {
-        setIsLoading(true);
-        setApiError(null);
-        try {
-          const fetchedComments = await getEventComments(token, eventId);
-          // API sortiert 'asc', Kommentare in dieser Reihenfolge setzen
-          setComments(fetchedComments);
-        } catch (error) {
-          console.error(
-            `Fehler beim Laden der Kommentare für Event ${eventId}:`,
-            error
-          );
-          setComments([]); // Liste bei Fehler leeren
-          if (error instanceof ApiError) {
-            if (error.status === 404) {
-              setApiError(null); // 404 ist kein Anzeigefehler
-              console.log(`Keine Kommentare für Event ${eventId} gefunden.`);
-            } else if (error.status === 401) {
-              setApiError('Nicht autorisiert. Bitte erneut anmelden.');
-            } else {
-              setApiError(
-                `Fehler ${error.status}: ${error.message}${error.detail ? ` (${JSON.stringify(error.detail)})` : ''}`
-              );
-            }
-          } else if (error instanceof Error) {
-            setApiError(
-              error.message || 'Kommentare konnten nicht geladen werden.'
-            );
+      setIsLoading(true);
+      setApiError(null); // Fehler vor jedem Ladeversuch zurücksetzen
+      try {
+        const fetchedComments = await getEventComments(token, eventId);
+        // API sortiert 'asc', Kommentare in dieser Reihenfolge setzen
+        setComments(fetchedComments);
+      } catch (error) {
+        console.error(
+          `Fehler beim Laden der Kommentare für Event ${eventId}:`,
+          error
+        );
+        setComments([]); // Liste bei Fehler leeren
+        // Die Fehlerbehandlung für den ausgeklappten Zustand bleibt erhalten.
+        if (error instanceof ApiError) {
+          if (error.status === 404) {
+            setApiError(null); // 404 ist kein Anzeigefehler für die Liste
+            console.log(`Keine Kommentare für Event ${eventId} gefunden.`);
+          } else if (error.status === 401) {
+            setApiError('Nicht autorisiert. Bitte erneut anmelden.');
           } else {
-            setApiError('Ein unbekannter Fehler ist aufgetreten.');
+            setApiError(
+              `Fehler ${error.status}: ${error.message}${error.detail ? ` (${JSON.stringify(error.detail)})` : ''}`
+            );
           }
-        } finally {
-          setIsLoading(false);
+        } else if (error instanceof Error) {
+          setApiError(
+            error.message || 'Kommentare konnten nicht geladen werden.'
+          );
+        } else {
+          setApiError('Ein unbekannter Fehler ist aufgetreten.');
         }
-      } else {
-        // Wenn eingeklappt wird, Ladezustand zurücksetzen (aber nicht die Kommentare löschen)
+      } finally {
         setIsLoading(false);
+        setInitialLoadDone(true); // Markiert, dass der Ladeversuch abgeschlossen ist
       }
     };
 
     loadComments();
-    // Abhängigkeiten: eventId, isExpanded, token
-  }, [eventId, isExpanded, token]);
+    // Abhängigkeiten: eventId, token. `isExpanded` wurde entfernt.
+  }, [eventId, token]);
 
   // --- Kommentar senden ---
   const submitComment = async () => {
@@ -200,7 +198,6 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
         setGifUrl(null); // GIF Auswahl zurücksetzen
         setShowGifPicker(false); // GIF Picker schließen
       } else {
-        // Sollte durch handleResponse abgedeckt sein, aber zur Sicherheit
         throw new Error(
           'URL für das hochgeladene Bild nicht in der Antwort gefunden.'
         );
@@ -236,15 +233,22 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
           size='sm'
           onClick={() => setIsExpanded(true)}
           className='flex items-center gap-2 text-sm'
-          disabled={isLoading} // Optional: Button deaktivieren, während im Hintergrund geladen wird (falls implementiert)
+          // Deaktivieren, während der allererste Ladevorgang läuft.
+          disabled={isLoading && !initialLoadDone}
         >
-          {isLoading ? (
+          {/* Icon: Loader während initialem Laden, sonst Kommentar-Icon */}
+          {isLoading && !initialLoadDone ? (
             <Loader2 className='h-4 w-4 animate-spin' />
           ) : (
             <MessageCircleMore className='h-4 w-4' />
           )}
-          Kommentare anzeigen
-          {/* Die Anzahl kann hier nur angezeigt werden, wenn sie separat/initial geladen wird */}
+
+          {/* Text: "Lade..." während initialem Laden, sonst "Kommentare" */}
+          {isLoading && !initialLoadDone ? 'Lade...' : 'Kommentare'}
+
+          {/* Counter: Wird angezeigt, sobald der initiale Ladevorgang abgeschlossen ist.
+              Zeigt (0) an, wenn keine Kommentare vorhanden sind. */}
+          {initialLoadDone && ` (${comments.length})`}
         </Button>
       </div>
     );
@@ -256,8 +260,7 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
       {/* Header */}
       <div className='flex justify-between items-center mb-2'>
         <h3 className='text-lg font-semibold'>
-          {/* Zeige Anzahl nur wenn nicht geladen wird */}
-          Kommentare {isLoading ? '' : `(${comments.length})`}
+          Kommentare {initialLoadDone ? `(${comments.length})` : ''}
         </h3>
         <Button
           variant='ghost'
@@ -278,35 +281,35 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
         </div>
       )}
 
-      {/* Ladezustand */}
+      {/* Ladezustand im ausgeklappten Bereich */}
+      {/* Zeige Loader, wenn isLoading und der initiale Ladevorgang noch nicht abgeschlossen ist ODER noch keine Kommentare geladen wurden */}
       {
-        isLoading ? (
+        isLoading &&
+        (!initialLoadDone || (comments.length === 0 && !apiError)) ? (
           <div className='flex items-center justify-center p-6 text-muted-foreground'>
             <Loader2 className='h-6 w-6 animate-spin mr-2' />
             <span>Lade Kommentare...</span>
           </div>
-        ) : // Keine Kommentare Nachricht (nur anzeigen, wenn nicht geladen wird und kein Fehler vorliegt)
-        !apiError && comments.length === 0 ? (
+        ) : // Keine Kommentare Nachricht (nur anzeigen, wenn initialLoadDone, kein Fehler und keine Kommentare)
+        initialLoadDone && !apiError && comments.length === 0 ? (
           <p className='text-sm text-muted-foreground italic py-4 text-center'>
             Noch keine Kommentare vorhanden. Sei der Erste!
           </p>
-        ) : // Kommentarliste (nur anzeigen, wenn nicht geladen wird und Kommentare vorhanden sind)
-        !isLoading && comments.length > 0 ? (
+        ) : // Kommentarliste (anzeigen, wenn Kommentare vorhanden sind und initialLoadDone)
+        initialLoadDone && comments.length > 0 ? (
           <ul className='space-y-4 max-h-[500px] overflow-y-auto pr-2 -mr-2'>
             {comments.map((comment) => (
-              // --- Robuster Zugriff auf comment.user ---
               <li key={comment.id} className='flex items-start space-x-3'>
-                {/* Avatar Placeholder */}
                 <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground'>
-                  {comment.user?.name?.charAt(0).toUpperCase() ?? // Optional Chaining
-                    comment.user?.email?.charAt(0).toUpperCase() ?? // Optional Chaining
+                  {comment.user?.name?.charAt(0).toUpperCase() ??
+                    comment.user?.email?.charAt(0).toUpperCase() ??
                     '?'}
                 </span>
                 <div className='flex-1 space-y-1'>
                   <div className='flex items-center justify-between text-xs'>
                     <span className='font-semibold text-foreground'>
-                      {comment.user?.name ?? // Optional Chaining & Nullish Coalescing
-                        comment.user?.email ?? // Optional Chaining & Nullish Coalescing
+                      {comment.user?.name ??
+                        comment.user?.email ??
                         'Unbekannter Nutzer'}
                     </span>
                     <span className='text-muted-foreground'>
@@ -334,7 +337,7 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
               </li>
             ))}
           </ul>
-        ) : null /* Fallback, sollte nicht erreicht werden */
+        ) : null /* Fallback, sollte nicht erreicht werden, wenn apiError oben behandelt wird */
       }
 
       {/* Eingabebereich */}
@@ -344,7 +347,7 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={
-            currentUser?.name // Sicherer Zugriff auf currentUser
+            currentUser?.name
               ? `${currentUser.name}, was denkst du?`
               : 'Dein Kommentar...'
           }
