@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 export const groupCreateSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
-  imageUrl: z.string().url().optional(), // ➋ NEU
+  description: z.string().optional().nullable(),
+  imageUrl: z.string().url().optional(),
 });
 
 export const groupUpdateSchema = z.object({
