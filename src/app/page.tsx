@@ -1,4 +1,3 @@
-// src/app/page.tsx
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -17,59 +16,67 @@ import {
   Eye,
   Users,
   PartyPopper,
-  Smartphone, // Wird für Icon im Text verwendet
-  // Download, // Nicht mehr direkt hier für PWAPromptMobile benötigt
+  Smartphone,
   ArrowRight,
   AlertTriangle,
   Loader2,
 } from 'lucide-react';
 import { EventListPublic } from '@/app/components/dashboard/EventListPublic';
 import { Button } from '@/app/components/ui/button';
-
-// PWAPromptMobile Komponente und zugehörige Logik wurden entfernt (jetzt im RootLayout)
+import { useAuth } from '@/app/context/AuthContext';
 
 export default function LandingPage() {
   const router = useRouter();
+  const { user, isLoading: authIsLoading, token } = useAuth(); // isLoading aus useAuth gibt den Ladezustand des Auth-Checks an
+
   const [ufcEvents, setUfcEvents] = useState<UfcEventItem[]>([]);
   const [boxingEvents, setBoxingEvents] = useState<BoxingScheduleItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingEvents, setLoadingEvents] = useState(true); // Separater Ladezustand für Events
   const [error, setError] = useState<string | null>(null);
-  // deferredInstallPrompt und der useEffect für 'beforeinstallprompt' wurden entfernt
-
-  const triggerGlobalInstallPrompt = () => {
-    // Löst ein globales Event aus, auf das RootLayout hört
-    window.dispatchEvent(new Event('requestPWAInstall'));
-  };
 
   useEffect(() => {
-    const loadPublicEvents = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [ufc, boxing] = await Promise.all([
-          getUfcSchedule(),
-          getBoxingSchedule(),
-        ]);
-        setUfcEvents(ufc);
-        setBoxingEvents(boxing);
-      } catch (err: any) {
-        console.error('Fehler beim Laden der öffentlichen Events:', err);
-        let errorMessage = 'Fehler beim Laden der Event-Daten.';
-        if (err instanceof ApiError) {
-          errorMessage = `API Fehler (${err.status}): ${err.detail || err.message}`;
-        } else if (err.message) {
-          errorMessage = err.message;
-        }
-        setError(errorMessage);
-        toast.error('Ladefehler', {
-          description: errorMessage,
-        });
-      } finally {
-        setLoading(false);
+    // Erst handeln, wenn der Auth-Status definitiv geladen ist
+    if (!authIsLoading) {
+      if (user && token) {
+        // Prüfe auf user und token für zusätzliche Sicherheit
+        // Wenn Nutzer eingeloggt ist, zum Dashboard weiterleiten
+        router.replace('/dashboard');
+      } else {
+        // Nur Events laden, wenn der Nutzer nicht eingeloggt ist
+        const loadPublicEvents = async () => {
+          setLoadingEvents(true);
+          setError(null);
+          try {
+            const [ufc, boxing] = await Promise.all([
+              getUfcSchedule(),
+              getBoxingSchedule(),
+            ]);
+            setUfcEvents(ufc);
+            setBoxingEvents(boxing);
+          } catch (err: any) {
+            console.error('Fehler beim Laden der öffentlichen Events:', err);
+            let errorMessage = 'Fehler beim Laden der Event-Daten.';
+            if (err instanceof ApiError) {
+              errorMessage = `API Fehler (${err.status}): ${err.detail || err.message}`;
+            } else if (err.message) {
+              errorMessage = err.message;
+            }
+            setError(errorMessage);
+            toast.error('Ladefehler', {
+              description: errorMessage,
+            });
+          } finally {
+            setLoadingEvents(false);
+          }
+        };
+        loadPublicEvents();
       }
-    };
-    loadPublicEvents();
-  }, []);
+    }
+  }, [user, authIsLoading, token, router]);
+
+  const triggerGlobalInstallPrompt = () => {
+    window.dispatchEvent(new Event('requestPWAInstall'));
+  };
 
   const parseDate = (dateStr: string): Date => {
     const now = new Date();
@@ -83,6 +90,7 @@ export default function LandingPage() {
   };
 
   const combinedEvents: MixedEvent[] = useMemo(() => {
+    // ... (deine bestehende Logik)
     return [...ufcEvents, ...boxingEvents]
       .map((e, i) => {
         const isBoxing = 'details' in e;
@@ -110,6 +118,7 @@ export default function LandingPage() {
   const handleProposeEventGuest = (
     event: UfcEventItem | BoxingScheduleItem
   ) => {
+    // ... (deine bestehende Logik)
     const title =
       'details' in event && event.details?.trim()
         ? event.details
@@ -127,9 +136,17 @@ export default function LandingPage() {
     });
   };
 
+  // Zeige eine Ladeanzeige, während der Auth-Status geprüft wird oder wenn der Nutzer eingeloggt ist und weitergeleitet wird
+  if (authIsLoading || (user && token)) {
+    return (
+      <div className='flex flex-1 justify-center items-center min-h-screen'>
+        <Loader2 className='w-16 h-16 animate-spin text-primary' />
+      </div>
+    );
+  }
+
+  // Der Rest der Komponente wird nur gerendert, wenn der Nutzer definitiv nicht eingeloggt ist.
   return (
-    // Der äußere div mit Gradient wurde entfernt; RootLayout stellt ihn bereit.
-    // Das `main`-Element ist der primäre Container für den Inhalt dieser Seite.
     <main className='flex-1 container mx-auto px-4 md:px-6 py-8 md:py-12'>
       {/* Hero Section */}
       <section className='text-center pt-12 pb-16 md:pt-20 md:pb-24'>
@@ -169,7 +186,7 @@ export default function LandingPage() {
             href='#'
             onClick={(e) => {
               e.preventDefault();
-              triggerGlobalInstallPrompt(); // Löst das globale Event aus
+              triggerGlobalInstallPrompt();
             }}
             className='text-primary hover:underline font-semibold'
           >
@@ -185,6 +202,7 @@ export default function LandingPage() {
           So einfach geht der Wett-Spaß
         </h2>
         <div className='grid md:grid-cols-3 gap-10 max-w-5xl mx-auto px-4'>
+          {/* ... Deine "How it works" Cards ... */}
           <div className='flex flex-col items-center text-center p-6 bg-background rounded-lg shadow-md hover:shadow-lg transition-shadow'>
             <div className='p-4 bg-primary/10 rounded-full mb-4'>
               <Eye className='w-10 h-10 text-primary' />
@@ -229,7 +247,7 @@ export default function LandingPage() {
         <h2 className='text-3xl md:text-4xl font-semibold tracking-tight mb-8 text-center sm:text-left text-foreground/90'>
           🔥 Aktuelle Events
         </h2>
-        {loading && (
+        {loadingEvents && ( // Hier den Ladezustand für Events verwenden
           <div className='flex flex-col items-center justify-center min-h-[200px] text-muted-foreground'>
             <Loader2 className='w-12 h-12 animate-spin text-primary mb-4' />
             <p className='text-lg'>Lade die heißesten Events...</p>
@@ -244,15 +262,14 @@ export default function LandingPage() {
             <p className='text-center'>{error}</p>
             <Button
               variant='outline'
-              // Verwende router.refresh() oder spezifische Neuladefunktion statt window.location.reload() für bessere SPA-Experience
-              onClick={() => router.refresh()}
+              onClick={() => router.refresh()} // oder die Event-Ladefunktion erneut aufrufen
               className='mt-6'
             >
               Seite neu laden
             </Button>
           </div>
         )}
-        {!loading && !error && combinedEvents.length === 0 && (
+        {!loadingEvents && !error && combinedEvents.length === 0 && (
           <div className='text-center text-muted-foreground py-10 min-h-[200px] flex flex-col justify-center items-center'>
             <PartyPopper className='w-16 h-16 text-slate-400 mb-4' />
             <p className='text-xl mb-2'>Aktuell keine öffentlichen Events.</p>
@@ -267,7 +284,7 @@ export default function LandingPage() {
             </Button>
           </div>
         )}
-        {!loading && !error && combinedEvents.length > 0 && (
+        {!loadingEvents && !error && combinedEvents.length > 0 && (
           <>
             <EventListPublic
               events={combinedEvents.slice(0, 6)}
