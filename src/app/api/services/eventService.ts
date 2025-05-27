@@ -1,3 +1,4 @@
+// src/app/api/services/eventService.ts
 import { Prisma } from '@prisma/client';
 import type { Event as PrismaEventFromPrismaClient } from '@prisma/client';
 import { prisma } from '@/app/api/lib/prisma';
@@ -26,9 +27,10 @@ export async function getEventsForGroup(
           selectedOption: true,
           points: true,
           user: {
+            // tip.user wird vom Typ { id, name, email } | null sein, wenn die Relation optional ist
             select: {
               id: true,
-              name: true,
+              name: true, // Kann auch null sein, je nach deinem User-Modell
               email: true,
             },
           },
@@ -38,27 +40,40 @@ export async function getEventsForGroup(
   });
 
   return eventsFromDb.map((event) => {
-    const awardedPoints: EventPointDetail[] = event.tips.map((tip) => {
-      let userName = `User ${tip.userId}`;
-      if (tip.user.name && tip.user.name.trim() !== '') {
-        userName = tip.user.name.trim();
-      } else if (tip.user.email) {
-        userName = tip.user.email.split('@')[0];
-      }
-      return {
-        userId: tip.userId,
-        userName,
-        selectedOption: tip.selectedOption,
-        points: tip.points,
-      };
-    });
+    const awardedPoints: EventPointDetail[] = event.tips
+      .filter((tip) => tip.userId !== null && tip.user !== null) // Expliziter Check auf tip.user !== null
+      .map((tip) => {
+        // Nach dem Filter ist tip.userId sicher eine Zahl und tip.user sicher nicht null.
+        // TypeScript sollte dies jetzt besser verstehen, aber wir verwenden trotzdem Optional Chaining für Robustheit.
+
+        let userName = `User ${tip.userId}`; // Fallback
+
+        // Verwende Optional Chaining für den Zugriff auf tip.user Eigenschaften
+        const usersActualName = tip.user?.name?.trim(); // Gibt undefined zurück, wenn user oder name null/undefined ist oder name leer ist
+        const usersActualEmail = tip.user?.email;
+
+        if (usersActualName) {
+          userName = usersActualName;
+        } else if (usersActualEmail) {
+          userName = usersActualEmail.split('@')[0];
+        }
+
+        const actualPoints: number = tip.points === null ? 0 : tip.points;
+
+        return {
+          userId: tip.userId as number, // Sicher nach Filter
+          userName,
+          selectedOption: tip.selectedOption,
+          points: actualPoints,
+        };
+      });
 
     const { tips, options: prismaOptions, ...eventData } = event;
 
-    const clientOptions =
+    const clientOptions: string[] =
       Array.isArray(prismaOptions) &&
-      prismaOptions.every((opt) => typeof opt === 'string')
-        ? (prismaOptions as string[])
+      prismaOptions.every((opt): opt is string => typeof opt === 'string')
+        ? prismaOptions
         : [];
 
     return {
@@ -69,6 +84,7 @@ export async function getEventsForGroup(
   });
 }
 
+// Der Rest der Datei bleibt unverändert:
 export async function getEventById(
   eventId: number
 ): Promise<PrismaEventFromPrismaClient | null> {
