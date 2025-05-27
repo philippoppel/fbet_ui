@@ -61,14 +61,18 @@ export async function GET(req: NextRequest) {
       { userId: number; userName: string | null; selectedOption: string }[]
     > = {};
 
-    tips.forEach((tip) => {
-      if (!grouped[tip.eventId]) grouped[tip.eventId] = [];
-      grouped[tip.eventId].push({
-        userId: tip.userId,
-        userName: tip.user?.name || null,
-        selectedOption: tip.selectedOption,
+    tips
+      .filter((tip) => tip.userId !== null)
+      .forEach((tip) => {
+        if (!grouped[tip.eventId]) {
+          grouped[tip.eventId] = [];
+        }
+        grouped[tip.eventId].push({
+          userId: tip.userId as number,
+          userName: tip.user?.name || null,
+          selectedOption: tip.selectedOption,
+        });
       });
-    });
 
     return NextResponse.json(grouped);
   } catch (e) {

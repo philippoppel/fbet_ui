@@ -50,7 +50,9 @@ export async function getHighscoreForGroup(
     // Map für schnellen Zugriff auf die Punkte
     const scoreMap = new Map<number, number>();
     scoresByUserId.forEach((score) => {
-      scoreMap.set(score.userId, score._sum.points ?? 0);
+      if (score.userId !== null) {
+        scoreMap.set(score.userId, score._sum.points ?? 0);
+      }
     });
     console.log(
       `[highscoreService] Found scores for ${scoreMap.size} members.`
