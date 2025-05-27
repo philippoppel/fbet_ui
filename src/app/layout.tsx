@@ -203,7 +203,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     const configureStatusBar = async () => {
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
         try {
-          await StatusBar.setOverlaysWebView({ overlay: true });
+          await StatusBar.setOverlaysWebView({ overlay: false });
           console.log(
             'Capacitor: StatusBar.setOverlaysWebView auf true gesetzt.'
           );
