@@ -174,6 +174,7 @@ function LoginCard() {
             href={`/register?redirect=${encodeURIComponent(redirectPath)}`}
             className='underline underline-offset-4 hover:text-foreground'
           >
+            <br />
             Konto erstellen
           </Link>
         </p>

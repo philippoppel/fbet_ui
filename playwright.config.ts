@@ -88,9 +88,6 @@ export default defineConfig({
     // },
   ],
 
-  // Pfad zur globalen Setup-Datei (wird einmal vor allen Tests ausgeführt)
-  globalSetup: './tests/global-setup.ts',
-
   // Verzeichnis für Testergebnisse (Screenshots, Videos, Traces, HTML-Report)
   outputDir: 'test-results/',
 

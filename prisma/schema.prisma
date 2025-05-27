@@ -10,37 +10,38 @@ datasource db {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  email          String   @unique
-  name           String?
-  hashedPassword String   @map("hashed_password")
-  isActive       Boolean  @default(true) @map("is_active")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id               Int       @id @default(autoincrement())
+  email            String    @unique
+  name             String?
+  hashedPassword   String    @map("hashed_password")
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  createdGroups    Group[]           @relation("GroupCreator")
-  createdEvents    Event[]           @relation("EventCreator")
-  groupMemberships GroupMembership[]
-  tips             Tip[]
-  comments         EventComment[]
+  createdGroups    Group[]             @relation("GroupCreator")
+  createdEvents    Event[]             @relation("EventCreator")
+  groupMemberships GroupMembership[] // Wird durch Cascade auf GroupMembership.user behandelt
+  tips             Tip[]               // Wird durch SetNull auf Tip.user behandelt
+  comments         EventComment[]      // Wird durch SetNull auf EventComment.user behandelt
 
   @@map("users")
 }
 
 model Group {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String?
-  imageUrl    String?  @map("image_url") // ➊ NEU
-  inviteToken String?  @unique @map("invite_token")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id            Int       @id @default(autoincrement())
+  name          String
+  description   String?
+  imageUrl      String?   @map("image_url")
+  inviteToken   String?   @unique @map("invite_token")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  createdById Int  @map("created_by_id")
-  creator     User @relation("GroupCreator", fields: [createdById], references: [id])
+  // Wenn der User (creator) gelöscht wird, wird createdById auf NULL gesetzt.
+  createdById   Int?      @map("created_by_id") // <-- WICHTIG: Optional machen
+  creator       User?     @relation("GroupCreator", fields: [createdById], references: [id], onDelete: SetNull) // <-- WICHTIG: onDelete: SetNull und User?
 
-  memberships GroupMembership[]
-  events      Event[]
+  memberships   GroupMembership[]
+  events        Event[]   // Events werden gelöscht, wenn die Gruppe gelöscht wird (siehe Event.group onDelete: Cascade)
 
   @@map("groups")
 }
@@ -49,11 +50,12 @@ model GroupMembership {
   id       Int      @id @default(autoincrement())
   joinedAt DateTime @default(now()) @map("joined_at")
 
-  userId Int  @map("user_id")
-  user   User @relation(fields: [userId], references: [id])
+  userId   Int      @map("user_id")
+  // Wenn der User gelöscht wird, wird dieser GroupMembership-Eintrag auch gelöscht.
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade) // <-- WICHTIG: onDelete: Cascade
 
-  groupId Int   @map("group_id")
-  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade) // <-- HIER onDelete
+  groupId  Int      @map("group_id")
+  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([userId, groupId], name: "uq_user_group")
   @@map("group_memberships")
@@ -71,14 +73,16 @@ model Event {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  groupId Int   @map("group_id")
-  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade) // <-- HIER onDelete
+  groupId         Int       @map("group_id")
+  // Wenn die Gruppe gelöscht wird, wird dieses Event auch gelöscht.
+  group           Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  createdById Int  @map("created_by_id")
-  creator     User @relation("EventCreator", fields: [createdById], references: [id])
+  // Wenn der User (creator) gelöscht wird, wird createdById auf NULL gesetzt.
+  createdById     Int?      @map("created_by_id") // <-- WICHTIG: Optional machen
+  creator         User?     @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull) // <-- WICHTIG: onDelete: SetNull und User?
 
-  tips     Tip[]
-  comments EventComment[]
+  tips            Tip[]     // Tipps werden gelöscht, wenn das Event gelöscht wird (siehe Tip.event onDelete: Cascade)
+  comments        EventComment[] // Kommentare werden gelöscht, wenn das Event gelöscht wird (siehe EventComment.event onDelete: Cascade)
 
   @@map("events")
 }
@@ -90,11 +94,13 @@ model Tip {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  eventId Int   @map("event_id")
-  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade) // Falls Tipps beim Löschen von Events auch weg sollen
+  eventId        Int      @map("event_id")
+  // Wenn das Event gelöscht wird, wird dieser Tipp auch gelöscht.
+  event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  userId Int  @map("user_id")
-  user   User @relation(fields: [userId], references: [id])
+  // Wenn der User gelöscht wird, wird userId auf NULL gesetzt, der Tipp bleibt bestehen.
+  userId         Int?     @map("user_id") // <-- WICHTIG: Optional machen
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull) // <-- WICHTIG: onDelete: SetNull und User?
 
   @@unique([eventId, userId], name: "unique_tip_per_user_per_event")
   @@map("tips")
@@ -102,15 +108,17 @@ model Tip {
 
 model EventComment {
   id        Int      @id @default(autoincrement())
-  text      String? // Optionaler Text
-  gifUrl    String? // Für Giphy oder Tenor GIFs
+  text      String?
+  gifUrl    String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  userId Int
-  user   User @relation(fields: [userId], references: [id])
+  // Wenn der User gelöscht wird, wird userId auf NULL gesetzt, der Kommentar bleibt bestehen.
+  userId    Int?     // <-- WICHTIG: Optional machen
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull) // <-- WICHTIG: onDelete: SetNull und User?
 
-  eventId Int
-  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   Int
+  // Wenn das Event gelöscht wird, wird dieser Kommentar auch gelöscht.
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("event_comments")
 }
