@@ -1,9 +1,8 @@
-// src/app/components/layout/AppHeader.tsx (oder wo immer die Datei liegt)
+// src/app/components/layout/AppHeader.tsx
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-// ... (andere Imports bleiben gleich)
 import {
   LogOut,
   LogIn,
@@ -105,7 +104,7 @@ export function AppHeader({
         setUserTippedEventIdsAll(tipIds);
       })
       .catch((err) => console.error('Fehler beim Laden der Tipps:', err));
-  }, [user?.id, fetchOpenEventsForHeader]); // fetchOpenEventsForHeader zur Dep-Liste hinzugefügt
+  }, [user?.id, fetchOpenEventsForHeader]);
 
   const untippedOpenEventsByGroup = useMemo(() => {
     return groupsWithOpenEventsData
@@ -163,7 +162,11 @@ export function AppHeader({
 
   return (
     <header
-      className='sticky top-0 z-50 w-full border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6 lg:px-8 pt-[env(safe-area-inset-top)]' // HIER DIE ÄNDERUNG
+      /* FIX 1 & 2 ––––––––––––––––––––––––––––––––––––––––––––––––––––– */
+      style={{ top: 'env(safe-area-inset-top)' }} // FIX 2
+      className='sticky z-50 w-full border-b bg-background/95   // FIX 1: pt-… entfernt
+                 px-4 backdrop-blur supports-[backdrop-filter]:
+                 bg-background/60 sm:px-6 lg:px-8'
     >
       <div className='flex h-14 items-center justify-between'>
         {/* LINKS: Burger + Logo */}
@@ -190,7 +193,7 @@ export function AppHeader({
                     error={null}
                     isCollapsed={false}
                     currentUserId={user.id}
-                    onDeleteGroup={() => Promise.resolve()} // Ggf. anpassen
+                    onDeleteGroup={() => Promise.resolve()}
                   />
                 </SheetContent>
               </Sheet>
@@ -211,10 +214,7 @@ export function AppHeader({
           {user && myGroups.length > 0 && onSelectGroup && (
             <DropdownMenu
               onOpenChange={(open) => {
-                if (!open) {
-                  // Mark as read when dropdown closes
-                  handleMarkNotificationsAsRead();
-                }
+                if (!open) handleMarkNotificationsAsRead();
               }}
             >
               <DropdownMenuTrigger asChild>
@@ -258,10 +258,7 @@ export function AppHeader({
                   untippedOpenEventsByGroup.map((g) => (
                     <DropdownMenuItem
                       key={g.groupId}
-                      onSelect={() => {
-                        onSelectGroup?.(g.groupId);
-                        // Optional: Mark specific group's notifications as read if needed
-                      }}
+                      onSelect={() => onSelectGroup?.(g.groupId)}
                       className='flex justify-between items-center px-2 py-1.5'
                     >
                       <span>{g.groupName}</span>
@@ -294,7 +291,9 @@ export function AppHeader({
             className='relative'
           >
             <RefreshCw
-              className={`h-4 w-4 transition-transform ${updateAvailable ? 'animate-spin' : ''}`}
+              className={`h-4 w-4 transition-transform ${
+                updateAvailable ? 'animate-spin' : ''
+              }`}
             />
             {!online && (
               <span className='absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-destructive' />
