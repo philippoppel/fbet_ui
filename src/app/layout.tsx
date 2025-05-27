@@ -214,7 +214,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta httpEquiv='X-UA-Compatible' content='IE=edge' />
         <meta
           name='viewport'
-          content='width=device-width,initial-scale=1,maximum-scale=1'
+          content='width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover'
         />
         <meta name='apple-mobile-web-app-capable' content='yes' />
         <meta name='apple-mobile-web-app-status-bar-style' content='default' />
@@ -249,7 +249,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           disableTransitionOnChange
         >
           <AuthProvider>
-            <div className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b from-background to-slate-50 dark:from-slate-900 dark:to-slate-800'>
+            <div className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b from-background to-slate-50 dark:from-slate-900 dark:to-slate-800 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] px-[env(safe-area-inset-left)]'>
               <SiteLayout>{children}</SiteLayout>
             </div>
             {/* PWAPromptMobile wurde entfernt, da der Hinweis nun nach Login kommt */}
