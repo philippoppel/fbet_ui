@@ -1,7 +1,9 @@
+// src/app/components/layout/AppHeader.tsx (oder wo immer die Datei liegt)
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+// ... (andere Imports bleiben gleich)
 import {
   LogOut,
   LogIn,
@@ -103,7 +105,7 @@ export function AppHeader({
         setUserTippedEventIdsAll(tipIds);
       })
       .catch((err) => console.error('Fehler beim Laden der Tipps:', err));
-  }, [user?.id]);
+  }, [user?.id, fetchOpenEventsForHeader]); // fetchOpenEventsForHeader zur Dep-Liste hinzugefügt
 
   const untippedOpenEventsByGroup = useMemo(() => {
     return groupsWithOpenEventsData
@@ -136,10 +138,12 @@ export function AppHeader({
       g.openEvents.forEach((e) => newSet.add(e.id))
     );
     setSeenNotificationEventIds(newSet);
-    localStorage.setItem(
-      STORAGE_KEY_SEEN_NOTIFICATIONS,
-      JSON.stringify(Array.from(newSet))
-    );
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        STORAGE_KEY_SEEN_NOTIFICATIONS,
+        JSON.stringify(Array.from(newSet))
+      );
+    }
   };
 
   useEffect(() => {
@@ -158,7 +162,9 @@ export function AppHeader({
   }, [fetchOpenEventsForHeader, user?.id]);
 
   return (
-    <header className='sticky top-0 z-50 w-full border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6 lg:px-8'>
+    <header
+      className='sticky top-0 z-50 w-full border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6 lg:px-8 pt-[env(safe-area-inset-top)]' // HIER DIE ÄNDERUNG
+    >
       <div className='flex h-14 items-center justify-between'>
         {/* LINKS: Burger + Logo */}
         <div className='flex items-center gap-2'>
@@ -184,7 +190,7 @@ export function AppHeader({
                     error={null}
                     isCollapsed={false}
                     currentUserId={user.id}
-                    onDeleteGroup={() => Promise.resolve()}
+                    onDeleteGroup={() => Promise.resolve()} // Ggf. anpassen
                   />
                 </SheetContent>
               </Sheet>
@@ -203,7 +209,14 @@ export function AppHeader({
         {/* RECHTS: Buttons */}
         <div className='flex items-center space-x-2 sm:space-x-3'>
           {user && myGroups.length > 0 && onSelectGroup && (
-            <DropdownMenu>
+            <DropdownMenu
+              onOpenChange={(open) => {
+                if (!open) {
+                  // Mark as read when dropdown closes
+                  handleMarkNotificationsAsRead();
+                }
+              }}
+            >
               <DropdownMenuTrigger asChild>
                 <Button
                   variant='ghost'
@@ -213,31 +226,62 @@ export function AppHeader({
                 >
                   <Flame className='h-5 w-5 text-orange-500' />
                   {notificationCount > 0 && (
-                    <span className='absolute -top-1 -right-1 text-xs bg-red-500 text-white rounded-full px-1.5'>
+                    <span className='absolute -top-1 -right-1 text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 leading-none'>
                       {notificationCount}
                     </span>
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align='end'>
-                <DropdownMenuItem disabled className='text-sm font-semibold'>
-                  Offene Wetten
-                </DropdownMenuItem>
+              <DropdownMenuContent align='end' className='w-56'>
                 <DropdownMenuItem
-                  onSelect={handleMarkNotificationsAsRead}
-                  className='text-xs text-muted-foreground flex items-center gap-2'
+                  disabled
+                  className='text-sm font-semibold px-2 pt-2 pb-1'
                 >
-                  <EyeOff className='w-3 h-3' /> Als gelesen markieren
+                  Offene Wetten (
+                  {untippedOpenEventsByGroup.reduce(
+                    (sum, g) => sum + g.openEvents.length,
+                    0
+                  )}
+                  )
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {untippedOpenEventsByGroup.map((g) => (
+                {untippedOpenEventsByGroup.length > 0 && (
                   <DropdownMenuItem
-                    key={g.groupId}
-                    onSelect={() => onSelectGroup?.(g.groupId)}
+                    onSelect={handleMarkNotificationsAsRead}
+                    className='text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer px-2 py-1.5'
                   >
-                    {g.groupName} ({g.openEvents.length})
+                    <EyeOff className='w-3.5 h-3.5' /> Alle als gelesen
+                    markieren
                   </DropdownMenuItem>
-                ))}
+                )}
+                <DropdownMenuSeparator />
+                {untippedOpenEventsByGroup.length > 0 ? (
+                  untippedOpenEventsByGroup.map((g) => (
+                    <DropdownMenuItem
+                      key={g.groupId}
+                      onSelect={() => {
+                        onSelectGroup?.(g.groupId);
+                        // Optional: Mark specific group's notifications as read if needed
+                      }}
+                      className='flex justify-between items-center px-2 py-1.5'
+                    >
+                      <span>{g.groupName}</span>
+                      <span className='text-xs bg-orange-500 text-white rounded-full px-1.5 py-0.5 leading-none'>
+                        {
+                          g.openEvents.filter(
+                            (e) => !seenNotificationEventIds.has(e.id)
+                          ).length
+                        }
+                      </span>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <DropdownMenuItem
+                    disabled
+                    className='text-sm text-muted-foreground px-2 py-1.5'
+                  >
+                    Keine offenen Tipps.
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
