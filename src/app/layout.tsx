@@ -14,6 +14,10 @@ import { Smartphone, Download } from 'lucide-react'; // Download wird im Toast v
 import { Button } from '@/app/components/ui/button';
 import { toast } from 'sonner'; // Button wird im Toast verwendet
 
+// NEU: Capacitor-Imports
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar'; // Style umbenannt, um Namenskonflikte zu vermeiden
+
 /* ------------------ FONTS ------------------ */
 const inter = Inter({
   subsets: ['latin'],
@@ -55,7 +59,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       (deferredPrompt as any).userChoice.then((choice: any) => {
         if (choice.outcome === 'accepted') {
           // Das 'appinstalled' Event kümmert sich um das Toast und localStorage.
-          // localStorage.setItem('fbetPwaInstallState', 'installed'); // Wird durch appinstalled gehandhabt
         } else {
           localStorage.setItem('fbetPwaInstallState', 'dismissed_prompt');
           toast.info('Installation abgebrochen', {
@@ -63,13 +66,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               'Du kannst die App später über das Browsermenü oder den Link auf der Startseite installieren.',
           });
         }
-        setDeferredPrompt(null); // Wichtig: Prompt kann nur einmal verwendet werden
-        setCanInstall(false); // Und canInstall entsprechend aktualisieren
+        setDeferredPrompt(null);
+        setCanInstall(false);
       });
     } else {
       showManualHint();
     }
-  }, [deferredPrompt]); // Abhängigkeit: deferredPrompt (showManualHint ist stabil, wenn außerhalb definiert)
+  }, [deferredPrompt]);
 
   /* Capture beforeinstallprompt */
   useEffect(() => {
@@ -77,11 +80,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       e.preventDefault();
       setDeferredPrompt(e);
       setCanInstall(true);
-      // Entferne ggf. einen alten "dismissed_toast_permanently", wenn der Prompt wieder verfügbar wird
-      // (optional, je nach gewünschtem Verhalten)
-      // if (localStorage.getItem('fbetPwaInstallState') === 'dismissed_toast_permanently') {
-      //   localStorage.removeItem('fbetPwaInstallState');
-      // }
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
@@ -92,7 +90,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     const onInstalled = () => {
       toast.success('Fbet wurde installiert ✅');
       localStorage.setItem('fbetPwaInstallState', 'installed');
-      setCanInstall(false); // App ist installiert, keine weitere Aufforderung nötig
+      setCanInstall(false);
     };
     window.addEventListener('appinstalled', onInstalled);
     return () => window.removeEventListener('appinstalled', onInstalled);
@@ -121,11 +119,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         pwaInstallState !== 'dismissed_toast_permanently'
       ) {
         const toastId = 'pwa-install-toast-after-login';
-
         toast.custom(
-          (
-            t // KORREKTUR: t ist hier die ID des Toasts
-          ) => (
+          (t) => (
             <div className='bg-background text-foreground p-4 rounded-lg shadow-xl flex flex-col sm:flex-row items-center justify-between border border-border w-full max-w-md dark:bg-slate-800 dark:border-slate-700'>
               <div className='flex items-center mb-3 sm:mb-0 sm:mr-4'>
                 <Smartphone className='w-7 h-7 mr-3 text-primary flex-shrink-0' />
@@ -144,7 +139,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   className='flex-1 sm:flex-initial'
                   onClick={() => {
                     handleInstallClick();
-                    toast.dismiss(t); // KORREKTUR: t statt t.id
+                    toast.dismiss(t);
                   }}
                 >
                   Installieren <Download className='ml-2 w-4 h-4' />
@@ -184,7 +179,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         showInstallPromptToast
       );
     };
-  }, [canInstall, handleInstallClick, deferredPrompt]); // KORREKTUR: Abhängigkeiten geprüft
+  }, [canInstall, handleInstallClick, deferredPrompt]);
 
   /* ------------------ SW REGISTRATION ------------------ */
   useEffect(() => {
@@ -203,6 +198,29 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('load', regSw);
   }, []);
 
+  // NEU: useEffect für die Capacitor Statusleisten-Konfiguration
+  useEffect(() => {
+    const configureStatusBar = async () => {
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+        try {
+          await StatusBar.setOverlaysWebView({ overlay: true });
+          console.log(
+            'Capacitor: StatusBar.setOverlaysWebView auf true gesetzt.'
+          );
+          // Optional: Stil der Statusleisten-Icons anpassen
+          // await StatusBar.setStyle({ style: StatusBarStyle.Default }); // Oder .Dark / .Light
+        } catch (e) {
+          console.error(
+            'Capacitor: Fehler beim Konfigurieren der Statusleiste',
+            e
+          );
+        }
+      }
+    };
+
+    configureStatusBar();
+  }, []); // Leeres Dependency-Array, damit es nur einmal beim Mounten ausgeführt wird
+
   return (
     <html
       lang='de'
@@ -214,15 +232,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta httpEquiv='X-UA-Compatible' content='IE=edge' />
         <meta
           name='viewport'
-          content='width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover'
+          content='width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover' // Wichtig für Safe Area
         />
         <meta name='apple-mobile-web-app-capable' content='yes' />
-        <meta name='apple-mobile-web-app-status-bar-style' content='default' />
+        <meta
+          name='apple-mobile-web-app-status-bar-style'
+          content='default'
+        />{' '}
+        {/* Oder 'black-translucent' wenn die WebView überlagert */}
         <meta name='apple-mobile-web-app-title' content='Fbet' />
-        {/* Du hattest theme-color #000000, was gut für Dark Mode sein kann.
-            Wenn du willst, dass es sich an den System-Theme anpasst oder hell ist,
-            kannst du es anpassen oder den ThemeProvider das steuern lassen.
-            Für PWA ist es oft gut, eine Standard-Farbe zu haben. */}
         <meta
           name='theme-color'
           media='(prefers-color-scheme: light)'
@@ -252,7 +270,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b from-background to-slate-50 dark:from-slate-900 dark:to-slate-800 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] px-[env(safe-area-inset-left)]'>
               <SiteLayout>{children}</SiteLayout>
             </div>
-            {/* PWAPromptMobile wurde entfernt, da der Hinweis nun nach Login kommt */}
             <Toaster richColors position='top-center' />
           </AuthProvider>
         </ThemeProvider>
