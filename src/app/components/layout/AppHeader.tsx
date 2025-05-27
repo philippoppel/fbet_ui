@@ -162,11 +162,11 @@ export function AppHeader({
 
   return (
     <header
-      /* FIX 1 & 2 ––––––––––––––––––––––––––––––––––––––––––––––––––––– */
-      style={{ top: 'env(safe-area-inset-top)' }} // FIX 2
-      className='sticky z-50 w-full border-b bg-background/95   // FIX 1: pt-… entfernt
-                 px-4 backdrop-blur supports-[backdrop-filter]:
-                 bg-background/60 sm:px-6 lg:px-8'
+      style={{
+        top: 'env(safe-area-inset-top)',
+      }} /* Header beginnt NACH der Safe-Area */
+      className='sticky z-50 w-full border-b bg-background/60 px-4 sm:px-6 lg:px-8
+                 frosted-header' /* Blur liegt im ::before */
     >
       <div className='flex h-14 items-center justify-between'>
         {/* LINKS: Burger + Logo */}

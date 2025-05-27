@@ -267,7 +267,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           disableTransitionOnChange
         >
           <AuthProvider>
-            <div className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b from-background to-slate-50 dark:from-slate-900 dark:to-slate-800 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] px-[env(safe-area-inset-left)]'>
+            <div
+              className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b
+                            from-background to-slate-50 dark:from-slate-900 dark:to-slate-800
+                            pb-[env(safe-area-inset-bottom)]
+                            px-[env(safe-area-inset-left)]'
+            >
               <SiteLayout>{children}</SiteLayout>
             </div>
             <Toaster richColors position='top-center' />

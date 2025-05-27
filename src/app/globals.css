@@ -167,3 +167,17 @@
     min-height: 100dvh;
   }
 }
+.frosted-header {
+  position: relative;
+}
+
+.frosted-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: hsl(var(--background) / 0.6); /* dezente Tönung, optional anpassen */
+  pointer-events: none;                     /* Klicks gehen durch */
+  z-index: -1;                              /* hinter Inhalt */
+}
