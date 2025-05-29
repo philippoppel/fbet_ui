@@ -141,21 +141,15 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           <Badge
             variant={isArchived ? 'outline' : 'default'}
             className={cn(
-              'text-xs font-normal mt-1 inline-flex items-center gap-1 px-2 py-1 max-w-full break-words rounded-md',
+              'text-xs font-normal mt-1 inline-flex items-baseline gap-1 px-2 py-1 max-w-full break-words rounded-md',
               isArchived
                 ? 'border-border/50'
                 : 'border-primary/30 text-primary-foreground bg-primary/90'
             )}
           >
             <span className='font-semibold'>Ergebnis:</span>
-            <span className='break-words'>
-              {event.winningOption && event.winningOption.length > 20 ? (
-                <span className='block whitespace-normal break-words text-left'>
-                  {event.winningOption}
-                </span>
-              ) : (
-                event.winningOption
-              )}
+            <span className='text-left whitespace-normal break-words'>
+              {event.winningOption}
             </span>
           </Badge>
         </div>

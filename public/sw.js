@@ -1,7 +1,7 @@
 // public/sw.js
 
 // NEU: Separate Cache-Namen für bessere Verwaltung
-const APP_SHELL_CACHE_NAME = 'fbet-app-shell-v2'; // WICHTIG: Erhöhe die Version (v2, v3...), wenn du die App-Shell-Dateien (unten in urlsToCacheForAppShell) änderst!
+const APP_SHELL_CACHE_NAME = 'fbet-app-shell-v2.1'; // WICHTIG: Erhöhe die Version (v2, v3...), wenn du die App-Shell-Dateien (unten in urlsToCacheForAppShell) änderst!
 const DATA_CACHE_NAME = 'fbet-data-cache-v1';    // Für dynamische Daten von deinen APIs
 
 // Dateien, die zur App-Shell gehören und beim Installieren gecached werden.
