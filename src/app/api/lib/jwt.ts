@@ -6,7 +6,7 @@ const SECRET: string =
   (() => {
     throw new Error('SECRET_KEY not set');
   })();
-const EXPIRES_IN: string = process.env.ACCESS_TOKEN_EXPIRE_DAYS || '30d';
+const EXPIRES_IN: string = process.env.ACCESS_TOKEN_EXPIRE_DAYS || '365d';
 
 if (!SECRET) {
   throw new Error(

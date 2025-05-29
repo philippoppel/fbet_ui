@@ -24,6 +24,7 @@ import {
   postEventComment,
   uploadImage,
 } from '@/app/lib/api';
+import { useAuth } from '@/app/context/AuthContext';
 
 // --- ANNAHME: Token Helper (am Ende der Datei definiert oder importiert) ---
 // Wenn du einen Context verwendest, importiere und nutze diesen stattdessen.
@@ -72,29 +73,22 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const gf = useGiphyFetch();
-  // --- ANNAHME: Token holen ---
-  // const { token } = useAuth(); // Alternative: Context
-  const token = localStorage.getItem('fbet_token');
+  const { token, isLoading: authLoading } = useAuth();
 
   // --- Kommentare laden ---
   useEffect(() => {
     const loadComments = async () => {
       if (!token) {
-        // Fehler wird erst relevant, wenn der Nutzer versucht, Kommentare anzuzeigen oder zu posten.
-        // Für die reine Zählung bei fehlendem Token, werden einfach keine Kommentare geladen.
         setIsLoading(false);
         setInitialLoadDone(true);
         setComments([]); // Kommentare bei fehlendem Token leeren
-        // Optional: Setze hier einen apiError, falls der Token generell fehlt und Aktionen blockiert werden sollen.
-        // setApiError('Nicht eingeloggt oder Token fehlt.');
         return;
       }
 
       setIsLoading(true);
-      setApiError(null); // Fehler vor jedem Ladeversuch zurücksetzen
+      setApiError(null);
       try {
         const fetchedComments = await getEventComments(token, eventId);
-        // API sortiert 'asc', Kommentare in dieser Reihenfolge setzen
         setComments(fetchedComments);
       } catch (error) {
         console.error(
@@ -123,13 +117,14 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
         }
       } finally {
         setIsLoading(false);
-        setInitialLoadDone(true); // Markiert, dass der Ladeversuch abgeschlossen ist
+        setInitialLoadDone(true);
       }
     };
-
-    loadComments();
+    if (!authLoading) {
+      loadComments();
+    }
     // Abhängigkeiten: eventId, token. `isExpanded` wurde entfernt.
-  }, [eventId, token]);
+  }, [eventId, token, authLoading]);
 
   // --- Kommentar senden ---
   const submitComment = async () => {
