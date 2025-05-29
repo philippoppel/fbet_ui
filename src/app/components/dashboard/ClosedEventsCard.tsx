@@ -132,8 +132,6 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
     >
       <div className='flex items-start justify-between gap-3'>
         <div className='space-y-1 flex-1 min-w-0'>
-          {' '}
-          {/* min-w-0 hilft bei Flexbox-Overflow */}
           <h4 className='text-base font-semibold text-foreground leading-tight'>
             {event.title}
           </h4>
@@ -143,13 +141,18 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           <Badge
             variant={isArchived ? 'outline' : 'default'}
             className={cn(
-              'text-xs font-normal mt-1 max-w-full whitespace-normal break-words',
+              'text-xs font-normal mt-1 max-w-full items-baseline', // items-baseline für bessere Ausrichtung
               isArchived
                 ? 'border-border/50'
                 : 'border-primary/30 text-primary-foreground bg-primary/90'
             )}
           >
-            Gewonnene Option: {event.winningOption}
+            <span className='mr-1 whitespace-nowrap font-semibold'>
+              Ergebnis:
+            </span>
+            <span className='whitespace-normal break-words'>
+              {event.winningOption}
+            </span>
           </Badge>
         </div>
         <div className='flex items-center gap-1'>
