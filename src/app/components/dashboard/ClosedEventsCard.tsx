@@ -131,7 +131,9 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
       )}
     >
       <div className='flex items-start justify-between gap-3'>
-        <div className='space-y-1 flex-1'>
+        <div className='space-y-1 flex-1 min-w-0'>
+          {' '}
+          {/* min-w-0 hilft bei Flexbox-Overflow */}
           <h4 className='text-base font-semibold text-foreground leading-tight'>
             {event.title}
           </h4>
@@ -141,13 +143,13 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           <Badge
             variant={isArchived ? 'outline' : 'default'}
             className={cn(
-              'text-xs font-normal mt-1',
+              'text-xs font-normal mt-1 max-w-full whitespace-normal break-words',
               isArchived
                 ? 'border-border/50'
                 : 'border-primary/30 text-primary-foreground bg-primary/90'
             )}
           >
-            Gewinner: {event.winningOption}
+            Gewonnene Option: {event.winningOption}
           </Badge>
         </div>
         <div className='flex items-center gap-1'>
@@ -217,7 +219,6 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
       <CommentSection eventId={event.id} currentUser={user} />
     </div>
   );
-
   return (
     <TooltipProvider delayDuration={100}>
       <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
