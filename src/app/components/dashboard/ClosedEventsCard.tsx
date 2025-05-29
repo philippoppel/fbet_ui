@@ -141,17 +141,21 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           <Badge
             variant={isArchived ? 'outline' : 'default'}
             className={cn(
-              'text-xs font-normal mt-1 max-w-full items-baseline', // items-baseline für bessere Ausrichtung
+              'text-xs font-normal mt-1 inline-flex items-center gap-1 px-2 py-1 max-w-full break-words rounded-md',
               isArchived
                 ? 'border-border/50'
                 : 'border-primary/30 text-primary-foreground bg-primary/90'
             )}
           >
-            <span className='mr-1 whitespace-nowrap font-semibold'>
-              Ergebnis:
-            </span>
-            <span className='whitespace-normal break-words'>
-              {event.winningOption}
+            <span className='font-semibold'>Ergebnis:</span>
+            <span className='break-words'>
+              {event.winningOption && event.winningOption.length > 20 ? (
+                <span className='block whitespace-normal break-words text-left'>
+                  {event.winningOption}
+                </span>
+              ) : (
+                event.winningOption
+              )}
             </span>
           </Badge>
         </div>
