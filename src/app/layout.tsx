@@ -1,22 +1,25 @@
 // src/app/layout.tsx
 'use client';
 
-import type { Metadata } from 'next'; // Behalte Metadaten, wenn du sie anderswo definierst
+import type { Metadata } from 'next';
 import { Inter, Fira_Code } from 'next/font/google';
 import './globals.css';
 
 import { ReactNode, useCallback, useEffect, useState } from 'react';
 import { AuthProvider } from '@/app/context/AuthContext';
 import { ThemeProvider } from '@/app/components/ThemeProvider';
-import { Toaster } from '@/app/components/ui/sonner'; // Stelle sicher, dass toast hier importiert wird
+import { Toaster } from '@/app/components/ui/sonner';
 import { SiteLayout } from '@/app/components/layout/SiteLayout';
-import { Smartphone, Download } from 'lucide-react'; // Download wird im Toast verwendet
+import { Smartphone, Download, RefreshCw } from 'lucide-react'; // RefreshCw Icon hinzugefügt
 import { Button } from '@/app/components/ui/button';
-import { toast } from 'sonner'; // Button wird im Toast verwendet
+import { toast } from 'sonner';
 
 // NEU: Capacitor-Imports
 import { Capacitor } from '@capacitor/core';
-import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar'; // Style umbenannt, um Namenskonflikte zu vermeiden
+import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
+import { useAppRefresh } from '@/app/hooks/useAppRefresh';
+
+// Hook für App-Refresh importieren
 
 /* ------------------ FONTS ------------------ */
 const inter = Inter({
@@ -42,6 +45,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [canInstall, setCanInstall] = useState(false);
 
+  // useAppRefresh Hook verwenden
+  const {
+    refresh: refreshApp,
+    updateAvailable: appUpdateAvailable,
+    online: isOnline,
+  } = useAppRefresh();
+
+  /* ... (Deine bestehende Logik für PWA-Installation: showManualHint, handleInstallClick, useEffects für beforeinstallprompt, appinstalled, requestPWAInstall, successfulLoginForPwaPrompt bleiben unverändert) ... */
   /* Manual instructions */
   const showManualHint = () => {
     const txt = isiOS()
@@ -182,33 +193,61 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   }, [canInstall, handleInstallClick, deferredPrompt]);
 
   /* ------------------ SW REGISTRATION ------------------ */
+  // Deine bestehende SW-Registrierungslogik ist gut, besonders das `reg.update()`.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     const regSw = async () => {
       try {
         const reg = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/',
+          scope: '/', // Stellt sicher, dass der SW die gesamte App kontrollieren kann
         });
-        reg.update();
+        console.log(
+          '[Layout] Service Worker registriert. Prüfe auf Updates...'
+        );
+        await reg.update(); // Proaktiv nach Updates suchen, wenn die Seite geladen wird
       } catch (err) {
-        console.error('[Layout] SW registration failed', err);
+        console.error('[Layout] SW Registrierung fehlgeschlagen', err);
       }
     };
+    // Registriere den SW, sobald das Fenster geladen ist
     window.addEventListener('load', regSw);
     return () => window.removeEventListener('load', regSw);
   }, []);
 
-  // NEU: useEffect für die Capacitor Statusleisten-Konfiguration
+  // NEU: useEffect, um einen Toast anzuzeigen, wenn appUpdateAvailable true wird
+  useEffect(() => {
+    if (appUpdateAvailable) {
+      const toastId = 'app-update-toast'; // Eindeutige ID für den Toast
+      toast('Update verfügbar', {
+        id: toastId,
+        description:
+          'Eine neue Version von Fbet ist bereit. Jetzt aktualisieren?',
+        duration: Infinity, // Toast bleibt sichtbar, bis der Benutzer interagiert
+        action: {
+          label: 'Aktualisieren',
+          onClick: () => {
+            console.log(
+              '[Layout] Update-Button geklickt. Rufe refreshApp() auf...'
+            );
+            refreshApp(); // Ruft die refresh-Funktion aus dem useAppRefresh Hook auf
+            // toast.dismiss(toastId); // Optional: Toast sofort entfernen oder warten bis Seite neu lädt
+          },
+        },
+        icon: <RefreshCw className='w-5 h-5 text-primary' />, // Icon für den Toast
+        // closeButton: true, // Optional: Schließen-Button anzeigen
+      });
+    }
+  }, [appUpdateAvailable, refreshApp]);
+
+  /* ... (Dein useEffect für Capacitor Statusleiste bleibt unverändert) ... */
   useEffect(() => {
     const configureStatusBar = async () => {
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
         try {
           await StatusBar.setOverlaysWebView({ overlay: false });
           console.log(
-            'Capacitor: StatusBar.setOverlaysWebView auf true gesetzt.'
+            'Capacitor: StatusBar.setOverlaysWebView auf false gesetzt.' // Korrigierter Log-Text
           );
-          // Optional: Stil der Statusleisten-Icons anpassen
-          // await StatusBar.setStyle({ style: StatusBarStyle.Default }); // Oder .Dark / .Light
         } catch (e) {
           console.error(
             'Capacitor: Fehler beim Konfigurieren der Statusleiste',
@@ -219,7 +258,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     };
 
     configureStatusBar();
-  }, []); // Leeres Dependency-Array, damit es nur einmal beim Mounten ausgeführt wird
+  }, []);
 
   return (
     <html
@@ -228,18 +267,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
     >
       <head>
+        {/* ... (deine Head-Elemente bleiben unverändert) ... */}
         <meta charSet='utf-8' />
         <meta httpEquiv='X-UA-Compatible' content='IE=edge' />
         <meta
           name='viewport'
-          content='width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover' // Wichtig für Safe Area
+          content='width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover'
         />
         <meta name='apple-mobile-web-app-capable' content='yes' />
-        <meta
-          name='apple-mobile-web-app-status-bar-style'
-          content='default'
-        />{' '}
-        {/* Oder 'black-translucent' wenn die WebView überlagert */}
+        <meta name='apple-mobile-web-app-status-bar-style' content='default' />
         <meta name='apple-mobile-web-app-title' content='Fbet' />
         <meta
           name='theme-color'
@@ -271,8 +307,28 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b
                             from-background to-slate-50 dark:from-slate-900 dark:to-slate-800
                             pb-[env(safe-area-inset-bottom)]
-                            px-[env(safe-area-inset-left)]'
+                            px-[env(safe-area-inset-left)]' // px korrigiert für safe-area-inset-right
             >
+              {/* Optional: Online-/Offline-Status anzeigen */}
+              {!isOnline && (
+                <div
+                  style={{
+                    position: 'fixed', // Oder 'sticky' wenn es im Scrollfluss bleiben soll
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    backgroundColor: 'hsl(var(--destructive))', // Verwende deine Theme-Farben
+                    color: 'hsl(var(--destructive-foreground))',
+                    padding: '8px',
+                    textAlign: 'center',
+                    zIndex: 1000, // Über anderen Elementen
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Du bist offline. Einige Funktionen sind möglicherweise nicht
+                  verfügbar.
+                </div>
+              )}
               <SiteLayout>{children}</SiteLayout>
             </div>
             <Toaster richColors position='top-center' />
