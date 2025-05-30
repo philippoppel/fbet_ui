@@ -52,8 +52,8 @@ export function AppHeader({
   onSelectGroup?: (groupId: number) => void;
 }) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const { refresh, updateAvailable, online } = useAppRefresh();
   const displayName = user?.name?.split(' ')[0] || user?.email || '';
+  const { refresh, updateAvailable, online, isRefreshing } = useAppRefresh();
 
   const [groupsWithOpenEventsData, setGroupsWithOpenEventsData] = useState<
     GroupWithOpenEvents[]
@@ -292,7 +292,7 @@ export function AppHeader({
           >
             <RefreshCw
               className={`h-4 w-4 transition-transform ${
-                updateAvailable ? 'animate-spin' : ''
+                updateAvailable || isRefreshing ? 'animate-spin' : ''
               }`}
             />
             {!online && (
