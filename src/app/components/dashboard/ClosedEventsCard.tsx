@@ -141,7 +141,7 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
 
           {/* Ergebnis + Kommentare gruppiert */}
           <div className='mt-2 space-y-3'>
-            <div className='rounded-lg border border-primary/50 bg-primary/10 p-3 text-sm leading-snug space-y-1'>
+            <div className='w-full rounded-md border-l-2 border-primary/50 bg-primary/10 pl-3 py-2 text-sm leading-snug space-y-1'>
               <div className='text-xs uppercase text-primary/80 font-semibold tracking-wide'>
                 Ergebnis
               </div>
