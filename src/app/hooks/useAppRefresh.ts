@@ -14,13 +14,15 @@ export const useAppRefresh = () => {
 
   const refresh = useCallback(() => {
     console.log('[AppRefresh] refresh() ausgelöst.');
-    setIsRefreshing(true); // NEU → Spinner aktivieren
+    setIsRefreshing(true);
+    // statt sofortigem reload, gib Steuerung nach außen
     if (waitingWorker) {
       console.log('[AppRefresh] Sende SKIP_WAITING an wartenden SW.');
       waitingWorker.postMessage({ type: 'SKIP_WAITING' });
     } else {
-      console.log('[AppRefresh] Kein wartender SW → direkt reload.');
-      window.location.reload();
+      console.log('[AppRefresh] Kein wartender SW → delayed reload.');
+      // window.location.reload(); → Entfernen!
+      // Das steuerst du jetzt von AppHeader per showFullScreenLoader
     }
   }, [waitingWorker]);
 

@@ -54,6 +54,7 @@ export function AppHeader({
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const displayName = user?.name?.split(' ')[0] || user?.email || '';
   const { refresh, updateAvailable, online, isRefreshing } = useAppRefresh();
+  const [showFullScreenLoader, setShowFullScreenLoader] = useState(false);
 
   const [groupsWithOpenEventsData, setGroupsWithOpenEventsData] = useState<
     GroupWithOpenEvents[]
@@ -129,6 +130,17 @@ export function AppHeader({
   const handleSelectAndCloseSheet = (groupId: number) => {
     onSelectGroup?.(groupId);
     setIsSheetOpen(false);
+  };
+
+  const handleRefreshClick = () => {
+    console.log('[AppHeader] handleRefreshClick ausgelöst.');
+    setShowFullScreenLoader(true);
+    refresh();
+
+    // Fallback: nach kurzer Verzögerung neu laden
+    setTimeout(() => {
+      window.location.reload();
+    }, 500); // 500ms = smooth genug für User
   };
 
   const handleMarkNotificationsAsRead = () => {
@@ -287,7 +299,7 @@ export function AppHeader({
             variant={updateAvailable ? 'default' : 'ghost'}
             size='icon'
             aria-label='App neu laden'
-            onClick={refresh}
+            onClick={handleRefreshClick} // HIER ändern!
             className='relative'
           >
             <RefreshCw
@@ -336,6 +348,11 @@ export function AppHeader({
           )}
         </div>
       </div>
+      {showFullScreenLoader && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm'>
+          <RefreshCw className='h-8 w-8 animate-spin text-primary' />
+        </div>
+      )}
     </header>
   );
 }
