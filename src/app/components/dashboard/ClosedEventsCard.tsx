@@ -138,15 +138,22 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           {event.question && (
             <p className='text-sm text-muted-foreground'>{event.question}</p>
           )}
-          <div className='mt-2 rounded-lg border border-primary/50 bg-primary/10 p-3 text-sm leading-snug space-y-1'>
-            <div className='text-xs uppercase text-primary/80 font-semibold tracking-wide'>
-              Ergebnis
+
+          {/* Ergebnis + Kommentare gruppiert */}
+          <div className='mt-2 space-y-3'>
+            <div className='rounded-lg border border-primary/50 bg-primary/10 p-3 text-sm leading-snug space-y-1'>
+              <div className='text-xs uppercase text-primary/80 font-semibold tracking-wide'>
+                Ergebnis
+              </div>
+              <div className='text-foreground font-medium break-words'>
+                {event.winningOption}
+              </div>
             </div>
-            <div className='text-foreground font-medium break-words'>
-              {event.winningOption}
-            </div>
+
+            <CommentSection eventId={event.id} currentUser={user} />
           </div>
         </div>
+
         <div className='flex items-center gap-1'>
           {!!event.awardedPoints?.length && (
             <Tooltip>
@@ -211,7 +218,6 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           </ul>
         </div>
       )}
-      <CommentSection eventId={event.id} currentUser={user} />
     </div>
   );
   return (

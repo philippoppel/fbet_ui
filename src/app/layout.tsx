@@ -196,22 +196,40 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   // Deine bestehende SW-Registrierungslogik ist gut, besonders das `reg.update()`.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
+
     const regSw = async () => {
       try {
         const reg = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/', // Stellt sicher, dass der SW die gesamte App kontrollieren kann
+          scope: '/',
+          updateViaCache: 'none', // WICHTIG: sonst cached Browser sw.js aggressiv!
         });
-        console.log(
-          '[Layout] Service Worker registriert. Prüfe auf Updates...'
-        );
-        await reg.update(); // Proaktiv nach Updates suchen, wenn die Seite geladen wird
+        console.log('[Layout] Service Worker registriert. Trigger update()...');
+        await reg.update();
       } catch (err) {
         console.error('[Layout] SW Registrierung fehlgeschlagen', err);
       }
     };
-    // Registriere den SW, sobald das Fenster geladen ist
+
+    // Initial bei Load registrieren
     window.addEventListener('load', regSw);
     return () => window.removeEventListener('load', regSw);
+  }, []);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const interval = setInterval(
+      async () => {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          console.log('[Layout] Intervall → Prüfe SW update()...');
+          await reg.update();
+        }
+      },
+      1000 * 60 * 5
+    ); // alle 5 Minuten
+
+    return () => clearInterval(interval);
   }, []);
 
   // NEU: useEffect, um einen Toast anzuzeigen, wenn appUpdateAvailable true wird
