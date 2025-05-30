@@ -138,20 +138,14 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           {event.question && (
             <p className='text-sm text-muted-foreground'>{event.question}</p>
           )}
-          <Badge
-            variant={isArchived ? 'outline' : 'default'}
-            className={cn(
-              'text-xs font-normal mt-1 inline-flex items-baseline gap-1 px-2 py-1 max-w-full break-words rounded-md',
-              isArchived
-                ? 'border-border/50'
-                : 'border-primary/30 text-primary-foreground bg-primary/90'
-            )}
-          >
-            <span className='font-semibold'>Ergebnis:</span>
-            <span className='text-left whitespace-normal break-words'>
+          <div className='mt-2 rounded-lg border border-primary/50 bg-primary/10 p-3 text-sm leading-snug space-y-1'>
+            <div className='text-xs uppercase text-primary/80 font-semibold tracking-wide'>
+              Ergebnis
+            </div>
+            <div className='text-foreground font-medium break-words'>
               {event.winningOption}
-            </span>
-          </Badge>
+            </div>
+          </div>
         </div>
         <div className='flex items-center gap-1'>
           {!!event.awardedPoints?.length && (
