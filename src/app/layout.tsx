@@ -1,25 +1,26 @@
 // src/app/layout.tsx
 'use client';
 
-import type { Metadata } from 'next';
+// Metadaten sind bei 'use client' Root-Layouts weniger direkt hier zu setzen,
+// aber für die Struktur und mögliche zukünftige serverseitige Aspekte kann es bleiben.
+// import type { Metadata } from 'next';
 import { Inter, Fira_Code } from 'next/font/google';
 import './globals.css';
 
 import { ReactNode, useCallback, useEffect, useState } from 'react';
+import Head from 'next/head'; // Für client-seitige <head> Anpassungen
 import { AuthProvider } from '@/app/context/AuthContext';
-import { ThemeProvider } from '@/app/components/ThemeProvider';
+import { ThemeProvider } from '@/app/components/ThemeProvider'; // Dein Wrapper
 import { Toaster } from '@/app/components/ui/sonner';
 import { SiteLayout } from '@/app/components/layout/SiteLayout';
-import { Smartphone, Download, RefreshCw } from 'lucide-react'; // RefreshCw Icon hinzugefügt
+import { Smartphone, Download, RefreshCw } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { toast } from 'sonner';
 
-// NEU: Capacitor-Imports
 import { Capacitor } from '@capacitor/core';
-import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
+import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar'; // Style importiert als StatusBarStyle
 import { useAppRefresh } from '@/app/hooks/useAppRefresh';
-
-// Hook für App-Refresh importieren
+import { useHasMounted } from '@/app/hooks/useHasMounted';
 
 /* ------------------ FONTS ------------------ */
 const inter = Inter({
@@ -45,37 +46,40 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [canInstall, setCanInstall] = useState(false);
 
-  // useAppRefresh Hook verwenden
   const {
     refresh: refreshApp,
     updateAvailable: appUpdateAvailable,
     online: isOnline,
   } = useAppRefresh();
 
-  /* ... (Deine bestehende Logik für PWA-Installation: showManualHint, handleInstallClick, useEffects für beforeinstallprompt, appinstalled, requestPWAInstall, successfulLoginForPwaPrompt bleiben unverändert) ... */
-  /* Manual instructions */
+  const hasMounted = useHasMounted();
+
+  // State, um zu erkennen, ob die Komponente clientseitig gemountet wurde (für ThemeProvider-Fix)
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  /* PWA Installation Logic */
   const showManualHint = () => {
     const txt = isiOS()
-      ? 'Am Besten einloogen & dann Teilen‑/Actions‑Button → "Zum Home‑Bildschirm"'
+      ? 'Zum Home‑Bildschirm: Teilen‑Button → "Zum Home‑Bildschirm"'
       : isAndroid()
-        ? 'Chrome-Menü → "Zum Home‑Bildschirm"'
+        ? 'Zum Home‑Bildschirm: Chrome-Menü → "Zum Startbildschirm hinzufügen"'
         : 'Installationsoption im Browser-Menü';
     toast.info('Manuelle Installation', { description: txt, duration: 8000 });
   };
 
-  /* Install click */
   const handleInstallClick = useCallback(() => {
     if (deferredPrompt) {
-      (deferredPrompt as any).prompt();
-      (deferredPrompt as any).userChoice.then((choice: any) => {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choice: any) => {
         if (choice.outcome === 'accepted') {
-          // Das 'appinstalled' Event kümmert sich um das Toast und localStorage.
+          // 'appinstalled' Event kümmert sich um Toast/localStorage.
         } else {
           localStorage.setItem('fbetPwaInstallState', 'dismissed_prompt');
-          toast.info('Installation abgebrochen', {
-            description:
-              'Du kannst die App später über das Browsermenü oder den Link auf der Startseite installieren.',
-          });
+          toast.info('Installation abgebrochen');
         }
         setDeferredPrompt(null);
         setCanInstall(false);
@@ -85,7 +89,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     }
   }, [deferredPrompt]);
 
-  /* Capture beforeinstallprompt */
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
@@ -96,7 +99,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  /* Listen to successful install */
   useEffect(() => {
     const onInstalled = () => {
       toast.success('Fbet wurde installiert ✅');
@@ -107,14 +109,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('appinstalled', onInstalled);
   }, []);
 
-  /* ⇢ Listen for global manual dispatch (Landing‑Page link) */
   useEffect(() => {
     const handler = () => handleInstallClick();
     window.addEventListener('requestPWAInstall', handler);
     return () => window.removeEventListener('requestPWAInstall', handler);
   }, [handleInstallClick]);
 
-  /* NEUER useEffect für den Post-Login Installations-Toast */
   useEffect(() => {
     const showInstallPromptToast = () => {
       const pwaInstallState = localStorage.getItem('fbetPwaInstallState');
@@ -179,92 +179,134 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         );
       }
     };
-
     window.addEventListener(
       'successfulLoginForPwaPrompt',
       showInstallPromptToast
     );
-    return () => {
+    return () =>
       window.removeEventListener(
         'successfulLoginForPwaPrompt',
         showInstallPromptToast
       );
-    };
   }, [canInstall, handleInstallClick, deferredPrompt]);
 
-  /* ------------------ SW REGISTRATION ------------------ */
-  // Deine bestehende SW-Registrierungslogik ist gut, besonders das `reg.update()`.
+  /* ------------------ SERVICE WORKER REGISTRATION (MODIFIZIERT FÜR DEV/PROD) ------------------ */
   useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      if (process.env.NODE_ENV === 'production') {
+        // PRODUKTIONSMODUS: Service Worker registrieren
+        const registerServiceWorker = async () => {
+          try {
+            const registration = await navigator.serviceWorker.register(
+              '/sw.js',
+              {
+                scope: '/',
+                updateViaCache: 'none',
+              }
+            );
+            console.log('[Layout] Service Worker registriert (PROD).');
+            registration.update(); // Optional: Sofort nach Updates suchen lassen
+          } catch (error) {
+            console.error(
+              '[Layout] Service Worker Registrierung fehlgeschlagen (PROD):',
+              error
+            );
+          }
+        };
+        window.addEventListener('load', registerServiceWorker);
 
-    const regSw = async () => {
-      try {
-        const reg = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/',
-          updateViaCache: 'none', // WICHTIG: sonst cached Browser sw.js aggressiv!
-        });
-        console.log('[Layout] Service Worker registriert. Trigger update()...');
-        await reg.update();
-      } catch (err) {
-        console.error('[Layout] SW Registrierung fehlgeschlagen', err);
+        const updateInterval = setInterval(
+          async () => {
+            const registration =
+              await navigator.serviceWorker.getRegistration();
+            if (registration) {
+              console.log('[Layout] Periodisches SW Update Check (PROD)...');
+              registration.update();
+            }
+          },
+          1000 * 60 * 15
+        ); // z.B. alle 15 Minuten
+
+        return () => {
+          window.removeEventListener('load', registerServiceWorker);
+          clearInterval(updateInterval);
+        };
+      } else {
+        // ENTWICKLUNGSMODUS: Alle Service Worker für diesen Scope de-registrieren
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((registrations) => {
+            if (registrations.length > 0) {
+              // console.log('[Layout] De-registriere existierende Service Worker (DEV)...');
+            }
+            for (const registration of registrations) {
+              if (registration.scope === window.location.origin + '/') {
+                registration
+                  .unregister()
+                  .then((success) => {
+                    if (success) {
+                      console.log(
+                        '[Layout] Service Worker de-registriert für Scope:',
+                        registration.scope,
+                        '(DEV)'
+                      );
+                    } else {
+                      // console.warn('[Layout] Service Worker konnte nicht de-registriert werden für Scope:', registration.scope, '(DEV)');
+                    }
+                  })
+                  .catch((err) =>
+                    console.error(
+                      '[Layout] Fehler beim De-registrieren des SW (DEV):',
+                      err
+                    )
+                  );
+              }
+            }
+          })
+          .catch((err) =>
+            console.error(
+              '[Layout] Fehler beim Abrufen der SW-Registrierungen (DEV):',
+              err
+            )
+          );
+        console.log(
+          '[Layout] Service Worker Registrierung im Entwicklungsmodus übersprungen/deaktiviert.'
+        );
       }
-    };
-
-    // Initial bei Load registrieren
-    window.addEventListener('load', regSw);
-    return () => window.removeEventListener('load', regSw);
+    }
   }, []);
 
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-
-    const interval = setInterval(
-      async () => {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          console.log('[Layout] Intervall → Prüfe SW update()...');
-          await reg.update();
-        }
-      },
-      1000 * 60 * 5
-    ); // alle 5 Minuten
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // NEU: useEffect, um einen Toast anzuzeigen, wenn appUpdateAvailable true wird
+  /* Toast für App-Update */
   useEffect(() => {
     if (appUpdateAvailable) {
-      const toastId = 'app-update-toast'; // Eindeutige ID für den Toast
+      const toastId = 'app-update-toast';
       toast('Update verfügbar', {
         id: toastId,
         description:
           'Eine neue Version von Fbet ist bereit. Jetzt aktualisieren?',
-        duration: Infinity, // Toast bleibt sichtbar, bis der Benutzer interagiert
+        duration: Infinity,
         action: {
           label: 'Aktualisieren',
           onClick: () => {
             console.log(
               '[Layout] Update-Button geklickt. Rufe refreshApp() auf...'
             );
-            refreshApp(); // Ruft die refresh-Funktion aus dem useAppRefresh Hook auf
-            // toast.dismiss(toastId); // Optional: Toast sofort entfernen oder warten bis Seite neu lädt
+            refreshApp();
           },
         },
-        icon: <RefreshCw className='w-5 h-5 text-primary' />, // Icon für den Toast
-        // closeButton: true, // Optional: Schließen-Button anzeigen
+        icon: <RefreshCw className='w-5 h-5 text-primary' />,
       });
     }
   }, [appUpdateAvailable, refreshApp]);
 
-  /* ... (Dein useEffect für Capacitor Statusleiste bleibt unverändert) ... */
+  /* Capacitor Statusleiste */
   useEffect(() => {
     const configureStatusBar = async () => {
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
         try {
           await StatusBar.setOverlaysWebView({ overlay: false });
           console.log(
-            'Capacitor: StatusBar.setOverlaysWebView auf false gesetzt.' // Korrigierter Log-Text
+            'Capacitor: StatusBar.setOverlaysWebView auf false gesetzt.'
           );
         } catch (e) {
           console.error(
@@ -274,18 +316,48 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         }
       }
     };
-
     configureStatusBar();
   }, []);
 
+  // Das Haupt-Div für den Body-Inhalt, das immer gerendert wird,
+  // einmal mit und einmal ohne ThemeProvider-Wrapper, je nach isClient-Status.
+  const coreAppStructure = (
+    <AuthProvider>
+      <div
+        className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b
+                      from-background to-slate-50 dark:from-slate-900 dark:to-slate-800
+                      pb-[env(safe-area-inset-bottom)]
+                      px-[env(safe-area-inset-left)]' // Korrigiert für beide Seiten, falls nötig
+      >
+        {hasMounted && !isOnline && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              backgroundColor: 'hsl(var(--destructive))',
+              color: 'hsl(var(--destructive-foreground))',
+              padding: '8px',
+              textAlign: 'center',
+              zIndex: 1000,
+              fontSize: '0.875rem',
+            }}
+          >
+            Du bist offline. Einige Funktionen sind möglicherweise nicht
+            verfügbar.
+          </div>
+        )}
+        <SiteLayout>{children}</SiteLayout>
+      </div>
+      <Toaster richColors position='top-center' />
+    </AuthProvider>
+  );
+
   return (
-    <html
-      lang='de'
-      className={`${inter.variable} ${firaCode.variable}`}
-      suppressHydrationWarning
-    >
-      <head>
-        {/* ... (deine Head-Elemente bleiben unverändert) ... */}
+    // suppressHydrationWarning ist hier korrekterweise entfernt!
+    <html lang='de' className={`${inter.variable} ${firaCode.variable}`}>
+      <Head>
         <meta charSet='utf-8' />
         <meta httpEquiv='X-UA-Compatible' content='IE=edge' />
         <meta
@@ -312,46 +384,28 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           sizes='180x180'
           href='/apple-touch-icon.png'
         />
-      </head>
+        <title>Fbet App</title>
+      </Head>
       <body className='font-sans antialiased'>
-        <ThemeProvider
-          attribute='class'
-          defaultTheme='system'
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            <div
-              className='flex flex-col min-h-dvh overflow-x-hidden bg-gradient-to-b
-                            from-background to-slate-50 dark:from-slate-900 dark:to-slate-800
-                            pb-[env(safe-area-inset-bottom)]
-                            px-[env(safe-area-inset-left)]' // px korrigiert für safe-area-inset-right
-            >
-              {/* Optional: Online-/Offline-Status anzeigen */}
-              {!isOnline && (
-                <div
-                  style={{
-                    position: 'fixed', // Oder 'sticky' wenn es im Scrollfluss bleiben soll
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    backgroundColor: 'hsl(var(--destructive))', // Verwende deine Theme-Farben
-                    color: 'hsl(var(--destructive-foreground))',
-                    padding: '8px',
-                    textAlign: 'center',
-                    zIndex: 1000, // Über anderen Elementen
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  Du bist offline. Einige Funktionen sind möglicherweise nicht
-                  verfügbar.
-                </div>
-              )}
-              <SiteLayout>{children}</SiteLayout>
-            </div>
-            <Toaster richColors position='top-center' />
-          </AuthProvider>
-        </ThemeProvider>
+        {/* ThemeProvider wird nur clientseitig nach dem Mount gerendert, um Hydrierungsfehler zu vermeiden */}
+        {isClient ? (
+          <ThemeProvider
+            attribute='class'
+            defaultTheme='system' // oder 'light' als sicherer Fallback, falls 'system' Probleme macht
+            enableSystem
+            disableTransitionOnChange
+          >
+            {coreAppStructure}
+          </ThemeProvider>
+        ) : (
+          // Fallback für Server-Render und allerersten Client-Render (bevor isClient true ist).
+          // Rendert den Inhalt OHNE ThemeProvider-Wrapper.
+          // Das `html`-Tag hat hier noch keine `dark`-Klasse vom ThemeProvider.
+          // Das style={{ visibility: 'hidden' }} auf dem body oder html könnte Flackern vermeiden,
+          // bis das Theme clientseitig geladen ist, ist aber optional.
+          // Wichtiger ist, dass die Struktur für die Hydrierung übereinstimmt.
+          <>{coreAppStructure}</>
+        )}
       </body>
     </html>
   );

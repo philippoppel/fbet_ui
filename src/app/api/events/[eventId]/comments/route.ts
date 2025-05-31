@@ -1,3 +1,4 @@
+// src/app/api/events/[eventId]/comments/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/app/api/lib/prisma';
 import { getCurrentUserFromRequest } from '@/app/api/lib/auth';
@@ -23,8 +24,10 @@ export async function POST(req: NextRequest, context: any) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const eventId = parseInt(context.params.eventId, 10);
-  if (isNaN(eventId)) {
+  const { eventId } = await context.params;
+  const eventIdNum = parseInt(eventId, 10);
+
+  if (isNaN(eventIdNum) || eventIdNum <= 0) {
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest, context: any) {
         text: text || null,
         gifUrl: gifUrl || null,
         userId: user.id,
-        eventId,
+        eventId: eventIdNum,
       },
       include: {
         user: {
@@ -62,9 +65,15 @@ export async function POST(req: NextRequest, context: any) {
         },
       },
     });
+
+    console.log(
+      `User ${user.id} created comment on event ${eventIdNum}:`,
+      createdComment.id
+    );
+
     return NextResponse.json(createdComment, { status: 201 });
   } catch (e) {
-    console.error('Error creating comment:', e);
+    console.error(`Error creating comment for event ${eventIdNum}:`, e);
     return NextResponse.json(
       { error: 'Failed to create comment' },
       { status: 500 }
@@ -76,14 +85,16 @@ export async function POST(req: NextRequest, context: any) {
  * GET-Handler zum Abrufen aller Kommentare für ein Event.
  */
 export async function GET(req: NextRequest, context: any) {
-  const eventId = parseInt(context.params.eventId, 10);
-  if (isNaN(eventId)) {
+  const { eventId } = await context.params;
+  const eventIdNum = parseInt(eventId, 10);
+
+  if (isNaN(eventIdNum) || eventIdNum <= 0) {
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
   try {
     const comments = await prisma.eventComment.findMany({
-      where: { eventId },
+      where: { eventId: eventIdNum },
       orderBy: { createdAt: 'asc' },
       include: {
         user: {
@@ -91,9 +102,12 @@ export async function GET(req: NextRequest, context: any) {
         },
       },
     });
+
+    console.log(`Fetched ${comments.length} comments for event ${eventIdNum}`);
+
     return NextResponse.json(comments);
   } catch (e) {
-    console.error('Error fetching comments:', e);
+    console.error(`Error fetching comments for event ${eventIdNum}:`, e);
     return NextResponse.json(
       { error: 'Failed to fetch comments' },
       { status: 500 }

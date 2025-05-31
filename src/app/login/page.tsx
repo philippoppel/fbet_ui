@@ -162,6 +162,7 @@ function LoginCard() {
 
           <Button type='submit' className='w-full' disabled={submitting}>
             {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+            <br />
             Anmelden
           </Button>
         </form>
@@ -170,6 +171,7 @@ function LoginCard() {
       <CardFooter className='flex flex-col gap-4 pt-0'>
         <p className='text-sm text-muted-foreground text-center w-full'>
           Neu hier?
+          <br />
           <Link
             href={`/register?redirect=${encodeURIComponent(redirectPath)}`}
             className='underline underline-offset-4 hover:text-foreground'

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { Event as GroupEvent, UserOut } from '@/app/lib/types';
+
 import {
   Card,
   CardContent,
@@ -9,7 +10,6 @@ import {
   CardTitle,
 } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
-import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import {
   Collapsible,
@@ -37,14 +37,25 @@ import {
 import { cn } from '@/app/lib/utils';
 import { CommentSection } from '@/app/components/dashboard/CommentSection';
 
-type ClosedEventsCardProps = {
+/**
+ * A cleaned‑up & layout‑safe Version of the original ClosedEventsCard.
+ * Hauptänderung: das Event‑Item benutzt jetzt ein Grid‑Layout (1fr + auto),
+ * sodass der „Ergebnis“-Block außerhalb der Kopfzeile steht und stets die volle
+ * Kartenbreite einnimmt. Dadurch verschwindet der störende Versatz zwischen
+ * Ergebnis‑ und Punkteverteilungs‑Box.
+ */
+
+export type ClosedEventsCardProps = {
   events: GroupEvent[];
   user: UserOut;
 };
 
 const STORAGE_KEY = 'closedEventsArchivedEventIds';
 
-export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
+export default function ClosedEventsCard({
+  events,
+  user,
+}: ClosedEventsCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [archivedEventIds, setArchivedEventIds] = useState<Set<number>>(() => {
     if (typeof window !== 'undefined') {
@@ -54,14 +65,14 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
           const parsed = JSON.parse(stored);
           if (
             Array.isArray(parsed) &&
-            parsed.every((item) => typeof item === 'number')
+            parsed.every((i) => typeof i === 'number')
           ) {
             return new Set(parsed as number[]);
           }
-        } catch (e) {
+        } catch (err) {
           console.warn(
-            '[ClosedEventsCard] Fehler beim Parsen von archivedEventIds:',
-            e
+            '[ClosedEventsCard] Fehler beim Parsen archivedEventIds:',
+            err
           );
         }
       }
@@ -73,6 +84,9 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
 
+  /* --------------------------------------------------
+   * Persist Archiv‑Status
+   * -------------------------------------------------- */
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(
@@ -82,23 +96,27 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
     }
   }, [archivedEventIds]);
 
-  const handleToggleArchive = (eventId: number) => {
+  /* --------------------------------------------------
+   * Helfer
+   * -------------------------------------------------- */
+  const toggleArchive = (id: number) =>
     setArchivedEventIds((prev) => {
       const next = new Set(prev);
-      next.has(eventId) ? next.delete(eventId) : next.add(eventId);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
 
-  const toggleEventPointDetails = (eventId: number) => {
+  const togglePointDetails = (id: number) =>
     setExpandedEvents((prev) => {
       const next = new Set(prev);
-      next.has(eventId) ? next.delete(eventId) : next.add(eventId);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
 
-  const filteredEvents = useMemo(() => {
+  /* --------------------------------------------------
+   * Filtering & Sorting
+   * -------------------------------------------------- */
+  const filtered = useMemo(() => {
     const base = events
       .filter((e): e is GroupEvent => !!e && e.winningOption !== null)
       .sort(
@@ -107,7 +125,7 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
       );
 
     const search = searchTerm.trim().toLowerCase();
-    const filtered = search
+    const bySearch = search
       ? base.filter(
           (e) =>
             e.title?.toLowerCase().includes(search) ||
@@ -116,45 +134,39 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
         )
       : base;
 
-    const active = filtered.filter((e) => !archivedEventIds.has(e.id));
-    const archived = filtered.filter((e) => archivedEventIds.has(e.id));
+    const active = bySearch.filter((e) => !archivedEventIds.has(e.id));
+    const archived = bySearch.filter((e) => archivedEventIds.has(e.id));
 
-    return { active, archived, total: base.length };
+    return { active, archived };
   }, [events, searchTerm, archivedEventIds]);
 
-  const renderEventItem = (event: GroupEvent, isArchived: boolean) => (
+  /* --------------------------------------------------
+   * Einzelnes Event‑Item
+   * -------------------------------------------------- */
+  const renderEvent = (event: GroupEvent, isArchived: boolean) => (
     <div
       key={event.id}
       className={cn(
-        'rounded-xl bg-card border border-border p-4 sm:p-5 shadow-sm transition-colors',
+        'rounded-xl bg-card border border-border p-4 sm:p-5 shadow-sm transition-colors space-y-4',
         isArchived && 'opacity-70 hover:opacity-100'
       )}
     >
-      <div className='flex items-start justify-between gap-3'>
-        <div className='space-y-1 flex-1 min-w-0'>
-          <h4 className='text-base font-semibold text-foreground leading-tight'>
+      {/* Header: Titel & Icons */}
+      <div className='grid grid-cols-[1fr_auto] gap-3'>
+        {/* Linke Spalte */}
+        <div className='space-y-1 min-w-0'>
+          <h4 className='text-base font-semibold text-foreground leading-tight break-words'>
             {event.title}
           </h4>
           {event.question && (
-            <p className='text-sm text-muted-foreground'>{event.question}</p>
+            <p className='text-sm text-muted-foreground break-words max-w-prose'>
+              {event.question}
+            </p>
           )}
-
-          {/* Ergebnis + Kommentare gruppiert */}
-          <div className='mt-2 space-y-3'>
-            <div className='w-full rounded-md border-l-2 border-primary/50 bg-primary/10 pl-3 py-2 text-sm leading-snug space-y-1'>
-              <div className='text-xs uppercase text-primary/80 font-semibold tracking-wide'>
-                Ergebnis
-              </div>
-              <div className='text-foreground font-medium break-words'>
-                {event.winningOption}
-              </div>
-            </div>
-
-            <CommentSection eventId={event.id} currentUser={user} />
-          </div>
         </div>
 
-        <div className='flex items-center gap-1'>
+        {/* Rechte Spalte: Icons */}
+        <div className='flex items-start gap-1 flex-none'>
           {!!event.awardedPoints?.length && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -162,7 +174,7 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
                   variant='ghost'
                   size='icon'
                   className='h-8 w-8 text-muted-foreground hover:text-primary'
-                  onClick={() => toggleEventPointDetails(event.id)}
+                  onClick={() => togglePointDetails(event.id)}
                 >
                   {expandedEvents.has(event.id) ? (
                     <ChevronDown className='h-4 w-4' />
@@ -171,18 +183,17 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>
-                <p>Punkteverteilung</p>
-              </TooltipContent>
+              <TooltipContent>Punkteverteilung</TooltipContent>
             </Tooltip>
           )}
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant='ghost'
                 size='icon'
                 className='h-8 w-8 text-muted-foreground hover:text-foreground'
-                onClick={() => handleToggleArchive(event.id)}
+                onClick={() => toggleArchive(event.id)}
               >
                 {isArchived ? (
                   <ArchiveRestore className='h-4 w-4' />
@@ -192,15 +203,30 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{isArchived ? 'Wiederherstellen' : 'Wette archivieren'}</p>
+              {isArchived ? 'Wiederherstellen' : 'Wette archivieren'}
             </TooltipContent>
           </Tooltip>
         </div>
       </div>
 
+      {/* Content: Ergebnis + Kommentare */}
+      <div className='space-y-3'>
+        <div>
+          <div className='text-xs uppercase text-primary/80 font-semibold tracking-wide'>
+            Ergebnis
+          </div>
+          <div className='text-foreground font-medium break-words'>
+            {event.winningOption}
+          </div>
+        </div>
+
+        <CommentSection eventId={event.id} currentUser={user} />
+      </div>
+
+      {/* Punkteverteilung */}
       {expandedEvents.has(event.id) && (
-        <div className='mt-3 ml-1 pl-3 py-2 bg-muted/50 dark:bg-black/20 rounded-md text-sm border-l-2 border-primary/50'>
-          <h5 className='font-semibold mb-1.5 text-xs text-foreground/90 uppercase tracking-wide'>
+        <div className='pl-3 py-2 bg-muted/50 dark:bg-black/20 rounded-md text-sm border-l-2 border-primary/50 space-y-1'>
+          <h5 className='font-semibold text-xs text-foreground/90 uppercase tracking-wide'>
             Punkteverteilung:
           </h5>
           <ul className='space-y-1 text-xs'>
@@ -220,10 +246,15 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
       )}
     </div>
   );
+
+  /* --------------------------------------------------
+   * Render
+   * -------------------------------------------------- */
   return (
     <TooltipProvider delayDuration={100}>
       <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          {/* Kopfzeile */}
           <CardHeader className='flex flex-row items-center justify-between gap-2 pb-3 pr-3 sm:pr-4'>
             <div className='flex items-center gap-2'>
               <CheckCircle2 className='h-5 w-5 text-green-500 dark:text-green-400' />
@@ -232,6 +263,7 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
               </CardTitle>
             </div>
             <div className='flex items-center gap-1'>
+              {/* Suche */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -243,10 +275,10 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
                     <Search className='h-4 w-4' />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Wetten durchsuchen</p>
-                </TooltipContent>
+                <TooltipContent>Wetten durchsuchen</TooltipContent>
               </Tooltip>
+
+              {/* Archiv anzeigen */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -262,10 +294,10 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Archiv anzeigen/ausblenden</p>
-                </TooltipContent>
+                <TooltipContent>Archiv anzeigen/ausblenden</TooltipContent>
               </Tooltip>
+
+              {/* Auf/Zu */}
               <CollapsibleTrigger asChild>
                 <Button
                   variant='ghost'
@@ -278,6 +310,7 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
             </div>
           </CardHeader>
 
+          {/* Suchfeld */}
           {isSearchVisible && (
             <div className='px-4 sm:px-6 pb-3'>
               <div className='relative'>
@@ -302,11 +335,12 @@ export function ClosedEventsCard({ events, user }: ClosedEventsCardProps) {
             </div>
           )}
 
+          {/* Inhalt */}
           <CollapsibleContent>
             <CardContent className='space-y-6 pt-2 pb-4'>
-              {filteredEvents.active.map((e) => renderEventItem(e, false))}
+              {filtered.active.map((e) => renderEvent(e, false))}
               {showArchived &&
-                filteredEvents.archived.map((e) => renderEventItem(e, true))}
+                filtered.archived.map((e) => renderEvent(e, true))}
             </CardContent>
           </CollapsibleContent>
         </Collapsible>

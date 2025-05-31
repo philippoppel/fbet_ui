@@ -11,10 +11,10 @@ import { groupUpdateSchema } from '@/app/api/lib/groupSchema';
 
 // --- GET Handler ---
 export async function GET(req: NextRequest, context: any) {
-  const { params } = context as { params: { groupId: string } };
-  const groupId = parseInt(params.groupId, 10);
+  const { groupId } = await context.params;
+  const groupIdNum = parseInt(groupId, 10);
 
-  if (isNaN(groupId) || groupId <= 0) {
+  if (isNaN(groupIdNum) || groupIdNum <= 0) {
     return NextResponse.json(
       { error: 'Invalid group ID format' },
       { status: 400 }
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, context: any) {
 
   try {
     const groupForAuthCheck = await prisma.group.findUnique({
-      where: { id: groupId },
+      where: { id: groupIdNum },
       select: { createdById: true, id: true },
     });
 
@@ -37,14 +37,14 @@ export async function GET(req: NextRequest, context: any) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    const isMember = await isUserMemberOfGroup(currentUser.id, groupId);
+    const isMember = await isUserMemberOfGroup(currentUser.id, groupIdNum);
 
     if (!isMember && groupForAuthCheck.createdById !== currentUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch (authError) {
     console.error(
-      `Authorization error for group ${groupId} by user ${currentUser?.id}:`,
+      `Authorization error for group ${groupIdNum} by user ${currentUser?.id}:`,
       authError
     );
     return NextResponse.json(
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, context: any) {
 
   try {
     const group = await prisma.group.findUnique({
-      where: { id: groupId },
+      where: { id: groupIdNum },
     });
 
     if (!group) {
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest, context: any) {
 
     return NextResponse.json(group);
   } catch (err) {
-    console.error(`GET /api/groups/${params.groupId} failed:`, err); // params ist hier dank Assertion verfügbar
+    console.error(`GET /api/groups/${groupId} failed:`, err);
     return NextResponse.json(
       { error: 'Server error while reading group details' },
       { status: 500 }
@@ -72,23 +72,19 @@ export async function GET(req: NextRequest, context: any) {
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: any // Geändert zu any
-) {
-  const { params } = context as { params: { groupId: string } }; // Typ-Assertion hinzugefügt
-  const groupId = parseInt(params.groupId, 10); // params.groupId verwenden
+// --- PATCH Handler ---
+export async function PATCH(req: NextRequest, context: any) {
+  const { groupId } = await context.params;
+  const groupIdNum = parseInt(groupId, 10);
   const json = await req.json();
 
-  // Authentifizierung/Autorisierung für PATCH hinzufügen!
   const currentUser = await getCurrentUserFromRequest(req);
   if (!currentUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  // Fügen Sie hier eine Überprüfung hinzu, ob der currentUser berechtigt ist, diese Gruppe zu bearbeiten.
-  // Zum Beispiel: Ist er der Ersteller oder ein Admin?
+
   const groupToPatch = await prisma.group.findUnique({
-    where: { id: groupId },
+    where: { id: groupIdNum },
     select: { createdById: true },
   });
 
@@ -96,7 +92,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Group not found' }, { status: 404 });
   }
 
-  // Beispiel für eine Berechtigungsprüfung (anpassen nach Bedarf)
+  // Beispiel für Berechtigungsprüfung:
   // if (groupToPatch.createdById !== currentUser.id) {
   //   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   // }
@@ -111,12 +107,12 @@ export async function PATCH(
 
   try {
     const updated = await prisma.group.update({
-      where: { id: groupId },
+      where: { id: groupIdNum },
       data: { imageUrl: parsed.data.imageUrl ?? null },
     });
     return NextResponse.json(updated);
   } catch (error) {
-    console.error(`PATCH /api/groups/${params.groupId} failed:`, error); // params.groupId verwenden
+    console.error(`PATCH /api/groups/${groupId} failed:`, error);
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
@@ -135,8 +131,8 @@ export async function PATCH(
 
 // --- DELETE Handler ---
 export async function DELETE(req: NextRequest, context: any) {
-  const { params } = context as { params: { groupId: string } };
-  const groupIdString = params.groupId;
+  const { groupId } = await context.params;
+  const groupIdNum = parseInt(groupId, 10);
 
   try {
     const currentUser = await getCurrentUserFromRequest(req);
@@ -144,35 +140,22 @@ export async function DELETE(req: NextRequest, context: any) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const groupId = parseInt(groupIdString, 10);
-    if (isNaN(groupId) || groupId <= 0) {
-      // Konsistente Prüfung hinzugefügt
+    if (isNaN(groupIdNum) || groupIdNum <= 0) {
       return NextResponse.json(
-        { error: `Invalid group ID: ${groupIdString}` },
+        { error: `Invalid group ID: ${groupId}` },
         { status: 400 }
       );
     }
 
     const group = await prisma.group.findUnique({
-      where: {
-        id: groupId,
-        // Stelle sicher, dass der createdById Check hier sinnvoll ist oder entferne ihn,
-        // wenn die Berechtigungsprüfung anderswo erfolgt.
-        // createdById: currentUser.id, // War vorher aktiv
-      },
-      select: { createdById: true }, // Nur benötigtes Feld für die Prüfung
+      where: { id: groupIdNum },
+      select: { createdById: true },
     });
 
     if (!group) {
-      return NextResponse.json(
-        {
-          error: 'Group not found', // Angepasste Fehlermeldung
-        },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     }
 
-    // Explizite Berechtigungsprüfung, falls createdById nicht in der where-Klausel ist
     if (group.createdById !== currentUser.id) {
       return NextResponse.json(
         { error: 'User not authorized to delete this group' },
@@ -181,14 +164,12 @@ export async function DELETE(req: NextRequest, context: any) {
     }
 
     await prisma.group.delete({
-      where: {
-        id: groupId,
-      },
+      where: { id: groupIdNum },
     });
 
     return new NextResponse(null, { status: 204 });
   } catch (error: unknown) {
-    console.error(`Error in DELETE /api/groups/${groupIdString}:`, error);
+    console.error(`Error in DELETE /api/groups/${groupId}:`, error);
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2025') {

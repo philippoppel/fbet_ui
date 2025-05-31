@@ -398,7 +398,7 @@ export interface GroupWithOpenEvents {
 export async function getGroupsWithOpenEvents(
   token: string
 ): Promise<GroupWithOpenEvents[]> {
-  const response = await fetch('/api/open-events', {
+  const response = await fetch(`${API_BASE_URL}/api/open-events`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return handleResponse<GroupWithOpenEvents[]>(response);

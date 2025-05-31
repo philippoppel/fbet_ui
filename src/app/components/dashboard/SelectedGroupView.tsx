@@ -9,11 +9,11 @@ import type {
 } from '@/app/lib/types'; // NEU: AllTipsPerEvent importieren
 import type { UseGroupInteractionsReturn } from '@/app/hooks/useGroupInteractions';
 
-import { ClosedEventsCard } from './ClosedEventsCard';
 import DeleteEventDialog from './DeleteEventDialog';
 import { GroupHeaderCard } from '@/app/components/dashboard/GroupHeaderCard';
 import OpenEventsCard from '@/app/components/dashboard/OpenEventsCard';
-import SubmittedOpenEventsCard from './SubmittedOpenEventsCard'; // NEU: Importieren
+import SubmittedOpenEventsCard from './SubmittedOpenEventsCard';
+import ClosedEventsCard from '@/app/components/dashboard/ClosedEventsCard'; // NEU: Importieren
 
 type SelectedGroupViewProps = {
   group: Group;
