@@ -1,5 +1,5 @@
 
-const APP_SHELL_CACHE_NAME = 'fbet-app-shell-v2.0.2';
+const APP_SHELL_CACHE_NAME = 'fbet-app-shell-v2.0.3';
 
 const urlsToCacheForAppShell = [
   '/', // Startseite
