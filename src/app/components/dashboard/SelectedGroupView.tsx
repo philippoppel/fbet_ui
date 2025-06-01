@@ -91,7 +91,11 @@ export function SelectedGroupView({
       />
 
       {/* ───────── Geschlossene Events ───────── */}
-      <ClosedEventsCard events={events} user={user} />
+      <ClosedEventsCard
+        events={events}
+        user={user}
+        allTipsPerEvent={allTipsPerEvent}
+      />
 
       {/* ───────── Delete-Event-Dialog ───────── */}
       {interactions.eventToDelete && (
