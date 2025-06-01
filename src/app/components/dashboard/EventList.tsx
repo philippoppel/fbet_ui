@@ -1,18 +1,14 @@
 // src/components/dashboard/EventList.tsx
-'use client'; // Notwendig, da ein onClick-Handler als Prop empfangen wird
+'use client';
 
-import { EventCard } from '@/app/components/event/EventCard'; // Importiere die bestehende EventCard
-import type {
-  MixedEvent,
-  UfcEventItem,
-  BoxingScheduleItem,
-} from '@/app/lib/types'; // Pfad ggf. anpassen
+import { EventCard } from '@/app/components/event/EventCard';
+import type { MixedEvent } from '@/app/lib/types'; // UfcEventItem und BoxingScheduleItem sind in MixedEvent.original enthalten
 
-// Definiere die Props
+// Definiere die Props - onProposeEvent erwartet jetzt einen string (die Event-ID)
 type EventListProps = {
-  events: MixedEvent[]; // Die kombinierten und sortierten Events
-  onProposeEvent: (event: UfcEventItem | BoxingScheduleItem) => void; // Callback-Funktion
-  disabled: boolean; // Soll der "Wette hinzufügen"-Button deaktiviert sein?
+  events: MixedEvent[];
+  onProposeEvent: (eventId: string) => void; // GEÄNDERT: Erwartet jetzt event.id (string)
+  disabled: boolean;
 };
 
 export function EventList({
@@ -20,12 +16,6 @@ export function EventList({
   onProposeEvent,
   disabled,
 }: EventListProps) {
-  // Optional: Füge hier Lade-/Fehlerzustände hinzu, wenn die Liste sie selbst behandeln soll.
-  // Aktuell gehen wir davon aus, dass die übergeordnete Komponente (DashboardPage)
-  // diese Liste nur rendert, wenn Events vorhanden und geladen sind.
-
-  // Zeige eine Nachricht an, wenn die Liste leer ist (obwohl nicht geladen wird)
-  // Diese Prüfung könnte auch in DashboardPage erfolgen.
   if (events.length === 0) {
     return (
       <p className='text-sm text-muted-foreground'>
@@ -35,23 +25,21 @@ export function EventList({
   }
 
   return (
-    // Das ist der JSX-Code aus der DashboardPage für die Event-Liste
     <ul className='space-y-4'>
-      {events.map((event) => (
-        <EventCard
-          key={event.id}
-          title={event.title}
-          subtitle={event.subtitle}
-          // Deaktivierungsstatus von der übergeordneten Komponente übernehmen
-          disabled={disabled}
-          // Callback-Funktion für den Klick weitergeben
-          onClick={() => onProposeEvent(event.original)}
-          // Badge basierend auf der Sportart setzen
-          badge={event.sport === 'ufc' ? 'UFC' : 'Boxen'}
-          // Hier könntest du auch ein Icon übergeben, wenn gewünscht
-          // icon={<PassendesIcon />}
-        />
-      ))}
+      {events.map(
+        (
+          event // 'event' hier ist ein MixedEvent-Objekt
+        ) => (
+          <EventCard
+            key={event.id} // Die eindeutige ID des MixedEvent
+            title={event.title}
+            subtitle={event.subtitle}
+            disabled={disabled}
+            onClick={() => onProposeEvent(event.id)} // GEÄNDERT: Übergibt jetzt event.id
+            badge={event.sport === 'ufc' ? 'UFC' : 'Boxen'}
+          />
+        )
+      )}
     </ul>
   );
 }
