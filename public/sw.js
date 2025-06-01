@@ -1,12 +1,8 @@
-// public/sw.js
 
-// NEU: Separate Cache-Namen für bessere Verwaltung
-const APP_SHELL_CACHE_NAME = 'fbet-app-shell-v2.0.2'; // WICHTIG: Erhöhe die Version (v2, v3...), wenn du die App-Shell-Dateien (unten in urlsToCacheForAppShell) änderst!
-const DATA_CACHE_NAME = 'fbet-data-cache-v1';    // Für dynamische Daten von deinen APIs
+const APP_SHELL_CACHE_NAME = 'fbet-app-shell-v2.0.2';
 
-// Dateien, die zur App-Shell gehören und beim Installieren gecached werden.
 const urlsToCacheForAppShell = [
-  '/', // Deine Startseite
+  '/', // Startseite
   '/manifest.json',
   '/favicon.ico',
   '/favicon-16x16.png',
@@ -14,136 +10,83 @@ const urlsToCacheForAppShell = [
   '/apple-touch-icon.png',
   '/web-app-manifest-192x192.png',
   '/web-app-manifest-512x512.png',
-  // '/web-app-manifest-maskable-192x192.png', // Falls du Maskable Icons hast
-  // '/web-app-manifest-maskable-512x512.png', // Falls du Maskable Icons hast
-  // '/offline.html' // Empfehlung: Eine Offline-Fallback-Seite erstellen und hier hinzufügen
+  // Optional: '/offline.html'
 ];
 
-// Installation: App-Shell-Assets in den Cache laden
+// Installation → App-Shell cachen
 self.addEventListener('install', (event) => {
-  console.log('[SW] Install Event: Caching App-Shell-Assets.');
+  console.log('[SW] Install Event: Caching App-Shell.');
   event.waitUntil(
     caches.open(APP_SHELL_CACHE_NAME)
       .then((cache) => {
-        console.log('[SW] Caching für App Shell:', urlsToCacheForAppShell);
+        console.log('[SW] Caching App-Shell:', urlsToCacheForAppShell);
         return cache.addAll(urlsToCacheForAppShell);
       })
-      .then(() => {
-        console.log('[SW] App-Shell-Assets erfolgreich gecached.');
-        return self.skipWaiting(); // Wichtig: Neuer SW übernimmt sofort Kontrolle
-      })
-      .catch(error => {
-        console.error('[SW] Fehler beim Cachen der App-Shell-Assets:', error);
+      .then(() => self.skipWaiting())
+      .catch((error) => {
+        console.error('[SW] Fehler beim Cachen der App-Shell:', error);
       })
   );
 });
 
-// Aktivierung: Alte Caches löschen
+// Aktivierung → Alte Caches löschen
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activate Event: Alte Caches werden gelöscht und Clients übernommen.');
+  console.log('[SW] Activate Event: Alte Caches bereinigen.');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Lösche alle Caches, die nicht unseren aktuell definierten Cache-Namen entsprechen
-          if (cacheName !== APP_SHELL_CACHE_NAME && cacheName !== DATA_CACHE_NAME) {
+          if (cacheName !== APP_SHELL_CACHE_NAME) {
             console.log('[SW] Lösche alten Cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => {
-      console.log('[SW] Clients werden übernommen.');
-      return self.clients.claim(); // Übernimmt Kontrolle über alle offenen Clients
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
-// Fetch: Anfragen abfangen und passende Cache-Strategie anwenden
+// Fetch → App-Shell Caching, API → Network Only
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Nur GET-Anfragen behandeln wir mit Caching-Strategien
-  if (request.method !== 'GET') {
-    // Für POST, PUT, DELETE etc. direkt ans Netzwerk, keine Cache-Interaktion durch den SW.
-    // console.log('[SW] Bearbeite nicht-GET Anfrage direkt vom Netzwerk:', request.method, request.url);
-    return; // Lässt den Browser die Anfrage normal behandeln
-  }
-
-  // Strategie für API-Anfragen (z.B. alles unter /api/)
-  // Hier: Stale-While-Revalidate (aus Cache schnell, dann im Hintergrund aktualisieren)
+  // 1️⃣ API → Immer Network Only
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) {
-    // console.log('[SW] API Anfrage (Stale-While-Revalidate):', request.url);
-    event.respondWith(
-      caches.open(DATA_CACHE_NAME).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          const fetchPromise = fetch(request).then((networkResponse) => {
-            // Wenn die Netzwerkantwort gültig ist, aktualisiere den Cache
-            if (networkResponse && networkResponse.ok) {
-              // console.log('[SW] Aktualisiere Daten-Cache für:', request.url);
-              cache.put(request, networkResponse.clone()); // Wichtig: Response klonen
-            }
-            return networkResponse;
-          }).catch(error => {
-            console.warn('[SW] Netzwerk-Fetch für API fehlgeschlagen:', request.url, error);
-            // Wenn Netzwerk fehlschlägt und nichts im Cache ist, wird der Fehler weitergegeben.
-            // Du könntest hier eine generische Offline-JSON-Antwort für APIs zurückgeben, falls gewünscht.
-          });
-
-          // Gebe die gecachte Antwort sofort zurück, falls vorhanden,
-          // andernfalls warte auf die Netzwerkantwort (fetchPromise).
-          return cachedResponse || fetchPromise;
-        });
-      })
-    );
+    console.log('[SW] API Call → Network Only:', request.url);
+    event.respondWith(fetch(request));
+    return;
   }
-    // Strategie für App-Shell-Assets und andere statische Ressourcen der eigenen Domain
-  // Hier: Cache First, dann Netzwerk (gut für JS/CSS Chunks von Next.js, Bilder etc.)
-  else if (url.origin === self.location.origin) {
-    // console.log('[SW] App/Statische Anfrage (Cache First):', request.url);
+
+  // 2️⃣ App-Shell / statische Ressourcen → Cache First
+  if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          // console.log('[SW] Liefere aus App-Shell-Cache:', request.url);
-          return cachedResponse; // Aus dem Cache servieren
+          return cachedResponse;
         }
-
-        // Nicht im Cache (oder Cache-Miss bei Navigation), also vom Netzwerk holen
-        // console.log('[SW] Hole vom Netzwerk (App/Statisch):', request.url);
         return fetch(request).then((networkResponse) => {
-          // Wichtig: Nur gültige Antworten cachen (Status 2xx)
-          // Und nur, wenn es sich nicht um eine API-Anfrage handelt (die oben schon behandelt wird)
-          // oder um Streams (wie Server-Sent Events), die man nicht ohne Weiteres cachen sollte.
-          if (networkResponse && networkResponse.ok && !url.pathname.startsWith('/api/')) {
-            const responseToCache = networkResponse.clone();
+          if (networkResponse && networkResponse.ok) {
             caches.open(APP_SHELL_CACHE_NAME).then((cache) => {
-              // console.log('[SW] Cache App/Statische Ressource dynamisch:', request.url);
-              cache.put(request, responseToCache);
+              cache.put(request, networkResponse.clone());
             });
           }
           return networkResponse;
         }).catch(() => {
-          // Offline-Fallback, falls gewünscht und gecached (z.B. für Navigationsanfragen)
-          // if (request.mode === 'navigate' && urlsToCacheForAppShell.includes('/offline.html')) {
-          //   console.log('[SW] Liefere Offline-Fallback-Seite für Navigation.');
-          //   return caches.match('/offline.html');
-          // }
-          // Ansonsten wird der Fehler weitergegeben, wenn nichts geladen werden kann.
+          // Optional: Offline-Fallback
+          // return caches.match('/offline.html');
         });
       })
     );
   }
-  // Für Cross-Origin-Anfragen (z.B. Google Fonts, externe Bilder) nicht eingreifen.
-  // Der Browser behandelt sie normal (Netzwerk, eigener HTTP-Cache des Browsers).
-  // Wenn du Cross-Origin-Ressourcen cachen möchtest, brauchst du eine explizite Strategie
-  // und der Server der Ressource muss CORS korrekt konfiguriert haben.
+
+  // 3️⃣ Externe Ressourcen → Standard Browser Handling (kein Eingriff)
 });
 
-// Nachrichten vom Client empfangen (z.B. für SKIP_WAITING)
+// Nachrichten vom Client (z.B. SKIP_WAITING)
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[SW] SKIP_WAITING Nachricht vom Client empfangen. Aktiviere neuen SW.');
+    console.log('[SW] SKIP_WAITING empfangen → aktiviere neuen SW.');
     self.skipWaiting();
   }
 });
