@@ -324,7 +324,7 @@ export function SingleOpenEventItem({
                       : 'outline'
                   }
                   size='sm'
-                  className='text-sm whitespace-normal break-words h-auto py-1.5 px-2 text-center'
+                  className='w-full justify-start py-3 px-4 text-sm rounded-md transition-colors whitespace-normal break-words h-auto text-left flex items-center gap-2'
                   onClick={() => onResultInputChange(event.id, option)}
                   disabled={isSettingCurrentEventResult}
                 >
