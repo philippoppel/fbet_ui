@@ -1,64 +1,86 @@
 // src/app/api/lib/auth.ts
 import { NextRequest } from 'next/server';
 import { verifyJwt } from './jwt'; // Deine existierende JWT-Logik-Datei
-// Passe den Pfad an, falls deine Datei anders heißt
-// z.B. './deine-jwt-datei'
 import { prisma } from './prisma'; // Deine globale Prisma Client Instanz
-import { User } from '@prisma/client';
+// Stelle sicher, dass der Prisma Client User Typ importiert wird, falls nicht automatisch erkannt
+// import type { User as PrismaUser } from '@prisma/client';
 
 // Definiere, wie dein User-Objekt aussehen soll, das von dieser Funktion zurückgegeben wird.
-// Es sollte mindestens die ID enthalten.
+// Diese Felder sollten mit dem `select` in `prisma.user.findUnique` übereinstimmen.
 export interface AuthenticatedUser {
   id: number;
   email: string;
-  // Füge hier weitere Felder hinzu, die du häufig benötigst, z.B. name, isActive
-  // Diese sollten mit den Feldern übereinstimmen, die du im `select` unten auswählst.
+  name: string | null; // Hinzugefügt, da es im select enthalten ist
+  isActive: boolean; // Hinzugefügt, da es im select enthalten ist
 }
 
 export async function getCurrentUserFromRequest(
   req: NextRequest
 ): Promise<AuthenticatedUser | null> {
+  let tokenValue: string | undefined = undefined;
+
+  // 1. Versuche, Token aus dem Authorization-Header zu lesen
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const headerToken = authHeader.split(' ')[1];
+    // Überprüfe, ob der Token nach dem Split tatsächlich existiert und nicht "null" oder "undefined" als String ist
+    if (
+      headerToken &&
+      headerToken.toLowerCase() !== 'null' &&
+      headerToken.toLowerCase() !== 'undefined'
+    ) {
+      tokenValue = headerToken;
+      console.log('[Auth] Token from Authorization header utilized.');
+    } else {
+      console.log(
+        '[Auth] Authorization header was "Bearer null/undefined", ignoring header.'
+      );
+    }
+  }
+
+  // 2. Wenn kein (gültiger) Token im Header, versuche, ihn aus dem 'fbet_token'-Cookie zu lesen
+  if (!tokenValue) {
+    const cookie = req.cookies.get('fbet_token'); // 'fbet_token' ist der Name deines Cookies
+    if (cookie && cookie.value) {
+      tokenValue = cookie.value;
+      console.log('[Auth] Token from "fbet_token" cookie utilized.');
+    }
+  }
+
+  if (!tokenValue) {
+    console.log(
+      '[Auth] No valid token found in Authorization header or "fbet_token" cookie.'
+    );
+    return null;
+  }
+
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('No Bearer token found in Authorization header');
-      return null;
-    }
-
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-      console.log('Token is empty after splitting Bearer');
-      return null;
-    }
-
-    const decodedPayload = verifyJwt(token); // Deine verifyJwt Funktion
+    const decodedPayload = verifyJwt(tokenValue); // Deine verifyJwt Funktion
     if (!decodedPayload) {
-      console.log('Token verification failed or token is invalid/expired');
+      console.log(
+        '[Auth] Token verification failed or token is invalid/expired. Token used (first 10 chars):',
+        tokenValue.substring(0, 10) + '...'
+      );
       return null;
     }
 
-    // Stelle sicher, dass die Payload eine userId enthält.
-    // Der Typ von decodedPayload.userId könnte string oder number sein, je nachdem, wie es im JWT gespeichert wird.
-    // Prisma erwartet eine number für die ID, also konvertieren wir ggf.
     let userId: number | undefined = undefined;
 
     if (decodedPayload.userId && typeof decodedPayload.userId === 'number') {
       userId = decodedPayload.userId;
     } else if (decodedPayload.sub && typeof decodedPayload.sub === 'string') {
-      // 'sub' ist ein gängiges Feld für User ID
       const parsedId = parseInt(decodedPayload.sub, 10);
       if (!isNaN(parsedId)) {
         userId = parsedId;
       }
     } else if (decodedPayload.id && typeof decodedPayload.id === 'number') {
-      // Falls du 'id' direkt verwendest
       userId = decodedPayload.id;
     }
-    // Füge weitere Checks hinzu, falls deine User-ID anders in der Payload heißt
+    // Du kannst hier bei Bedarf weitere Felder aus dem JWT Payload prüfen
 
     if (userId === undefined) {
       console.log(
-        'User ID (userId, sub, or id) not found or invalid in JWT payload',
+        '[Auth] User ID (userId, sub, or id) not found or invalid in JWT payload:',
         decodedPayload
       );
       return null;
@@ -69,24 +91,28 @@ export async function getCurrentUserFromRequest(
       select: {
         id: true,
         email: true,
-        name: true, // Beispiel: auch den Namen laden
-        isActive: true, // Wichtig, um inaktive User auszuschließen
+        name: true, // Wie in deinem ursprünglichen Code
+        isActive: true, // Wie in deinem ursprünglichen Code
       },
     });
 
     if (!user) {
-      console.log(`User with ID ${userId} not found in database.`);
+      console.log(`[Auth] User with ID ${userId} not found in database.`);
       return null;
     }
 
     if (!user.isActive) {
-      console.log(`User with ID ${userId} is not active.`);
+      console.log(`[Auth] User with ID ${userId} is not active.`);
       return null;
     }
 
-    return user as AuthenticatedUser; // Stelle sicher, dass die ausgewählten Felder zum Interface passen
+    // Das 'user' Objekt von Prisma sollte nun dem 'AuthenticatedUser' Interface entsprechen.
+    return user as AuthenticatedUser;
   } catch (error) {
-    console.error('Error in getCurrentUserFromRequest:', error);
+    console.error(
+      '[Auth] Error during token verification, JWT parsing, or database lookup:',
+      error
+    );
     return null;
   }
 }

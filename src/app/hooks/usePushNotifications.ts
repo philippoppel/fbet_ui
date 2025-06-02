@@ -1,11 +1,10 @@
 // src/app/hooks/usePushNotifications.ts
 import { useState, useEffect, useCallback } from 'react';
 
-// Stelle sicher, dass dein VAPID Public Key als Umgebungsvariable verfügbar ist
-// und mit NEXT_PUBLIC_ beginnt, damit er im Client-Bundle enthalten ist.
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  // ... (Funktion bleibt gleich) ...
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = window.atob(base64);
@@ -17,11 +16,12 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export enum PushNotificationStatus {
+  // ... (Enum bleibt gleich) ...
   LOADING = 'loading',
-  SUPPORTED_SUBSCRIBED = 'supported_subscribed', // Push unterstützt & Nutzer ist abonniert
-  SUPPORTED_NOT_SUBSCRIBED = 'supported_not_subscribed', // Push unterstützt & Nutzer ist NICHT abonniert (oder Erlaubnis fehlt)
-  NOT_SUPPORTED = 'not_supported', // Push API nicht im Browser verfügbar
-  PERMISSION_DENIED = 'permission_denied', // Nutzer hat Erlaubnis verweigert
+  SUPPORTED_SUBSCRIBED = 'supported_subscribed',
+  SUPPORTED_NOT_SUBSCRIBED = 'supported_not_subscribed',
+  NOT_SUPPORTED = 'not_supported',
+  PERMISSION_DENIED = 'permission_denied',
   ERROR = 'error',
 }
 
@@ -34,6 +34,7 @@ export function usePushNotifications() {
     useState<PushSubscription | null>(null);
 
   const isPushApiSupported = useCallback(() => {
+    // ... (Funktion bleibt gleich) ...
     return (
       typeof window !== 'undefined' &&
       'serviceWorker' in navigator &&
@@ -42,8 +43,8 @@ export function usePushNotifications() {
     );
   }, []);
 
-  // Funktion, um den aktuellen Status (inkl. Subscription) zu prüfen und zu setzen
   const checkSubscriptionStatus = useCallback(async () => {
+    // ... (Funktion bleibt gleich) ...
     if (!isPushApiSupported()) {
       setStatus(PushNotificationStatus.NOT_SUPPORTED);
       return;
@@ -79,6 +80,7 @@ export function usePushNotifications() {
 
   const requestPermissionAndSubscribe =
     useCallback(async (): Promise<boolean> => {
+      // ... (Logik für Support-Check, VAPID Key, Permission-Request, SW ready, pushManager.subscribe bleibt gleich) ...
       if (!isPushApiSupported()) {
         setStatus(PushNotificationStatus.NOT_SUPPORTED);
         setError(
@@ -97,7 +99,6 @@ export function usePushNotifications() {
 
       setStatus(PushNotificationStatus.LOADING);
       try {
-        // 1. Erlaubnis anfordern
         const permission = await Notification.requestPermission();
         if (permission === 'denied') {
           setStatus(PushNotificationStatus.PERMISSION_DENIED);
@@ -105,46 +106,45 @@ export function usePushNotifications() {
           return false;
         }
         if (permission === 'default') {
-          // Nutzer hat das Dialogfeld geschlossen ohne eine Auswahl zu treffen
           setStatus(PushNotificationStatus.SUPPORTED_NOT_SUBSCRIBED);
           setError('Keine Erlaubnis für Benachrichtigungen erteilt.');
           return false;
         }
 
-        // 2. Service Worker Registrierung abwarten (sollte durch Layout schon erfolgt sein)
         const registration = await navigator.serviceWorker.ready;
-
-        // 3. Push Manager abonnieren
-        console.log(
-          '[usePushNotifications] Versuche zu subscriben mit VAPID Key:',
-          VAPID_PUBLIC_KEY.substring(0, 10) + '...'
-        );
         const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true, // Erforderlich, bedeutet, dass jede Push-Nachricht eine sichtbare Benachrichtigung auslöst
+          userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
-        console.log(
-          '[usePushNotifications] Erfolgreich subscribed beim Push Manager:',
-          subscription
-        );
 
-        // 4. Subscription an Backend senden
-        const token = localStorage.getItem('fbet_token'); // Dein Auth-Token
+        // 4. Subscription an Backend senden - OHNE manuellen Authorization Header
+        // Der Browser sollte den 'fbet_token' Cookie automatisch mitsenden.
+        console.log(
+          '[PushHook] Sending subscription to backend (relying on cookie auth)'
+        );
         const response = await fetch('/api/push/subscribe', {
           method: 'POST',
           body: JSON.stringify(subscription),
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`, // Wichtig für die User-Zuordnung im Backend
+            // KEIN 'Authorization': `Bearer ${token}` Header mehr hier!
           },
         });
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({
-            error: 'Failed to send subscription to backend, unknown error.',
+            error:
+              'Failed to send subscription to backend, unknown server error.',
           }));
+          // Spezifische Fehlermeldung für 401, falls es immer noch passiert
+          if (response.status === 401) {
+            throw new Error(
+              errorData.error || 'Nicht autorisiert. Bitte erneut einloggen.'
+            );
+          }
           throw new Error(
-            errorData.error || `Server error: ${response.status}`
+            errorData.error ||
+              `Serverfehler beim Speichern der Subscription: ${response.status}`
           );
         }
 
@@ -156,6 +156,7 @@ export function usePushNotifications() {
         setError(null);
         return true;
       } catch (err: any) {
+        // ... (Fehlerbehandlung bleibt ähnlich) ...
         console.error(
           '[usePushNotifications] Fehler beim Anfordern der Erlaubnis oder Subscriben:',
           err
@@ -164,20 +165,20 @@ export function usePushNotifications() {
           err.message ||
             'Unbekannter Fehler beim Aktivieren der Benachrichtigungen.'
         );
-        // Status basierend auf Fehler aktualisieren
         if (
           err.message.includes('Permission denied') ||
           err.name === 'NotAllowedError'
         ) {
           setStatus(PushNotificationStatus.PERMISSION_DENIED);
         } else {
-          await checkSubscriptionStatus(); // Erneut prüfen, um den korrekten "not subscribed" Status zu setzen
+          await checkSubscriptionStatus();
         }
         return false;
       }
     }, [isPushApiSupported, checkSubscriptionStatus]);
 
   const unsubscribeUser = useCallback(async (): Promise<boolean> => {
+    // ... (Logik für Support-Check, currentSubscription.unsubscribe() bleibt gleich) ...
     if (!isPushApiSupported() || !currentSubscription) {
       setError(
         currentSubscription
@@ -189,34 +190,39 @@ export function usePushNotifications() {
 
     setStatus(PushNotificationStatus.LOADING);
     try {
-      // 1. Vom Push Manager des Browsers de-subscriben
       const unsubscribedSuccessfully = await currentSubscription.unsubscribe();
       if (!unsubscribedSuccessfully) {
-        // Sollte selten passieren, aber zur Sicherheit
         throw new Error(
           'Fehler beim De-Subscriben vom Push Manager des Browsers.'
         );
       }
-      console.log(
-        '[usePushNotifications] Erfolgreich de-subscribed vom Push Manager.'
-      );
 
-      // 2. Info an Backend senden, um Subscription zu löschen
-      const token = localStorage.getItem('fbet_token');
+      // 2. Info an Backend senden - OHNE manuellen Authorization Header
+      console.log(
+        '[PushHook] Sending unsubscribe to backend (relying on cookie auth)'
+      );
       const response = await fetch('/api/push/unsubscribe', {
         method: 'POST',
         body: JSON.stringify({ endpoint: currentSubscription.endpoint }),
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          // KEIN 'Authorization': `Bearer ${token}` Header mehr hier!
         },
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
-          error: 'Failed to send unsubscribe to backend, unknown error.',
+          error: 'Failed to send unsubscribe to backend, unknown server error.',
         }));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+        if (response.status === 401) {
+          throw new Error(
+            errorData.error || 'Nicht autorisiert. Bitte erneut einloggen.'
+          );
+        }
+        throw new Error(
+          errorData.error ||
+            `Serverfehler beim Abmelden der Subscription: ${response.status}`
+        );
       }
 
       console.log(
@@ -227,25 +233,27 @@ export function usePushNotifications() {
       setError(null);
       return true;
     } catch (err: any) {
+      // ... (Fehlerbehandlung bleibt ähnlich) ...
       console.error('[usePushNotifications] Fehler beim Unsubscriben:', err);
       setError(
         err.message ||
           'Unbekannter Fehler beim Deaktivieren der Benachrichtigungen.'
       );
-      await checkSubscriptionStatus(); // Status neu prüfen, um Konsistenz sicherzustellen
+      await checkSubscriptionStatus();
       return false;
     }
   }, [isPushApiSupported, currentSubscription, checkSubscriptionStatus]);
 
   return {
+    // ... (Return-Objekt bleibt gleich) ...
     status,
     error,
     requestPermissionAndSubscribe,
     unsubscribeUser,
-    checkSubscriptionStatus, // Um manuell den Status neu zu laden, falls nötig
-    isSubscribed: status === PushNotificationStatus.SUPPORTED_SUBSCRIBED, // Bequemer Helfer
-    canSubscribe: status === PushNotificationStatus.SUPPORTED_NOT_SUBSCRIBED, // Bequemer Helfer
-    permissionDenied: status === PushNotificationStatus.PERMISSION_DENIED, // Bequemer Helfer
-    isLoading: status === PushNotificationStatus.LOADING, // Bequemer Helfer
+    checkSubscriptionStatus,
+    isSubscribed: status === PushNotificationStatus.SUPPORTED_SUBSCRIBED,
+    canSubscribe: status === PushNotificationStatus.SUPPORTED_NOT_SUBSCRIBED,
+    permissionDenied: status === PushNotificationStatus.PERMISSION_DENIED,
+    isLoading: status === PushNotificationStatus.LOADING,
   };
 }
