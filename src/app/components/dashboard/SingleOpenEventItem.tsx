@@ -10,7 +10,7 @@ import {
 } from '@/app/components/ui/dropdown-menu';
 import { Button } from '@/app/components/ui/button';
 import { MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
-import { cn } from '@/app/lib/utils';
+import { cn } from '@/app/lib/utils'; // cn is imported but not used in the provided snippet. Assuming it might be used elsewhere or intended for future use.
 import { CommentSection } from '@/app/components/dashboard/CommentSection';
 
 interface SingleOpenEventItemProps {
@@ -77,13 +77,15 @@ export function SingleOpenEventItem({
     <div className='space-y-4'>
       <div className='flex justify-between items-start gap-4'>
         <div className='flex-1 space-y-1'>
-          <h4 className='text-lg font-semibold text-foreground leading-tight'>
+          <h4 className='text-lg font-semibold text-foreground leading-tight break-words'>
             {event.title || 'Unbenanntes Event'}
           </h4>
           {event.description && (
-            <p className='text-sm text-muted-foreground'>{event.description}</p>
+            <p className='text-sm text-muted-foreground break-words'>
+              {event.description}
+            </p>
           )}
-          <p className='text-sm font-medium text-primary mt-1'>
+          <p className='text-sm font-medium text-primary mt-1 break-words'>
             {event.question || 'Frage fehlt.'}
           </p>
         </div>
@@ -130,7 +132,7 @@ export function SingleOpenEventItem({
               if (!userHasSubmittedTip) onSelectTip(event.id, option);
             }}
             disabled={userHasSubmittedTip || submitting}
-            className='w-full justify-start py-3 px-4 text-sm rounded-md transition-colors hover:bg-accent'
+            className='w-full justify-start py-3 px-4 text-sm rounded-md transition-colors hover:bg-accent whitespace-normal break-words h-auto text-left'
           >
             {option}
             {userSubmittedTips[event.id] === option && (
@@ -166,7 +168,7 @@ export function SingleOpenEventItem({
       )}
 
       {userHasSubmittedTip && (
-        <p className='text-sm text-muted-foreground'>
+        <p className='text-sm text-muted-foreground break-words'>
           Dein Tipp: „{userSubmittedTips[event.id]}“
         </p>
       )}
@@ -184,7 +186,7 @@ export function SingleOpenEventItem({
                   key={`result-${event.id}-${i}`}
                   variant={resultInput === option ? 'default' : 'outline'}
                   size='sm'
-                  className='text-sm'
+                  className='text-sm whitespace-normal break-words h-auto py-1.5 px-2 text-center'
                   onClick={() => onResultInputChange(event.id, option)}
                   disabled={settingResult}
                 >
@@ -197,7 +199,7 @@ export function SingleOpenEventItem({
                 onClick={() => onSetResult(event.id, resultInput)}
                 disabled={settingResult}
                 size='sm'
-                className='mt-3 text-sm'
+                className='mt-3 text-sm whitespace-normal break-words h-auto py-1.5 px-2 text-center'
               >
                 {settingResult && (
                   <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -208,7 +210,6 @@ export function SingleOpenEventItem({
           </div>
         )}
 
-      {/* Kommentarbereich */}
       {user && <CommentSection eventId={event.id} currentUser={user} />}
     </div>
   );
