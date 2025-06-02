@@ -193,86 +193,64 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   /* ------------------ SERVICE WORKER REGISTRATION (MODIFIZIERT FÜR DEV/PROD) ------------------ */
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      if (process.env.NODE_ENV === 'production') {
-        // PRODUKTIONSMODUS: Service Worker registrieren
-        const registerServiceWorker = async () => {
-          try {
-            const registration = await navigator.serviceWorker.register(
-              '/sw.js',
-              {
-                scope: '/',
-                updateViaCache: 'none',
-              }
-            );
-            console.log('[Layout] Service Worker registriert (PROD).');
-            registration.update(); // Optional: Sofort nach Updates suchen lassen
-          } catch (error) {
-            console.error(
-              '[Layout] Service Worker Registrierung fehlgeschlagen (PROD):',
-              error
-            );
-          }
-        };
-        window.addEventListener('load', registerServiceWorker);
+      const registerServiceWorker = async () => {
+        try {
+          // Registriere deinen Service Worker (sw.js) für alle Umgebungen
+          const registration = await navigator.serviceWorker.register(
+            '/sw.js',
+            {
+              scope: '/', // Stellt sicher, dass der SW den gesamten Ursprung abdeckt
+              // updateViaCache: 'none', // 'none' kann bei der Entwicklung helfen, Updates schneller zu bekommen,
+              // aber für Produktion ist das Standardverhalten oft besser.
+              // Überlege, ob du das für Prod anders setzen willst.
+            }
+          );
+          console.log(
+            `[Layout] Service Worker registriert (Scope: ${registration.scope}). NODE_ENV: ${process.env.NODE_ENV}`
+          );
 
-        const updateInterval = setInterval(
+          // Optional: Sofort nach Updates suchen lassen, besonders nützlich nach der ersten Registrierung
+          // oder wenn du schnelle Updates erzwingen möchtest.
+          registration.update();
+        } catch (error) {
+          console.error(
+            '[Layout] Service Worker Registrierung fehlgeschlagen:',
+            error
+          );
+        }
+      };
+
+      // Registriere den SW, sobald das Fenster geladen ist, um kritische Ressourcen nicht zu blockieren.
+      // Du kannst dies auch früher tun, wenn es für deine App-Struktur besser passt.
+      window.addEventListener('load', registerServiceWorker);
+
+      // Periodisches Update-Check (optional, aber gut für langlebige PWAs)
+      // Nur im Produktionsmodus, um im Entwicklungsmodus nicht unnötig zu pollen
+      let updateIntervalId: NodeJS.Timeout | null = null;
+      if (process.env.NODE_ENV === 'production') {
+        updateIntervalId = setInterval(
           async () => {
             const registration =
               await navigator.serviceWorker.getRegistration();
             if (registration) {
-              console.log('[Layout] Periodisches SW Update Check (PROD)...');
+              console.log('[Layout] Periodischer SW Update Check (PROD)...');
               registration.update();
             }
           },
           1000 * 60 * 15
         ); // z.B. alle 15 Minuten
-
-        return () => {
-          window.removeEventListener('load', registerServiceWorker);
-          clearInterval(updateInterval);
-        };
-      } else {
-        // ENTWICKLUNGSMODUS: Alle Service Worker für diesen Scope de-registrieren
-        navigator.serviceWorker
-          .getRegistrations()
-          .then((registrations) => {
-            if (registrations.length > 0) {
-              // console.log('[Layout] De-registriere existierende Service Worker (DEV)...');
-            }
-            for (const registration of registrations) {
-              if (registration.scope === window.location.origin + '/') {
-                registration
-                  .unregister()
-                  .then((success) => {
-                    if (success) {
-                      console.log(
-                        '[Layout] Service Worker de-registriert für Scope:',
-                        registration.scope,
-                        '(DEV)'
-                      );
-                    } else {
-                      // console.warn('[Layout] Service Worker konnte nicht de-registriert werden für Scope:', registration.scope, '(DEV)');
-                    }
-                  })
-                  .catch((err) =>
-                    console.error(
-                      '[Layout] Fehler beim De-registrieren des SW (DEV):',
-                      err
-                    )
-                  );
-              }
-            }
-          })
-          .catch((err) =>
-            console.error(
-              '[Layout] Fehler beim Abrufen der SW-Registrierungen (DEV):',
-              err
-            )
-          );
-        console.log(
-          '[Layout] Service Worker Registrierung im Entwicklungsmodus übersprungen/deaktiviert.'
-        );
       }
+
+      return () => {
+        window.removeEventListener('load', registerServiceWorker);
+        if (updateIntervalId) {
+          clearInterval(updateIntervalId);
+        }
+      };
+    } else {
+      console.log(
+        '[Layout] Service Worker API nicht unterstützt in diesem Browser.'
+      );
     }
   }, []);
 

@@ -11,6 +11,8 @@ import {
   RefreshCw,
   Flame,
   EyeOff,
+  Bell, // NEU: Icon für Benachrichtigungen an
+  BellOff, // NEU: Icon für Benachrichtigungen aus
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -27,6 +29,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/app/components/ui/tooltip'; // NEU: Tooltip
 import { useAppRefresh } from '@/app/hooks/useAppRefresh';
 import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar';
 import { UserOut, Group as GroupType } from '@/app/lib/types';
@@ -35,6 +43,13 @@ import {
   getMyTipsAcrossAllGroups,
   GroupWithOpenEvents,
 } from '@/app/lib/api';
+
+// NEU: Importiere den Hook und das Enum
+import {
+  usePushNotifications,
+  PushNotificationStatus,
+} from '@/app/hooks/usePushNotifications';
+import { toast } from 'sonner'; // Für Feedback
 
 const STORAGE_KEY_SEEN_NOTIFICATIONS = 'fbet_openEventNotificationSeenIds_v2';
 
@@ -79,6 +94,25 @@ export function AppHeader({
     }
     return new Set();
   });
+
+  // NEU: Push Notification Hook aufrufen
+  const {
+    status: pushStatus,
+    error: pushError, // Dies ist die Fehlermeldung vom Hook
+    requestPermissionAndSubscribe,
+    unsubscribeUser,
+    isSubscribed: isPushSubscribed,
+    isLoading: isPushLoading,
+    permissionDenied: isPushPermissionDenied,
+  } = usePushNotifications();
+
+  // NEU: Effekt für Fehler-Toasts vom Push Hook
+  useEffect(() => {
+    if (pushError) {
+      // Der Hook sollte bereits benutzerfreundliche Fehlermeldungen im 'error'-State setzen
+      toast.error(pushError, { duration: 6000 });
+    }
+  }, [pushError]);
 
   const fetchOpenEventsForHeader = useCallback(async () => {
     if (!user) return;
@@ -136,11 +170,9 @@ export function AppHeader({
     console.log('[AppHeader] handleRefreshClick ausgelöst.');
     setShowFullScreenLoader(true);
     refresh();
-
-    // Fallback: nach kurzer Verzögerung neu laden
     setTimeout(() => {
       window.location.reload();
-    }, 500); // 500ms = smooth genug für User
+    }, 500);
   };
 
   const handleMarkNotificationsAsRead = () => {
@@ -172,13 +204,93 @@ export function AppHeader({
     return () => clearInterval(interval);
   }, [fetchOpenEventsForHeader, user?.id]);
 
+  // NEU: Handler für den Push Notification Toggle Button
+  const handleTogglePushNotifications = async () => {
+    // `pushError` wird durch den useEffect oben bereits als Toast angezeigt,
+    // hier fokussieren wir uns auf Erfolgsmeldungen oder spezifische Hinweise.
+    if (isPushSubscribed) {
+      const success = await unsubscribeUser();
+      if (success) {
+        toast.info('Push-Benachrichtigungen deaktiviert.');
+      }
+      // Fehlerfall wird vom useEffect oben behandelt
+    } else {
+      const success = await requestPermissionAndSubscribe();
+      if (success) {
+        toast.success('Push-Benachrichtigungen aktiviert!');
+      } else {
+        // Spezifische Behandlung, falls die Berechtigung verweigert wurde und der Hook dies nicht schon als 'pushError' gemeldet hat
+        // (Der Hook sollte das aber bereits im 'pushError' State abbilden)
+        if (isPushPermissionDenied || Notification.permission === 'denied') {
+          toast.warning(
+            'Berechtigung für Benachrichtigungen blockiert. Bitte in den Browser-Einstellungen ändern.',
+            { duration: 7000 }
+          );
+        }
+        // Andere Fehler beim Subscriben werden vom useEffect oben behandelt
+      }
+    }
+  };
+
+  // NEU: Logik für den Push Notification Button
+  const renderPushNotificationButton = () => {
+    if (!user || pushStatus === PushNotificationStatus.NOT_SUPPORTED) {
+      return null;
+    }
+
+    let icon = <Bell className='h-5 w-5' />; // Angepasste Größe
+    let label = 'Push-Benachrichtigungen aktivieren';
+    let tooltipText = 'Klicke, um Push-Benachrichtigungen zu aktivieren.';
+    let currentIsDisabled = isPushLoading; // Generelle Ladezustandsprüfung
+
+    if (isPushSubscribed) {
+      icon = <BellOff className='h-5 w-5 text-muted-foreground' />;
+      label = 'Push-Benachrichtigungen deaktivieren';
+      tooltipText = 'Push-Benachrichtigungen sind aktiviert.';
+    } else if (isPushPermissionDenied) {
+      icon = <BellOff className='h-5 w-5 text-destructive' />; // Rotes Icon bei Blockade
+      label = 'Push-Benachrichtigungen blockiert';
+      tooltipText = 'Berechtigung blockiert. In Browser-Einstellungen ändern.';
+      // Optional: Button deaktivieren, wenn Erlaubnis endgültig verweigert wurde
+      // currentIsDisabled = true;
+      // Oder erlaube Klick, um ggf. Browser-Dialog erneut zu triggern (führt meist zu keiner Aktion bei "denied")
+      // Der Hook und handleTogglePushNotifications fangen den Fall ab.
+    } else if (pushStatus === PushNotificationStatus.SUPPORTED_NOT_SUBSCRIBED) {
+      // Standard UI zum Aktivieren bleibt
+    }
+
+    if (isPushLoading) {
+      label = isPushSubscribed ? 'Deaktiviere...' : 'Aktiviere...';
+    }
+
+    return (
+      <TooltipProvider>
+        <Tooltip delayDuration={100}>
+          <TooltipTrigger asChild>
+            <Button
+              variant='ghost'
+              size='icon'
+              aria-label={label}
+              onClick={handleTogglePushNotifications}
+              disabled={currentIsDisabled}
+            >
+              {icon}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side='bottom'>
+            <p>{tooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   return (
     <header
       style={{
         top: 'env(safe-area-inset-top)',
-      }} /* Header beginnt NACH der Safe-Area */
-      className='sticky z-50 w-full border-b bg-background/60 px-4 sm:px-6 lg:px-8
-                 frosted-header' /* Blur liegt im ::before */
+      }}
+      className='sticky z-50 w-full border-b bg-background/60 px-4 sm:px-6 lg:px-8 frosted-header'
     >
       <div className='flex h-14 items-center justify-between'>
         {/* LINKS: Burger + Logo */}
@@ -295,15 +407,19 @@ export function AppHeader({
             </DropdownMenu>
           )}
 
+          {/* NEUER PUSH NOTIFICATION BUTTON WIRD HIER GERENDERT */}
+          {renderPushNotificationButton()}
+
           <Button
             variant={updateAvailable ? 'default' : 'ghost'}
             size='icon'
             aria-label='App neu laden'
-            onClick={handleRefreshClick} // HIER ändern!
+            onClick={handleRefreshClick}
             className='relative'
           >
             <RefreshCw
               className={`h-4 w-4 transition-transform ${
+                // Beibehaltung der Originalgröße für diesen Button
                 updateAvailable || isRefreshing ? 'animate-spin' : ''
               }`}
             />

@@ -21,6 +21,7 @@ model User {
   tips              Tip[]
   comments          EventComment[]
   leadershipStreaks LeadershipStreak[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -115,4 +116,18 @@ model LeadershipStreak {
   @@unique([groupId, userId, becameLeaderOn], name: "uq_group_user_streak_start")
   @@index([groupId, endedOn], name: "idx_group_active_streak")
   @@map("leadership_streaks")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique // Der Endpoint des Push-Dienstes
+  p256dh    String   // Public key für die Verschlüsselung
+  auth      String   // Authentifizierungsgeheimnis
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_subscriptions")
 }

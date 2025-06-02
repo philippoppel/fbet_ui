@@ -7,6 +7,7 @@ import type {
   EventPointDetail,
   Event as ClientEvent,
 } from '@/app/lib/types';
+import { sendNewEventNotificationsToGroupMembers } from '@/app/api/services/notificationService';
 
 export async function getEventsForGroup(
   groupId: number
@@ -85,14 +86,50 @@ export async function createEvent(
     title: eventData.title,
     description: eventData.description,
     question: eventData.question,
-    options: eventData.options,
+    options: eventData.options as Prisma.JsonArray, // Sicherstellen, dass es als JsonArray typisiert ist
     group: { connect: { id: eventData.group_id } },
     creator: { connect: { id: creatorId } },
+    // Füge ggf. weitere Felder hinzu, die dein AppEventCreate enthält
+    tippingDeadline: eventData.tippingDeadline,
   };
 
-  return prisma.event.create({
+  const newEvent = await prisma.event.create({
     data: dataToCreate,
   });
+
+  // Nach erfolgreicher Erstellung, Benachrichtigungen auslösen (nicht blockierend für die API-Antwort)
+  if (newEvent) {
+    prisma.group
+      .findUnique({ where: { id: newEvent.groupId } })
+      .then((group) => {
+        if (group) {
+          const eventWithDetailsForNotification = {
+            ...newEvent,
+            groupName: group.name,
+          };
+          sendNewEventNotificationsToGroupMembers(
+            eventWithDetailsForNotification,
+            creatorId
+          ).catch((err) =>
+            console.error(
+              '[EventService] Error in sendNewEventNotificationsToGroupMembers:',
+              err
+            )
+          );
+        } else {
+          console.error(
+            `[EventService] Group not found for event ${newEvent.id} during notification dispatch.`
+          );
+        }
+      })
+      .catch((err) =>
+        console.error(
+          '[EventService] Error fetching group for notification dispatch:',
+          err
+        )
+      );
+  }
+  return newEvent;
 }
 
 export async function setEventResult(
