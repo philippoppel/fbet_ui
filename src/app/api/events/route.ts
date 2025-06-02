@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 // Importiere prisma nur, wenn es für andere Checks hier noch direkt benötigt wird
-// import { prisma } from '../lib/prisma';
+import { prisma } from '../lib/prisma';
 import { getCurrentUserFromRequest, AuthenticatedUser } from '../lib/auth';
 import { isUserMemberOfGroup } from '../services/groupService'; // Annahme: Dieser Service existiert
 import { createEvent as createEventFromService } from '../services/eventService'; // WICHTIG: Importiere createEvent aus dem Service
@@ -87,7 +87,6 @@ export async function POST(req: NextRequest) {
 
   try {
     // Prisma direkt importieren, wenn hier benötigt für groupExists Check
-    const { prisma } = await import('../lib/prisma.js'); // .js hinzugefügt
     const groupExists = await prisma.group.findUnique({
       where: { id: parsedZodData.group_id },
       select: { id: true },
