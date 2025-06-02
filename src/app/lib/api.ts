@@ -278,7 +278,6 @@ export async function getGroupHighscore(
   token: string,
   groupId: number
 ): Promise<HighscoreEntry[]> {
-  // Annahme: Pfad ist /api/tips/highscore/{groupId}
   const response = await fetch(
     `${API_BASE_URL}/api/tips/highscore/${groupId}`,
     {
@@ -286,7 +285,13 @@ export async function getGroupHighscore(
       headers: { Authorization: `Bearer ${token}` },
     }
   );
-  return handleResponse<HighscoreEntry[]>(response);
+
+  const data = await handleResponse<{
+    groupId: number;
+    highscores: HighscoreEntry[];
+  }>(response);
+
+  return data.highscores;
 }
 
 export async function createEvent(

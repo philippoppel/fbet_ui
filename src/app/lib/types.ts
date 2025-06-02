@@ -1,16 +1,13 @@
-// src/lib/types.ts
+// src/app/lib/types.ts
 import type {
   User,
   Group as PrismaGroup,
   GroupMembership as PrismaGroupMembership,
-  Event as PrismaEventModel, // Umbenannt, um Konflikt mit unserem erweiterten Typ zu vermeiden
+  Event as PrismaEventModel,
   Tip as PrismaTip,
 } from '@prisma/client';
-import type { JsonValue } from '@prisma/client/runtime/library'; // Für den Optionstyp
+import type { JsonValue } from '@prisma/client/runtime/library';
 
-/**
- * Der Benutzer wie vom Server zurückgegeben (ohne Passwort)
- */
 export type UserOut = Omit<User, 'hashedPassword'>;
 
 export interface UserCreate {
@@ -34,15 +31,17 @@ export interface UfcEventItem {
 }
 
 export interface BoxingScheduleItem {
-  date: string | null; // Der ursprüngliche Datumsstring, z.B. "June 8"
+  date: string | null;
   location: string | null;
   broadcaster: string | null;
   details: string | null;
-  parsedDate?: string | null; // Der hinzugefügte ISO-Datumsstring
+  parsedDate?: string | null;
 }
 
 export interface Group extends PrismaGroup {
   creator: {
+    // Wird für groupLeaderId in HighscoreCard verwendet
+    id: number; // Stelle sicher, dass die ID hier ist, wenn createdById verwendet wird
     name: string | null;
   };
 }
@@ -65,7 +64,14 @@ export interface HighscoreEntry {
   user_id: number;
   name: string;
   points: number;
+  leaderSince?: Date | string | null; // Für "Seit X Tagen Nr. 1"
 }
+
+export type LeaderboardWinner = {
+  // Für GroupHeaderCard
+  name: string | null;
+  leaderSince?: Date | string | null; // Für "Seit X Tagen Nr. 1"
+};
 
 export interface EventPointDetail {
   userId: number;
@@ -105,13 +111,25 @@ export interface TipOut {
   userId: number;
 }
 
+export interface FootballEvent {
+  matchID: number;
+  competition: string;
+  matchDate: string;
+  homeTeam: string;
+  awayTeam: string;
+  status: string;
+  result?: string | null;
+  leagueShortcut?: string;
+  leagueSeason?: string;
+}
+
 export interface MixedEvent {
-  id: string; // Eindeutige ID für die Liste (z.B. "football-12345")
+  id: string;
   title: string;
   subtitle: string;
-  sport: 'ufc' | 'boxing' | 'football'; // 'football' hinzugefügt
-  date: Date; // Wird als Date-Objekt für die Sortierung gespeichert
-  original: UfcEventItem | BoxingScheduleItem | FootballEvent; // FootballEvent hinzugefügt
+  sport: 'ufc' | 'boxing' | 'football';
+  date: Date;
+  original: UfcEventItem | BoxingScheduleItem | FootballEvent; // Alle drei Typen hier
 }
 
 export interface UserTipSelection {
@@ -120,11 +138,8 @@ export interface UserTipSelection {
   id?: number;
 }
 
-// NEU: Typ für die Antwort des /api/tips/group-all Endpunkts
-// Beschreibt ein Objekt, bei dem der Schlüssel die Event-ID (als Zahl) ist
-// und der Wert ein Array von Tipp-Details für dieses Event ist.
 export type AllTipsPerEvent = Record<
-  number, // eventId
+  number,
   {
     userId: number;
     userName: string | null;
@@ -132,7 +147,6 @@ export type AllTipsPerEvent = Record<
   }[]
 >;
 
-// Bestehender Typ für GroupWithOpenEvents
 export interface GroupWithOpenEvents {
   groupId: number;
   groupName: string;
@@ -141,13 +155,12 @@ export interface GroupWithOpenEvents {
 
 export interface EventComment {
   id: number;
-  text?: string | null; // Erlaube null, falls DB null speichert
+  text?: string | null;
   gifUrl?: string | null;
-  createdAt: string; // ISO-String Datum
+  createdAt: string;
   userId: number;
   eventId: number;
   user: {
-    // Eingebettete User-Infos
     id: number;
     name: string | null;
     email: string;
@@ -158,19 +171,3 @@ export interface EventCommentCreate {
   text?: string;
   gifUrl?: string;
 }
-export interface FootballEvent {
-  matchID: number; // Eindeutige ID von OpenLigaDB
-  competition: string;
-  matchDate: string; // ISO-8601 UTC String
-  homeTeam: string;
-  awayTeam: string;
-  status: string; // z.B. SCHEDULED, FINISHED
-  result?: string | null; // Optional, falls schon vorhanden
-  // Fügen Sie weitere Felder hinzu, die von Ihrer API-Funktion zurückgegeben werden könnten
-  leagueShortcut?: string;
-  leagueSeason?: string;
-}
-export type LeaderboardWinner = {
-  name: string | null;
-  // points?: number; // Optional
-};

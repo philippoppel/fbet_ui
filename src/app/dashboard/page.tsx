@@ -1,3 +1,4 @@
+// src/app/page.tsx (Deine DashboardPage.tsx)
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -23,10 +24,8 @@ import { AppHeader } from '@/app/components/layout/AppHeader';
 import { DashboardLayout } from '@/app/components/dashboard/DashboardLayout';
 import { GroupDetailsSection } from '@/app/components/dashboard/GroupDetailsSection';
 import { NoGroupsCard } from '@/app/components/dashboard/NoGroupsCard';
-// FullscreenCenter wird in den ersten Ladezuständen temporär NICHT verwendet für diesen Test
-// import { FullscreenCenter } from '@/app/components/dashboard/FullscreenCenter';
 import { deleteGroup as apiDeleteGroup } from '@/app/lib/api';
-import type { Group } from '@/app/lib/types';
+import type { Group, MixedEvent } from '@/app/lib/types'; // MixedEvent für den Fehler importieren
 import { cn } from '@/app/lib/utils';
 
 export default function DashboardPage() {
@@ -54,6 +53,8 @@ export default function DashboardPage() {
     refreshSelectedGroupData,
     updateUserTipState,
     refreshMyGroups,
+    // retrievedCombinedEvents, // Wird hier nicht direkt verwendet, aber vom Hook bereitgestellt
+    // loadCombinedEvents, // Wird hier nicht direkt verwendet, aber vom Hook bereitgestellt
   } = useDashboardData();
 
   const interactions = useGroupInteractions({
@@ -77,13 +78,8 @@ export default function DashboardPage() {
     setClientRenderComplete(true);
   }, []);
 
-  const userTippedEventIds = useMemo(() => {
-    return new Set(Object.keys(userSubmittedTips).map(Number));
-  }, [userSubmittedTips]);
-
   useEffect(() => {
     if (clientRenderComplete && !isAuthLoading && !user && !token) {
-      console.log('[DashboardPage] Redirecting to /login');
       router.replace('/login');
     }
   }, [isAuthLoading, user, token, router, clientRenderComplete]);
@@ -104,7 +100,6 @@ export default function DashboardPage() {
         handleSelectGroup(refreshedGroups[0]?.id ?? null);
       }
     } catch (err: any) {
-      console.error('Fehler beim Löschen der Gruppe (Kernlogik):', err);
       toast.error('Fehler beim Löschen der Gruppe', {
         description: err.message || 'Ein unbekannter Fehler ist aufgetreten.',
       });
@@ -130,22 +125,31 @@ export default function DashboardPage() {
         );
         setGroupToDeleteFromHeader(null);
       } catch (e) {
-        console.error('Fehler in confirmDeleteGroupFromHeader abgefangen:', e);
+        // Fehler wird schon in coreDeleteGroupLogic getoastet
       }
     }
     setShowDeleteGroupDialogFromHeader(false);
   };
 
-  // ----- START: VEREINFACHTE LADEZUSTÄNDE FÜR HYDRATION-DEBUGGING -----
+  // HINWEIS ZUM FEHLER TS2322 (Zeile 291):
+  // Der Fehler "Type '(event: UfcEventItem | BoxingScheduleItem) => void' is not assignable to type
+  // '(originalEventData: UfcEventItem | BoxingScheduleItem | FootballEvent) => void'"
+  // tritt auf, wenn eine Funktion, die nur UfcEventItem oder BoxingScheduleItem erwartet,
+  // einer Prop zugewiesen wird, die auch ein FootballEvent übergeben könnte.
+  // Du musst die entsprechende Funktion (die um Zeile 291 herum definiert oder verwendet wird,
+  // oder eine Funktion, die Teil von `interactions` ist und von einer Kindkomponente aufgerufen wird)
+  // so anpassen, dass ihr Parameter den Typ `MixedEvent['original']` oder
+  // `UfcEventItem | BoxingScheduleItem | FootballEvent` akzeptiert.
+  // Beispiel:
+  // const deineEventHandlerFunktion = (event: MixedEvent['original']) => { /* ... Logik ... */ };
+  // Und diese Funktion wird dann z.B. an eine Komponente übergeben, die `retrievedCombinedEvents` verarbeitet.
+  // Da `retrievedCombinedEvents` hier nicht direkt verwendet wird, ist der Fehler wahrscheinlich
+  // tiefer verschachtelt oder in einer Komponente, die `interactions` verwendet.
 
-  // SCHRITT 1: Der absolut identische erste Render für Server und Client
-  // Server (isAuthLoading=true) und initialer Client-Render (!clientRenderComplete=true)
-  // sollten diesen Block ausführen.
   if (!clientRenderComplete || isAuthLoading) {
-    // console.log(`[DashboardPage] Initial Render Test: clientRenderComplete=${clientRenderComplete}, isAuthLoading=${isAuthLoading}`);
     return (
       <div
-        data-testid='initial-loading-div' // Für Testzwecke
+        data-testid='initial-loading-div'
         style={{
           minHeight: '100vh',
           width: '100%',
@@ -157,7 +161,7 @@ export default function DashboardPage() {
           padding: '20px',
           boxSizing: 'border-box',
           backgroundColor: 'var(--background)',
-          color: 'var(--foreground)', // Basisfarben
+          color: 'var(--foreground)',
         }}
       >
         <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
@@ -180,14 +184,10 @@ export default function DashboardPage() {
     );
   }
 
-  // Wenn wir hier sind: clientRenderComplete = true UND isAuthLoading = false.
-
-  // SCHRITT 2: Fall für nicht eingeloggte User (nachdem Client bereit und Auth geprüft)
   if (!user || !token) {
-    // console.log('[DashboardPage] Test: User not logged in, showing login prompt.');
     return (
       <div
-        data-testid='login-prompt-div' // Für Testzwecke
+        data-testid='login-prompt-div'
         style={{
           minHeight: '100vh',
           width: '100%',
@@ -212,13 +212,10 @@ export default function DashboardPage() {
     );
   }
 
-  // SCHRITT 3: Dashboard-Daten laden (loadingInitial)
-  // Erreicht, wenn: Client bereit, Auth fertig, User vorhanden.
   if (loadingInitial) {
-    // console.log('[DashboardPage] Test: Auth complete, user present. Loading initial dashboard data...');
     return (
-      <div // Ersetzt FullscreenCenter für diesen Test
-        data-testid='dashboard-data-loading-div' // Für Testzwecke
+      <div
+        data-testid='dashboard-data-loading-div'
         style={{
           minHeight: '100vh',
           width: '100%',
@@ -249,10 +246,7 @@ export default function DashboardPage() {
       </div>
     );
   }
-  // ----- ENDE: VEREINFACHTE LADEZUSTÄNDE -----
 
-  // ----- FINALER ZUSTAND: ALLES GELADEN, CLIENT IST BEREIT, VOLLSTÄNDIGES DASHBOARD -----
-  // console.log('[DashboardPage] All loading complete. Rendering full dashboard.');
   const hasGroups = myGroups.length > 0;
 
   return (
@@ -264,19 +258,19 @@ export default function DashboardPage() {
         selectedGroupId={selectedGroupId}
         onSelectGroup={handleSelectGroup}
       />
-
       <DashboardLayout
         myGroups={myGroups}
         selectedGroupId={selectedGroupId}
+        selectedGroupDetails={selectedGroupDetails} // Übergeben für groupLeaderId
         selectedGroupHighscore={selectedGroupHighscore}
         selectedGroupMembers={selectedGroupMembers}
         isGroupDataLoading={isGroupDataLoading}
-        loadingInitial={loadingInitial} // Ist hier false
+        loadingInitial={loadingInitial}
         errors={errors}
         isDesktopSidebarCollapsed={isDesktopSidebarCollapsed}
         onToggleCollapse={toggleDesktopSidebar}
         onSelectGroup={handleSelectGroup}
-        currentUserId={user.id} // User ist hier nicht null, da oben geprüft
+        currentUserId={user.id}
         onDeleteGroupFromPage={handleDeleteGroupFromSidebar}
       >
         {errors.groups ? (
@@ -300,13 +294,13 @@ export default function DashboardPage() {
             selectedGroupDetails={selectedGroupDetails}
             selectedGroupEvents={selectedGroupEvents}
             userSubmittedTips={userSubmittedTips}
-            allTipsPerEvent={allTipsPerEvent}
-            user={user} // User ist hier nicht null
+            allTipsPerEvent={allTipsPerEvent} // Sicherstellen, dass diese Prop korrekt von useDashboardData kommt
+            highscoreEntries={selectedGroupHighscore}
+            user={user}
             isGroupDataLoading={isGroupDataLoading}
             groupDataError={
               errors.groupData || errors.userTips || errors.allGroupTips
             }
-            highscoreEntries={selectedGroupHighscore}
             interactions={interactions}
             onDeleteGroupInPage={handleInitiateDeleteGroupFromHeader}
             onImageChanged={() => {

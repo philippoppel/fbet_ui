@@ -3,12 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../lib/prisma';
 import { getCurrentUserFromRequest, AuthenticatedUser } from '../../lib/auth';
 import { eventResultSetSchema } from '../../lib/eventSchema';
+// NEUER IMPORT:
+import { updateLeadershipStreaks } from '../../services/leadershipService'; // Pfad ggf. anpassen
 
 export async function POST(req: NextRequest) {
   const routeName = '/api/events/result';
   console.log(`[ROUTE ${routeName}] POST request received.`);
 
-  // 1. Authentifizierung (unverändert)
   let currentUser: AuthenticatedUser | null = null;
   try {
     currentUser = await getCurrentUserFromRequest(req);
@@ -26,7 +27,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Request Body lesen und validieren (unverändert)
   let parsedData: { event_id: number; winning_option: string };
   try {
     const json = await req.json();
@@ -47,9 +47,9 @@ export async function POST(req: NextRequest) {
 
   const { event_id: eventId, winning_option: winningOption } = parsedData;
 
-  // 3. Autorisierung & Vorab-Validierung des Events (unverändert)
   try {
-    const event = await prisma.event.findUnique({
+    const eventForAuth = await prisma.event.findUnique({
+      // Umbenannt für Klarheit
       where: { id: eventId },
       select: {
         groupId: true,
@@ -59,21 +59,24 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (!event)
+    if (!eventForAuth)
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-    if (event.winningOption !== null)
+    if (eventForAuth.winningOption !== null)
       return NextResponse.json(
         { error: 'Result for this event has already been set.' },
         { status: 400 }
       );
-    if (!event.group || event.group.createdById !== currentUser.id)
+    if (
+      !eventForAuth.group ||
+      eventForAuth.group.createdById !== currentUser.id
+    )
       return NextResponse.json(
         { error: 'Only the group creator can set event results.' },
         { status: 403 }
       );
     if (
-      !Array.isArray(event.options) ||
-      !(event.options as string[]).includes(winningOption)
+      !Array.isArray(eventForAuth.options) ||
+      !(eventForAuth.options as string[]).includes(winningOption)
     )
       return NextResponse.json(
         { error: `'${winningOption}' is not a valid option for this event.` },
@@ -84,18 +87,18 @@ export async function POST(req: NextRequest) {
       `[ROUTE ${routeName}] Auth and validation successful for event ${eventId}.`
     );
 
-    // --- 4. Event-Ergebnis setzen UND PUNKTE BERECHNEN (in einer Transaktion) ---
     const transactionResult = await prisma.$transaction(async (tx) => {
-      // 4a. Event aktualisieren
       const updatedEvent = await tx.event.update({
         where: { id: eventId },
         data: { winningOption: winningOption },
+        // Wichtig: groupId hier selektieren, falls sie für die Antwort benötigt wird
+        // oder wenn sie nicht standardmäßig im updatedEvent-Objekt enthalten wäre.
+        // Standardmäßig sind Scalar-Felder wie groupId aber enthalten.
       });
       console.log(
         `[ROUTE ${routeName}] Event ${eventId} updated with winningOption: ${winningOption}.`
       );
 
-      // 4b. Alle Tipps für dieses Event holen (nur userId und selectedOption werden für die Logik benötigt)
       const allTipsForEvent = await tx.tip.findMany({
         where: { eventId: eventId },
         select: { id: true, userId: true, selectedOption: true },
@@ -108,10 +111,13 @@ export async function POST(req: NextRequest) {
         console.log(
           `[ROUTE ${routeName}] No tips submitted for this event. No points to calculate.`
         );
-        return { updatedEvent, pointsUpdatedCount: 0 };
+        return {
+          updatedEvent,
+          pointsUpdatedCount: 0,
+          groupId: updatedEvent.groupId,
+        }; // groupId für Außenseite
       }
 
-      // 4c. Zählen, wie viele die richtige Option getippt haben
       const winningTips = allTipsForEvent.filter(
         (tip) => tip.selectedOption === winningOption
       );
@@ -121,47 +127,77 @@ export async function POST(req: NextRequest) {
       );
 
       let pointsUpdatedCount = 0;
-
-      // 4d. Punkte für jeden Tipp berechnen und Tipps aktualisieren
       for (const tip of allTipsForEvent) {
-        let pointsToAward = 0; // Standard: 0 Punkte für falsche Tipps
+        let pointsToAward = 0;
         if (tip.selectedOption === winningOption) {
-          // Kicktipp-ähnliche Logik anwenden
-          pointsToAward = 2; // Grundpunkte für richtigen Tipp
-
-          if (correctTipstersCount === 1) {
-            // Nur einer hat richtig getippt
-            pointsToAward += 3; // z.B. +3 Bonuspunkte
-          } else if (correctTipstersCount >= 2 && correctTipstersCount <= 3) {
-            pointsToAward += 2; // z.B. +2 Bonuspunkte
-          } else if (correctTipstersCount >= 4 && correctTipstersCount <= 5) {
-            pointsToAward += 1; // z.B. +1 Bonuspunkt
-          }
-          // Wenn correctTipstersCount > 5, gibt es nur die Grundpunkte
+          pointsToAward = 2;
+          if (correctTipstersCount === 1) pointsToAward += 3;
+          else if (correctTipstersCount >= 2 && correctTipstersCount <= 3)
+            pointsToAward += 2;
+          else if (correctTipstersCount >= 4 && correctTipstersCount <= 5)
+            pointsToAward += 1;
         }
-
         await tx.tip.update({
           where: { id: tip.id },
           data: { points: pointsToAward },
         });
-        if (tip.selectedOption === winningOption) {
+        // Zähle nur, wenn Punkte tatsächlich > 0 sind oder sich geändert haben (hier vereinfacht)
+        if (pointsToAward > 0) {
           pointsUpdatedCount++;
         }
       }
       console.log(
-        `[ROUTE ${routeName}] Points updated for ${pointsUpdatedCount} tips (winners might be more if points were already 0 for losers).`
+        `[ROUTE ${routeName}] Points calculation done for ${allTipsForEvent.length} tips, ${pointsUpdatedCount} received points.`
       );
-      return { updatedEvent, pointsUpdatedCount };
+      return {
+        updatedEvent,
+        pointsUpdatedCount,
+        groupId: updatedEvent.groupId,
+      }; // groupId für Außenseite
     });
 
-    return NextResponse.json(transactionResult.updatedEvent, { status: 200 });
+    // --- Leadership Streaks aktualisieren NACH erfolgreicher Transaktion ---
+    if (transactionResult && transactionResult.groupId) {
+      try {
+        await updateLeadershipStreaks(transactionResult.groupId, prisma);
+        console.log(
+          `[ROUTE ${routeName}] Leadership streaks successfully updated for group ${transactionResult.groupId}.`
+        );
+      } catch (streakError) {
+        console.error(
+          `[ROUTE ${routeName}] Error updating leadership streaks for group ${transactionResult.groupId}:`,
+          streakError
+        );
+        // Fehler beim Streak-Update sollte die Hauptantwort nicht blockieren
+      }
+    } else {
+      console.warn(
+        `[ROUTE ${routeName}] Could not update leadership streaks: groupId not available from transaction result.`
+      );
+    }
+
+    // Sende nur die relevanten Teile des Events zurück oder eine Erfolgsmeldung
+    return NextResponse.json(
+      {
+        message: 'Event result processed and points awarded.',
+        eventId: transactionResult.updatedEvent.id,
+        winningOption: transactionResult.updatedEvent.winningOption,
+        pointsUpdatedForWinners: transactionResult.pointsUpdatedCount,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error(
       `[ROUTE ${routeName}] Error processing event result for event ${eventId}:`,
       error
     );
+    const errorMessage =
+      error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json(
-      { error: 'Could not set event result or calculate points.' },
+      {
+        error: 'Could not set event result or calculate points.',
+        details: errorMessage,
+      },
       { status: 500 }
     );
   }

@@ -14,7 +14,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@/app/components/ui/collapsible'; // NEU: Import für Collapsible
+} from '@/app/components/ui/collapsible';
 import {
   MoreHorizontal,
   Trash2,
@@ -23,7 +23,7 @@ import {
   Users,
   ChevronsUpDown,
   Info,
-} from 'lucide-react'; // NEU: ChevronsUpDown oder Info Icon
+} from 'lucide-react';
 import { cn } from '@/app/lib/utils';
 import { CommentSection } from '@/app/components/dashboard/CommentSection';
 
@@ -70,7 +70,7 @@ export function SingleOpenEventItem({
 }: SingleOpenEventItemProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteActionPending, setIsDeleteActionPending] = useState(false);
-  const [showDetailedTips, setShowDetailedTips] = useState(false); // NEU: State für detaillierte Tipps
+  const [showDetailedTips, setShowDetailedTips] = useState(false);
 
   const canDeleteEvent =
     user?.id === groupCreatedBy || user?.id === event.createdById;
@@ -115,7 +115,7 @@ export function SingleOpenEventItem({
 
   return (
     <div className='space-y-4'>
-      {/* Event Titel, Beschreibung, Frage - unverändert */}
+      {/* Event Titel, Beschreibung, Frage */}
       <div className='flex justify-between items-start gap-4'>
         <div className='flex-1 space-y-1'>
           <h4 className='text-lg font-semibold text-foreground leading-tight break-words'>
@@ -158,7 +158,7 @@ export function SingleOpenEventItem({
         )}
       </div>
 
-      {/* Optionen und Tipps anzeigen - Logik für Anzeige bleibt gleich */}
+      {/* Optionen und Tipps anzeigen */}
       <div className='space-y-2'>
         <div className='flex items-center justify-between mb-2 text-sm text-muted-foreground'>
           <span>Optionen</span>
@@ -215,7 +215,7 @@ export function SingleOpenEventItem({
         })}
       </div>
 
-      {/* NEU: Aufklappbare Sektion für detaillierte Tipps */}
+      {/* Aufklappbare Sektion für detaillierte Tipps */}
       {totalVotesOnEvent > 0 && (
         <Collapsible
           open={showDetailedTips}
@@ -271,7 +271,7 @@ export function SingleOpenEventItem({
                 </div>
               );
             })}
-            {allTipsForThisEvent.length === 0 && ( // Fallback falls gar keine Tipps vorhanden (sollte durch totalVotesOnEvent > 0 abgefangen sein)
+            {allTipsForThisEvent.length === 0 && (
               <p className='text-muted-foreground italic'>
                 Noch keine Tipps für dieses Event abgegeben.
               </p>
@@ -280,17 +280,77 @@ export function SingleOpenEventItem({
         </Collapsible>
       )}
 
-      {/* Tipp abgeben / Auswahl löschen - unverändert */}
+      {/* Tipp abgeben / Auswahl löschen */}
       {!userHasSubmittedTip && selectedOptionForTipping && (
-        <div className='flex gap-2 pt-2'>{/* ... */}</div>
+        <div className='flex gap-2 pt-2'>
+          <Button
+            onClick={() => onSubmitTip(event.id)}
+            disabled={isSubmittingCurrentEventTip}
+            size='sm'
+            className='text-sm'
+          >
+            {isSubmittingCurrentEventTip && (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            )}
+            Tipp abgeben
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => onClearSelectedTip(event.id)}
+            disabled={isSubmittingCurrentEventTip}
+            className='text-sm text-muted-foreground'
+          >
+            Auswahl löschen
+          </Button>
+        </div>
       )}
 
-      {/* Admin: Ergebnis festlegen - unverändert */}
-      {user?.id === groupCreatedBy && !event.winningOption && (
-        <div className='mt-6 border-t pt-4 border-border/60'>{/* ... */}</div>
-      )}
+      {/* Admin: Ergebnis festlegen */}
+      {user?.id === groupCreatedBy &&
+        !event.winningOption &&
+        userHasSubmittedTip && ( // <-- userHasSubmittedTip HINZUGEFÜGT
+          <div className='mt-6 border-t pt-4 border-border/60'>
+            <h5 className='text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2'>
+              Ergebnis festlegen (Admin)
+            </h5>
+            <div className='flex flex-wrap gap-2'>
+              {event.options?.map((option, i) => (
+                <Button
+                  key={`result-${event.id}-${i}`}
+                  variant={
+                    currentResultInputForEvent === option
+                      ? 'default'
+                      : 'outline'
+                  }
+                  size='sm'
+                  className='text-sm whitespace-normal break-words h-auto py-1.5 px-2 text-center'
+                  onClick={() => onResultInputChange(event.id, option)}
+                  disabled={isSettingCurrentEventResult}
+                >
+                  {option}
+                </Button>
+              ))}
+            </div>
+            {currentResultInputForEvent && (
+              <Button
+                onClick={() =>
+                  onSetResult(event.id, currentResultInputForEvent)
+                }
+                disabled={isSettingCurrentEventResult}
+                size='sm'
+                className='mt-3 text-sm whitespace-normal break-words h-auto py-1.5 px-2 text-center'
+              >
+                {isSettingCurrentEventResult && (
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                )}
+                Ergebnis „{currentResultInputForEvent}“ bestätigen
+              </Button>
+            )}
+          </div>
+        )}
 
-      {/* Kommentar Sektion - unverändert */}
+      {/* Kommentar Sektion */}
       {user && <CommentSection eventId={event.id} currentUser={user} />}
     </div>
   );

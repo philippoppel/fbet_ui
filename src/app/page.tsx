@@ -8,6 +8,7 @@ import type {
   UfcEventItem,
   BoxingScheduleItem,
   MixedEvent,
+  FootballEvent, // <<< Stelle sicher, dass dieser Typ existiert und importiert wird
 } from '@/app/lib/types';
 import { toast } from 'sonner';
 import {
@@ -27,22 +28,18 @@ import { useAuth } from '@/app/context/AuthContext';
 
 export default function LandingPage() {
   const router = useRouter();
-  const { user, isLoading: authIsLoading, token } = useAuth(); // isLoading aus useAuth gibt den Ladezustand des Auth-Checks an
+  const { user, isLoading: authIsLoading, token } = useAuth();
 
   const [ufcEvents, setUfcEvents] = useState<UfcEventItem[]>([]);
   const [boxingEvents, setBoxingEvents] = useState<BoxingScheduleItem[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true); // Separater Ladezustand für Events
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Erst handeln, wenn der Auth-Status definitiv geladen ist
     if (!authIsLoading) {
       if (user && token) {
-        // Prüfe auf user und token für zusätzliche Sicherheit
-        // Wenn Nutzer eingeloggt ist, zum Dashboard weiterleiten
         router.replace('/dashboard');
       } else {
-        // Nur Events laden, wenn der Nutzer nicht eingeloggt ist
         const loadPublicEvents = async () => {
           setLoadingEvents(true);
           setError(null);
@@ -90,7 +87,6 @@ export default function LandingPage() {
   };
 
   const combinedEvents: MixedEvent[] = useMemo(() => {
-    // ... (deine bestehende Logik)
     return [...ufcEvents, ...boxingEvents]
       .map((e, i) => {
         const isBoxing = 'details' in e;
@@ -116,15 +112,23 @@ export default function LandingPage() {
   }, [ufcEvents, boxingEvents]);
 
   const handleProposeEventGuest = (
-    event: UfcEventItem | BoxingScheduleItem
+    event: UfcEventItem | BoxingScheduleItem | FootballEvent // <<< KORREKTUR HIER
   ) => {
-    // ... (deine bestehende Logik)
-    const title =
-      'details' in event && event.details?.trim()
-        ? event.details
-        : 'summary' in event && event.summary?.trim()
-          ? event.summary
-          : 'dieses Event';
+    let title = 'dieses Event'; // Default title
+
+    if ('details' in event && event.details?.trim()) {
+      // Boxing
+      title = event.details;
+    } else if ('summary' in event && event.summary?.trim()) {
+      // UFC
+      title = event.summary;
+    }
+    // Hier könntest du eine spezifische Logik für FootballEvent hinzufügen,
+    // um einen passenderen Titel zu extrahieren, falls 'details' oder 'summary' nicht passen.
+    // Beispiel:
+    // else if ('matchName' in event && (event as FootballEvent).matchName) {
+    //   title = (event as FootballEvent).matchName;
+    // }
 
     toast.info('Login erforderlich', {
       description: `Melde dich an oder registriere dich, um "${title}" für eine Wette vorzuschlagen.`,
@@ -136,7 +140,6 @@ export default function LandingPage() {
     });
   };
 
-  // Zeige eine Ladeanzeige, während der Auth-Status geprüft wird oder wenn der Nutzer eingeloggt ist und weitergeleitet wird
   if (authIsLoading || (user && token)) {
     return (
       <div className='flex flex-1 justify-center items-center min-h-screen'>
@@ -145,7 +148,6 @@ export default function LandingPage() {
     );
   }
 
-  // Der Rest der Komponente wird nur gerendert, wenn der Nutzer definitiv nicht eingeloggt ist.
   return (
     <main className='flex-1 container mx-auto px-4 md:px-6 py-8 md:py-12'>
       {/* Hero Section */}
@@ -202,7 +204,6 @@ export default function LandingPage() {
           So einfach geht der Wett-Spaß
         </h2>
         <div className='grid md:grid-cols-3 gap-10 max-w-5xl mx-auto px-4'>
-          {/* ... Deine "How it works" Cards ... */}
           <div className='flex flex-col items-center text-center p-6 bg-background rounded-lg shadow-md hover:shadow-lg transition-shadow'>
             <div className='p-4 bg-primary/10 rounded-full mb-4'>
               <Eye className='w-10 h-10 text-primary' />
@@ -247,7 +248,7 @@ export default function LandingPage() {
         <h2 className='text-3xl md:text-4xl font-semibold tracking-tight mb-8 text-center sm:text-left text-foreground/90'>
           🔥 Aktuelle Events
         </h2>
-        {loadingEvents && ( // Hier den Ladezustand für Events verwenden
+        {loadingEvents && (
           <div className='flex flex-col items-center justify-center min-h-[200px] text-muted-foreground'>
             <Loader2 className='w-12 h-12 animate-spin text-primary mb-4' />
             <p className='text-lg'>Lade die heißesten Events...</p>
@@ -262,7 +263,7 @@ export default function LandingPage() {
             <p className='text-center'>{error}</p>
             <Button
               variant='outline'
-              onClick={() => router.refresh()} // oder die Event-Ladefunktion erneut aufrufen
+              onClick={() => router.refresh()}
               className='mt-6'
             >
               Seite neu laden

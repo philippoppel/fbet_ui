@@ -1,4 +1,7 @@
 // src/app/components/dashboard/DashboardLayout.tsx
+'use client';
+
+import { useMemo } from 'react'; // useMemo importieren
 import { cn } from '@/app/lib/utils';
 import type { Group, HighscoreEntry, UserOut } from '@/app/lib/types';
 
@@ -12,6 +15,7 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
   myGroups: Group[];
   selectedGroupId: number | null;
+  selectedGroupDetails: Group | null; // NEU: Hinzugefügt
   selectedGroupHighscore: HighscoreEntry[];
   selectedGroupMembers: UserOut[];
   isGroupDataLoading: boolean;
@@ -28,6 +32,7 @@ export function DashboardLayout({
   children,
   myGroups,
   selectedGroupId,
+  selectedGroupDetails, // NEU: Empfangen
   selectedGroupHighscore,
   selectedGroupMembers,
   isGroupDataLoading,
@@ -41,26 +46,30 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const hasGroups = myGroups && myGroups.length > 0;
 
-  // Sidebar-Breiten (aus GroupSidebar.tsx)
-  const collapsedSidebarWidthClass = 'lg:w-[72px]'; // ca. 4.5rem
-  // Annahme: xl:w-80 ist die breiteste Einstellung (20rem / 320px)
+  const collapsedSidebarWidthClass = 'lg:w-[72px]';
   const expandedSidebarWidthClass = 'xl:w-80';
-
-  // Entsprechende Padding-Klassen für den Hauptinhalt
   const collapsedPaddingClass = 'lg:pl-[72px]';
-  const expandedPaddingClass = 'lg:pl-80'; // Entspricht pl-20rem
+  const expandedPaddingClass = 'lg:pl-80';
+  const headerHeightClass = 'h-16';
+  const sidebarTopOffsetClass = `top-${headerHeightClass.split('-')[1]}`;
+  const mainContentMarginTopClass = `mt-${headerHeightClass.split('-')[1]}`;
+  const sidebarCalculatedHeightClass = `h-[calc(100vh-4rem)]`; // Annahme: Header ist 4rem hoch
 
-  // Annahme: Dein AppHeader ist fixiert und hat eine Höhe von h-16 (4rem / 64px)
-  const headerHeightClass = 'h-16'; // Anpassen, falls dein Header anders ist
-  const sidebarTopOffsetClass = `top-${headerHeightClass.split('-')[1]}`; // ergibt 'top-16'
-  const mainContentMarginTopClass = `mt-${headerHeightClass.split('-')[1]}`; // ergibt 'mt-16'
-  const sidebarCalculatedHeightClass = `h-[calc(100vh-${headerHeightClass.split('-')[1] === '16' ? '4rem' : 'DEINE_HEADER_HOEHE_IN_REM'})]`;
-  // Vereinfacht, wenn du die rem-Höhe direkt kennst:
-  // const sidebarCalculatedHeightClass = 'h-[calc(100vh-4rem)]'; // Wenn Header 4rem hoch
+  const groupLeaderIdForSelectedGroup = useMemo(() => {
+    // Bevorzuge selectedGroupDetails, da es aktueller sein kann als myGroups
+    if (selectedGroupDetails?.createdById) {
+      return selectedGroupDetails.createdById;
+    }
+    // Fallback auf myGroups, falls selectedGroupDetails noch nicht geladen oder null ist
+    if (selectedGroupId && myGroups.length > 0) {
+      const currentGroup = myGroups.find((g) => g.id === selectedGroupId);
+      return currentGroup?.createdById ?? null;
+    }
+    return null;
+  }, [selectedGroupId, myGroups, selectedGroupDetails]);
 
   return (
     <div data-testid='dashboard-layout' className='relative min-h-screen'>
-      {/* Desktop Sidebar - bleibt wie zuvor */}
       {hasGroups && (
         <div
           className={cn(
@@ -87,7 +96,6 @@ export function DashboardLayout({
         </div>
       )}
 
-      {/* Hauptinhaltsbereich */}
       <main
         className={cn(
           'container mx-auto px-4 md:px-6 lg:px-8 py-6',
@@ -100,29 +108,25 @@ export function DashboardLayout({
         )}
       >
         <div className={cn('grid grid-cols-1 lg:grid-cols-12 gap-6')}>
-          {/* Mittlere Spalte: Hauptinhalt (children) */}
           <section
             className={cn(
               'col-span-12',
-              // NEU: Wenn Gruppen vorhanden, nimmt Hauptinhalt 8 Spalten, sonst 12
-              hasGroups ? 'lg:col-span-8' : 'lg:col-span-12' // War vorher lg:col-span-9
+              hasGroups ? 'lg:col-span-8' : 'lg:col-span-12'
             )}
           >
             {children}
           </section>
 
-          {/* Rechte Spalte: Highscore */}
           {hasGroups && (
             <aside className={cn('col-span-12 lg:col-span-4')}>
-              {/* NEU: War vorher lg:col-span-3 */}
-              {/* Logik zur Anzeige von HighscoreCard, Placeholder oder Fehler bleibt gleich */}
               {selectedGroupId && !errors.groupData && !isGroupDataLoading ? (
                 <HighscoreCard
                   highscore={selectedGroupHighscore}
                   members={selectedGroupMembers}
-                  isLoading={isGroupDataLoading}
-                  error={null}
+                  isLoading={isGroupDataLoading} // Korrigiert: Sollte den aktuellen Ladezustand reflektieren
+                  error={null} // Wenn kein Fehler, dann null
                   currentUserId={currentUserId}
+                  groupLeaderId={groupLeaderIdForSelectedGroup} // NEU
                 />
               ) : selectedGroupId && errors.groupData && !isGroupDataLoading ? (
                 <Card className='flex flex-col items-center justify-center h-48 text-center shadow-sm border border-dashed p-4'>
@@ -141,6 +145,7 @@ export function DashboardLayout({
                   isLoading={true}
                   error={null}
                   currentUserId={currentUserId}
+                  groupLeaderId={groupLeaderIdForSelectedGroup} // Oder null, wenn noch nicht bekannt
                 />
               ) : !selectedGroupId && !loadingInitial ? (
                 <HighscorePlaceholder />

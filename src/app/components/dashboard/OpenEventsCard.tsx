@@ -1,7 +1,12 @@
+// src/app/components/dashboard/OpenEventsCard.tsx
 'use client';
 
 import React, { useState } from 'react';
-import type { Event as GroupEvent, UserOut } from '@/app/lib/types';
+import type {
+  Event as GroupEvent,
+  UserOut,
+  AllTipsPerEvent,
+} from '@/app/lib/types'; // AllTipsPerEvent importiert
 import {
   Card,
   CardContent,
@@ -28,6 +33,7 @@ interface OpenEventsCardProps {
   resultInputs: Record<number, string>;
   isSubmittingTip: Record<number, boolean>;
   isSettingResult: Record<number, boolean>;
+  allTipsPerEvent: AllTipsPerEvent; // NEUE PROP
   onSelectTip: (eventId: number, option: string) => void;
   onSubmitTip: (eventId: number) => Promise<void>;
   onResultInputChange: (eventId: number, value: string) => void;
@@ -46,6 +52,7 @@ export default function OpenEventsCard({
   resultInputs,
   isSubmittingTip,
   isSettingResult,
+  allTipsPerEvent, // NEUE PROP empfangen
   onSelectTip,
   onSubmitTip,
   onResultInputChange,
@@ -132,6 +139,7 @@ export default function OpenEventsCard({
                     onResultInputChange={onResultInputChange}
                     onSetResult={onSetResult}
                     onClearSelectedTip={onClearSelectedTip}
+                    allTipsForThisEvent={allTipsPerEvent[event.id] || []} // NEU: Prop übergeben
                   />
                 </div>
               ))

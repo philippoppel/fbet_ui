@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useMemo } from 'react'; // useMemo hinzugefügt
+import { useCallback, useMemo } from 'react';
 import type {
   Group,
   Event as GroupEvent,
   UserOut,
   AllTipsPerEvent,
-  HighscoreEntry, // NEU: Importieren
-  LeaderboardWinner, // NEU: Importieren (oder stelle sicher, dass es global/aus types.ts verfügbar ist)
+  HighscoreEntry,
+  LeaderboardWinner,
 } from '@/app/lib/types';
 import type { UseGroupInteractionsReturn } from '@/app/hooks/useGroupInteractions';
 
@@ -24,7 +24,7 @@ type SelectedGroupViewProps = {
   interactions: UseGroupInteractionsReturn;
   userSubmittedTips: Record<number, string>;
   allTipsPerEvent: AllTipsPerEvent;
-  highscoreEntries: HighscoreEntry[] | null; // NEU: Prop hinzugefügt
+  highscoreEntries: HighscoreEntry[] | null;
   onDeleteGroup: (group: Group) => void;
   onImageChanged: () => void;
 };
@@ -35,8 +35,8 @@ export function SelectedGroupView({
   user,
   interactions,
   userSubmittedTips,
-  allTipsPerEvent,
-  highscoreEntries, // NEU: Prop empfangen
+  allTipsPerEvent, // Wird hier empfangen
+  highscoreEntries,
   onDeleteGroup,
   onImageChanged,
 }: SelectedGroupViewProps) {
@@ -51,16 +51,12 @@ export function SelectedGroupView({
     if (!highscoreEntries || highscoreEntries.length === 0) {
       return null;
     }
-
-    // Erstelle eine Kopie, um sie zu sortieren, falls das Original nicht verändert werden soll
     const sortedScores = [...highscoreEntries].sort(
       (a, b) => b.points - a.points
     );
     const topPlayer = sortedScores[0];
 
     if (topPlayer && topPlayer.name != null) {
-      // Stelle sicher, dass der Name existiert
-      // Prüfe auf Gleichstand beim ersten Platz
       const coWinners = sortedScores.filter(
         (p) => p.points === topPlayer.points
       );
@@ -69,7 +65,7 @@ export function SelectedGroupView({
           .map((p) => p.name)
           .filter((name) => name != null) as string[];
         if (names.length > 0) {
-          return { name: names.join(' & ') }; // z.B. "Alice & Bob"
+          return { name: names.join(' & ') };
         }
       } else {
         return { name: topPlayer.name };
@@ -82,7 +78,7 @@ export function SelectedGroupView({
     <div className='space-y-8'>
       <GroupHeaderCard
         group={group}
-        leaderboardWinner={leaderboardWinner} // NEU: Den ermittelten Gewinner übergeben
+        leaderboardWinner={leaderboardWinner}
         isAddEventDialogOpen={interactions.isAddEventDialogOpen}
         addEventForm={interactions.addEventForm}
         onSetAddEventDialogOpen={interactions.setIsAddEventDialogOpen}
@@ -108,6 +104,7 @@ export function SelectedGroupView({
         onClearSelectedTip={interactions.handleClearSelectedTip}
         onInitiateDeleteEvent={interactions.handleInitiateDeleteEvent}
         onOpenAddEventDialog={() => interactions.setIsAddEventDialogOpen(true)}
+        allTipsPerEvent={allTipsPerEvent} // <<< KORREKTUR HIER: Prop weitergeben
       />
 
       <SubmittedOpenEventsCard
