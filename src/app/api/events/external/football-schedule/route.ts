@@ -3,8 +3,8 @@ import {
   addDays,
   fetchAndParseOpenLigaCompetition,
   fetchAndParseAustriaMatchesOpenLiga,
-  type FootballEvent,
-} from '@/app/api/services/football_schedule'; // Passen Sie den Pfad ggf. an
+} from '@/app/api/services/football_schedule';
+import { FootballEvent } from '@/app/lib/types'; // Passen Sie den Pfad ggf. an
 
 /* -------------------------------------------------------------------------- */
 /* Konfiguration                                                              */

@@ -306,6 +306,7 @@ export default function DashboardPage() {
             groupDataError={
               errors.groupData || errors.userTips || errors.allGroupTips
             }
+            highscoreEntries={selectedGroupHighscore}
             interactions={interactions}
             onDeleteGroupInPage={handleInitiateDeleteGroupFromHeader}
             onImageChanged={() => {

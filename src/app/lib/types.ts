@@ -41,8 +41,11 @@ export interface BoxingScheduleItem {
   parsedDate?: string | null; // Der hinzugefügte ISO-Datumsstring
 }
 
-export type Group = PrismaGroup;
-
+export interface Group extends PrismaGroup {
+  creator: {
+    name: string | null;
+  };
+}
 export interface GroupCreate {
   name: string;
   description?: string | null;
@@ -103,12 +106,12 @@ export interface TipOut {
 }
 
 export interface MixedEvent {
-  id: string;
+  id: string; // Eindeutige ID für die Liste (z.B. "football-12345")
   title: string;
   subtitle: string;
-  sport: 'ufc' | 'boxing';
-  date: Date;
-  original: UfcEventItem | BoxingScheduleItem;
+  sport: 'ufc' | 'boxing' | 'football'; // 'football' hinzugefügt
+  date: Date; // Wird als Date-Objekt für die Sortierung gespeichert
+  original: UfcEventItem | BoxingScheduleItem | FootballEvent; // FootballEvent hinzugefügt
 }
 
 export interface UserTipSelection {
@@ -155,3 +158,19 @@ export interface EventCommentCreate {
   text?: string;
   gifUrl?: string;
 }
+export interface FootballEvent {
+  matchID: number; // Eindeutige ID von OpenLigaDB
+  competition: string;
+  matchDate: string; // ISO-8601 UTC String
+  homeTeam: string;
+  awayTeam: string;
+  status: string; // z.B. SCHEDULED, FINISHED
+  result?: string | null; // Optional, falls schon vorhanden
+  // Fügen Sie weitere Felder hinzu, die von Ihrer API-Funktion zurückgegeben werden könnten
+  leagueShortcut?: string;
+  leagueSeason?: string;
+}
+export type LeaderboardWinner = {
+  name: string | null;
+  // points?: number; // Optional
+};

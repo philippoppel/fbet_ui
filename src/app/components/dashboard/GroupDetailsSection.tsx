@@ -1,4 +1,3 @@
-// src/app/components/dashboard/GroupDetailsSection.tsx
 'use client';
 
 import type {
@@ -6,21 +5,23 @@ import type {
   Event as GroupEvent,
   UserOut,
   AllTipsPerEvent,
-} from '@/app/lib/types'; // NEU: AllTipsPerEvent importieren
+  HighscoreEntry, // NEU: Importieren
+} from '@/app/lib/types';
 import type { UseGroupInteractionsReturn } from '@/app/hooks/useGroupInteractions';
 
 import { Card, CardContent, CardHeader } from '@/app/components/ui/card';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { Users, TriangleAlert } from 'lucide-react';
-import { SelectedGroupView } from '@/app/components/dashboard/SelectedGroupView'; // Annahme: SelectedGroupView ist in diesem Pfad
+import { SelectedGroupView } from '@/app/components/dashboard/SelectedGroupView';
 
 interface GroupDetailsSectionProps {
-  selectedGroupId: number | null; // Kann null sein, wird aber in der Logik behandelt
+  selectedGroupId: number | null;
   selectedGroupDetails: Group | null;
   selectedGroupEvents: GroupEvent[];
   userSubmittedTips: Record<number, string>;
-  allTipsPerEvent: AllTipsPerEvent; // NEU: Prop hinzugefügt
-  user: UserOut; // User-Objekt wird hier erwartet (nicht null/undefined)
+  allTipsPerEvent: AllTipsPerEvent;
+  highscoreEntries: HighscoreEntry[] | null; // NEU: Prop hinzugefügt
+  user: UserOut;
   isGroupDataLoading: boolean;
   groupDataError: string | null | undefined;
   interactions: UseGroupInteractionsReturn;
@@ -29,6 +30,7 @@ interface GroupDetailsSectionProps {
 }
 
 function SelectedGroupViewSkeleton() {
+  // ... (Keine Änderungen hier notwendig für diese Funktion)
   return (
     <div className='space-y-6'>
       {/* Header Card Skeleton */}
@@ -60,7 +62,6 @@ function SelectedGroupViewSkeleton() {
       <Card className='rounded-xl border border-border bg-muted shadow-sm'>
         <CardHeader className='p-6'>
           <Skeleton className='h-6 w-2/5 rounded-xl' />
-          {/* Angepasste Breite für längeren Titel */}
         </CardHeader>
         <CardContent className='space-y-4 p-6 pt-0'>
           <Skeleton className='h-20 w-full rounded-xl border p-4' />
@@ -86,7 +87,8 @@ export function GroupDetailsSection({
   selectedGroupDetails,
   selectedGroupEvents,
   userSubmittedTips,
-  allTipsPerEvent, // NEU: Prop empfangen
+  allTipsPerEvent,
+  highscoreEntries, // NEU: Prop empfangen
   user,
   isGroupDataLoading,
   groupDataError,
@@ -94,9 +96,7 @@ export function GroupDetailsSection({
   onDeleteGroupInPage,
   onImageChanged,
 }: GroupDetailsSectionProps) {
-  // 1. Keine Gruppe ausgewählt (wird eigentlich schon in DashboardPage behandelt, aber als double check)
   if (!selectedGroupId && !isGroupDataLoading) {
-    // Nur anzeigen, wenn nicht gerade geladen wird
     return (
       <Card className='flex flex-col items-center justify-center py-16 px-6 min-h-[400px] border border-dashed border-border bg-muted text-muted-foreground shadow-sm rounded-xl text-center space-y-2'>
         <Users className='h-12 w-12 opacity-50 mb-4' />
@@ -108,7 +108,6 @@ export function GroupDetailsSection({
     );
   }
 
-  // 2. Gruppe wird geladen (oder es gibt noch keine Details, aber eine ID ist ausgewählt)
   if (
     isGroupDataLoading ||
     (selectedGroupId && !selectedGroupDetails && !groupDataError)
@@ -116,7 +115,6 @@ export function GroupDetailsSection({
     return <SelectedGroupViewSkeleton />;
   }
 
-  // 3. Fehler beim Laden
   if (groupDataError && !isGroupDataLoading) {
     return (
       <Card className='p-6 border border-destructive/40 bg-destructive/10 text-destructive shadow-sm rounded-xl flex flex-col items-center text-center min-h-[400px] justify-center space-y-2'>
@@ -127,24 +125,22 @@ export function GroupDetailsSection({
     );
   }
 
-  // 4. Alles geladen und Details vorhanden
   if (selectedGroupDetails && !isGroupDataLoading && !groupDataError) {
     return (
       <SelectedGroupView
         group={selectedGroupDetails}
         events={selectedGroupEvents}
-        user={user} // User wird weitergegeben
+        user={user}
         interactions={interactions}
         userSubmittedTips={userSubmittedTips}
-        allTipsPerEvent={allTipsPerEvent} // NEU: allTipsPerEvent an SelectedGroupView weitergeben
+        allTipsPerEvent={allTipsPerEvent}
+        highscoreEntries={highscoreEntries} // NEU: highscoreEntries an SelectedGroupView weitergeben
         onDeleteGroup={onDeleteGroupInPage}
         onImageChanged={onImageChanged}
       />
     );
   }
 
-  // 5. Fallback, falls ein unerwarteter Zustand eintritt
-  // (sollte idealerweise nicht erreicht werden, wenn die obige Logik greift)
   console.warn(
     '[GroupDetailsSection] Fallback-UI erreicht. Überprüfe Ladezustände und Daten.',
     {

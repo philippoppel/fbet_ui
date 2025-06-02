@@ -1,4 +1,3 @@
-// src/components/dashboard/AddEventDialog.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -29,40 +28,45 @@ import { toast } from 'sonner';
 import type { UseFormReturn } from 'react-hook-form';
 import type { AddEventFormData } from '@/app/hooks/useGroupInteractions';
 import type {
-  BoxingScheduleItem,
   MixedEvent,
   UfcEventItem,
-} from '@/app/lib/types'; // UfcEventItem, BoxingScheduleItem werden indirekt über MixedEvent.original behandelt
+  BoxingScheduleItem,
+  FootballEvent,
+} from '@/app/lib/types';
 import { EventList } from '@/app/components/dashboard/EventList';
 import { useDashboardData } from '@/app/hooks/useDashboardData';
-
-// --- HILFSFUNKTIONEN ---
+import type { AiEventPayload } from '@/app/components/event/EventCard'; // Import für den Payload-Typ
 
 const extractAIFields = (text: string): Partial<AddEventFormData> => {
   const lines = text
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
-  let title = '';
-  let question = '';
-  let description = '';
+  let title = '',
+    question = '',
+    description = '';
   let options: string[] = [];
   let parsingState: 'none' | 'options' | 'description' = 'none';
 
   for (const line of lines) {
     const lowerLine = line.toLowerCase();
     if (lowerLine.startsWith('titel:')) {
-      // Startswith ist robuster
-      title = line.split(':')[1]?.trim().replace(/^"|"$/g, '') || '';
+      title = line
+        .substring(line.indexOf(':') + 1)
+        .trim()
+        .replace(/^"|"$/g, '');
       parsingState = 'none';
     } else if (lowerLine.startsWith('frage:')) {
-      question = line.split(':')[1]?.trim().replace(/^"|"$/g, '') || '';
+      question = line
+        .substring(line.indexOf(':') + 1)
+        .trim()
+        .replace(/^"|"$/g, '');
       parsingState = 'none';
     } else if (lowerLine.startsWith('optionen:')) {
       parsingState = 'options';
     } else if (lowerLine.startsWith('beschreibung:')) {
-      description = line.split(':').slice(1).join(':').trim();
-      parsingState = 'description'; // Wichtig: State hier setzen
+      description = line.substring(line.indexOf(':') + 1).trim();
+      parsingState = 'description';
     } else if (parsingState === 'options') {
       if (line.match(/^(\*|\-|\d+\.|[A-Z]\))\s+/)) {
         options.push(line.replace(/^(\*|\-|\d+\.|[A-Z]\))\s*/, '').trim());
@@ -78,10 +82,7 @@ const extractAIFields = (text: string): Partial<AddEventFormData> => {
           lowerLine.startsWith(kw)
         )
       ) {
-        // Wenn ein neues Feld beginnt, Optionen beenden und Zeile neu verarbeiten
         parsingState = 'none';
-        // Hier könnte man die Zeile ggf. in der nächsten Iteration neu verarbeiten oder den Index zurücksetzen.
-        // Für Einfachheit: Aktuelle Zeile wird ignoriert, wenn sie ein neues Feld einleitet.
       }
     } else if (parsingState === 'description') {
       if (
@@ -91,49 +92,44 @@ const extractAIFields = (text: string): Partial<AddEventFormData> => {
       ) {
         description += '\n' + line;
       } else {
-        // Wenn ein neues Feld beginnt, Beschreibung beenden
         parsingState = 'none';
-        // Ggf. Zeile neu verarbeiten
       }
     }
   }
-  description = description.trim();
   return {
-    title: title,
-    question: question || title, // Fallback, falls keine explizite Frage
-    description: description,
+    title: title.trim(),
+    question: question.trim() || title.trim(),
+    description: description.trim(),
     options: options.join('\n'),
   };
 };
 
-const getDefaultDeadlineString = (date?: Date): string => {
+const getDefaultDeadlineString = (eventDateInput?: Date): string => {
   const now = new Date();
-  let targetDate: Date;
+  let deadlineDate: Date;
 
-  if (date && date.getTime() > now.getTime()) {
-    // Wenn ein gültiges Zukunftsdatum übergeben wird, dieses verwenden
-    targetDate = new Date(date);
+  if (eventDateInput && eventDateInput.getTime() > now.getTime()) {
+    deadlineDate = new Date(eventDateInput);
   } else {
-    // Andernfalls Standard: aktuelles Datum + 1 Monat (oder das Event-Datum, falls es in der Vergangenheit liegt)
-    targetDate = new Date(date || now); // Nimm Event-Datum als Basis, auch wenn vergangen, oder jetzt
-    if (!date || date.getTime() <= now.getTime()) {
-      // Wenn kein Datum oder vergangenes Datum, dann +1 Monat ab jetzt
-      targetDate = new Date(); // Zurücksetzen auf jetzt für +1 Monat Logik
-      targetDate.setMonth(targetDate.getMonth() + 1);
+    deadlineDate = new Date(now);
+    if (eventDateInput && eventDateInput.getTime() <= now.getTime()) {
+      deadlineDate.setDate(deadlineDate.getDate() + 7);
+    } else if (!eventDateInput) {
+      deadlineDate.setDate(deadlineDate.getDate() + 1);
     }
-  }
-  // Sicherstellen, dass die Deadline mindestens ein paar Stunden in der Zukunft liegt, falls Event-Datum sehr nah ist
-  if (targetDate.getTime() - now.getTime() < 2 * 60 * 60 * 1000) {
-    // Weniger als 2 Stunden
-    targetDate = new Date(now.getTime() + 2 * 60 * 60 * 1000); // Setze auf 2 Stunden in der Zukunft
+    deadlineDate.setHours(23, 59, 0, 0);
   }
 
-  const offset = targetDate.getTimezoneOffset();
-  const localDate = new Date(targetDate.getTime() - offset * 60000);
-  return localDate.toISOString().slice(0, 16);
+  const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  if (deadlineDate.getTime() < twoHoursFromNow.getTime()) {
+    deadlineDate = twoHoursFromNow;
+  }
+
+  const offset = deadlineDate.getTimezoneOffset();
+  const localDeadline = new Date(deadlineDate.getTime() - offset * 60000);
+  return localDeadline.toISOString().slice(0, 16);
 };
 
-// --- PROPS ---
 type AddEventDialogProps = {
   groupName: string;
   open: boolean;
@@ -143,7 +139,6 @@ type AddEventDialogProps = {
   triggerProps?: ButtonProps & { children?: React.ReactNode };
 };
 
-// --- KOMPONENTE ---
 export function AddEventDialog({
   groupName,
   open,
@@ -156,23 +151,14 @@ export function AddEventDialog({
   const [internalSuggestions, setInternalSuggestions] = useState<MixedEvent[]>(
     []
   );
-
-  // Verwende useDashboardData für Ladezustand und Fehler von kombinierten Events
   const {
     retrievedCombinedEvents,
     loadCombinedEvents,
-    isLoadingCombinedEvents, // von useDashboardData
-    errors: dashboardErrors, // von useDashboardData
+    isLoadingCombinedEvents,
+    errors: dashboardErrors,
   } = useDashboardData();
 
-  const resetFormToDefaults = useCallback(() => {
-    form.reset({
-      title: '',
-      description: '',
-      question: 'Wer gewinnt?',
-      options: '',
-      tippingDeadline: getDefaultDeadlineString(),
-    });
+  const triggerTextareaResize = useCallback(() => {
     setTimeout(() => {
       document
         .querySelectorAll(
@@ -187,9 +173,19 @@ export function AddEventDialog({
           }
         });
     }, 0);
-  }, [form]);
+  }, []);
 
-  // useEffect zum Laden/Übernehmen der kombinierten Event-Vorschläge
+  const resetFormToDefaults = useCallback(() => {
+    form.reset({
+      title: '',
+      description: '',
+      question: 'Wer gewinnt?',
+      options: '',
+      tippingDeadline: getDefaultDeadlineString(),
+    });
+    triggerTextareaResize();
+  }, [form, triggerTextareaResize]);
+
   useEffect(() => {
     if (open) {
       if (
@@ -197,11 +193,8 @@ export function AddEventDialog({
         !isLoadingCombinedEvents &&
         !dashboardErrors.combinedEvents
       ) {
-        // Nur laden, wenn noch nicht geladen, nicht gerade lädt und kein Fehler vorliegt.
         loadCombinedEvents();
       }
-      // Setze internalSuggestions immer, wenn retrievedCombinedEvents sich ändert und der Dialog offen ist.
-      // Das Filtern nach gültigem Datum (getFullYear > 1970) geschieht bereits in useDashboardData.
       setInternalSuggestions(retrievedCombinedEvents);
     }
   }, [
@@ -212,66 +205,50 @@ export function AddEventDialog({
     dashboardErrors.combinedEvents,
   ]);
 
-  const generateAiSuggestion = async () => {
+  const processAndApplyAiSuggestion = (
+    aiResponseData: any, // Typ sollte genauer sein, z.B. { message: string, event_bet_on?: { date?: string } }
+    successMessage: string
+  ) => {
+    const aiBetText =
+      aiResponseData.message || aiResponseData.generated_bet_text || '';
+    const suggestion = extractAIFields(aiBetText);
+
+    if (!suggestion.title && !suggestion.question) {
+      toast.error('AI konnte keine gültige Wette erzeugen.', {
+        description: 'Das Format der AI-Antwort war unerwartet.',
+      });
+      return;
+    }
+
+    const eventDateForDeadline = aiResponseData.event_bet_on?.date
+      ? new Date(aiResponseData.event_bet_on.date)
+      : undefined;
+
+    form.reset({
+      title: suggestion.title || '',
+      question: suggestion.question || suggestion.title || '',
+      description: suggestion.description || '',
+      options: suggestion.options || '',
+      tippingDeadline: getDefaultDeadlineString(eventDateForDeadline),
+    });
+    triggerTextareaResize();
+    toast.success(successMessage);
+  };
+
+  const generateRandomAiSuggestion = async () => {
     setIsAiLoading(true);
     try {
+      // Der GET-Request an dieselbe Route führt zur Generierung eines zufälligen Events
       const res = await fetch('/api/generate-ai-bet', { method: 'GET' });
-
       if (!res.ok) {
-        let errorMsg = `API-Fehler: ${res.status}`;
-        try {
-          const errorData = await res.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch {
-          /* Ignore */
-        }
-        throw new Error(errorMsg);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `API-Fehler: ${res.status}`);
       }
-
-      const data = await res.json(); // Erwartet { generated_bet_text: string, event_bet_on: GenericEvent }
-
-      // data.message für Kompatibilität mit der alten AI-Endpunkt-Antwort
-      const aiBetText = data.generated_bet_text || data.message || '';
-      const suggestion = extractAIFields(aiBetText);
-
-      if (!suggestion.title && !suggestion.question) {
-        toast.error('AI konnte keine gültige Wette erzeugen.', {
-          description: 'Das Format der AI-Antwort war unerwartet.',
-        });
-        return;
-      }
-
-      let eventDateForDeadline: Date | undefined = undefined;
-      if (data.event_bet_on && data.event_bet_on.date) {
-        eventDateForDeadline = new Date(data.event_bet_on.date);
-      }
-
-      form.reset({
-        title: suggestion.title || '',
-        question: suggestion.question || suggestion.title || '',
-        description: suggestion.description || '',
-        options: suggestion.options || '',
-        tippingDeadline: getDefaultDeadlineString(eventDateForDeadline),
-      });
-
-      setTimeout(() => {
-        document
-          .querySelectorAll(
-            'textarea[data-react-textarea-autosize="true"], input[type="datetime-local"]'
-          )
-          .forEach((el) => {
-            const event = new Event('input', { bubbles: true });
-            try {
-              el.dispatchEvent(event);
-            } catch (e) {
-              /* ignore */
-            }
-          });
-      }, 0);
-      toast.success('AI-Vorschlag eingefügt!');
+      const data = await res.json();
+      processAndApplyAiSuggestion(data, 'Zufälliger AI-Vorschlag eingefügt!');
     } catch (error: any) {
-      console.error('Fehler bei AI-Wette:', error);
-      toast.error('Fehler bei der AI-Wette.', {
+      console.error('Fehler bei zufälliger AI-Wette:', error);
+      toast.error('Fehler bei der zufälligen AI-Wette.', {
         description: error.message || 'Unbekannter Fehler.',
       });
     } finally {
@@ -279,53 +256,84 @@ export function AddEventDialog({
     }
   };
 
+  const handleAiGenerateForSpecificEvent = async (payload: AiEventPayload) => {
+    setIsAiLoading(true);
+    try {
+      const res = await fetch('/api/generate-ai-bet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        toast.error('API-Fehler beim Generieren der Wette für dieses Event.', {
+          description: errorData.error || `Status: ${res.status}`,
+        });
+        throw new Error(errorData.error || `API-Fehler: ${res.status}`);
+      }
+      const data = await res.json();
+      processAndApplyAiSuggestion(
+        data,
+        'AI-Vorschlag für ausgewähltes Event eingefügt!'
+      );
+    } catch (error: any) {
+      console.error('Fehler bei AI-Wette für spezifisches Event:', error);
+      toast.error('Fehler bei der AI-Wette für spezifisches Event.', {
+        description: error.message || 'Ein unbekannter Fehler ist aufgetreten.',
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   const handleSuggestionClick = (suggestedEventId: string) => {
-    // Erwartet jetzt die ID des MixedEvent
     const eventToUse = internalSuggestions.find(
       (e) => e.id === suggestedEventId
     );
-
     if (!eventToUse) {
-      console.warn(
-        'Konnte volles Event-Objekt nicht über ID finden für Vorschlag:',
-        suggestedEventId
-      );
       toast.error('Fehler bei Übernahme des Vorschlags.');
       return;
     }
 
-    let title = eventToUse.title || 'Event Titel';
+    let title = eventToUse.title;
     let description = `Vorgeschlagenes Event: ${title}`;
     let question = 'Wer gewinnt?';
-    let optionsArray = ['Team 1 gewinnt', 'Team 2 gewinnt', 'Unentschieden'];
+    let optionsArray: string[] = [];
 
     if (eventToUse.sport === 'ufc' && eventToUse.original) {
       const ufcItem = eventToUse.original as UfcEventItem;
-      const fighters = ufcItem.summary?.split(' vs ');
-      if (fighters && fighters.length === 2) {
-        optionsArray = [
-          `${fighters[0].trim()} gewinnt`,
-          `${fighters[1].trim()} gewinnt`,
-        ];
-        // Im UFC ist Unentschieden sehr selten, besonders bei Hauptkämpfen. Man könnte es weglassen.
-        // if (!ufcItem.summary?.toLowerCase().includes('main event')) {
-        //   optionsArray.push('Unentschieden (Draw)');
-        // }
-      }
-      description = `UFC Event: ${ufcItem.summary || title}\nOrt: ${ufcItem.location || 'N/A'}`;
       question = `Wer gewinnt den Kampf: ${ufcItem.summary || title}?`;
+      const fighters = ufcItem.summary?.split(' vs ');
+      optionsArray =
+        fighters && fighters.length === 2
+          ? [`${fighters[0].trim()} gewinnt`, `${fighters[1].trim()} gewinnt`]
+          : ['Kämpfer 1 gewinnt', 'Kämpfer 2 gewinnt'];
+      description = `UFC Event: ${ufcItem.summary || title}\nOrt: ${ufcItem.location || 'N/A'}\nDatum: ${eventToUse.date.toLocaleString('de-DE')}`;
     } else if (eventToUse.sport === 'boxing' && eventToUse.original) {
       const boxingItem = eventToUse.original as BoxingScheduleItem;
-      const fighters = boxingItem.details?.split(' vs ');
-      if (fighters && fighters.length === 2) {
-        optionsArray = [
-          `${fighters[0].trim()} gewinnt`,
-          `${fighters[1].trim()} gewinnt`,
-          'Unentschieden',
-        ];
-      }
-      description = `Boxkampf: ${boxingItem.details || title}\nOrt: ${boxingItem.location || 'N/A'}, Übertragen von: ${boxingItem.broadcaster || 'N/A'}`;
       question = `Wer gewinnt den Boxkampf: ${boxingItem.details || title}?`;
+      const fighters = boxingItem.details?.split(' vs ');
+      optionsArray =
+        fighters && fighters.length === 2
+          ? [
+              `${fighters[0].trim()} gewinnt`,
+              `${fighters[1].trim()} gewinnt`,
+              'Unentschieden',
+            ]
+          : ['Boxer 1 gewinnt', 'Boxer 2 gewinnt', 'Unentschieden'];
+      description = `Boxkampf: ${boxingItem.details || title}\nOrt: ${boxingItem.location || 'N/A'}${boxingItem.broadcaster ? `, Übertragung: ${boxingItem.broadcaster}` : ''}\nDatum: ${eventToUse.date.toLocaleString('de-DE')}`;
+    } else if (eventToUse.sport === 'football' && eventToUse.original) {
+      const footballItem = eventToUse.original as FootballEvent;
+      question = `Wie endet das Spiel ${footballItem.homeTeam} vs ${footballItem.awayTeam}?`;
+      optionsArray = [
+        `${footballItem.homeTeam} gewinnt`,
+        `${footballItem.awayTeam} gewinnt`,
+        'Unentschieden',
+      ];
+      description = `Fußballspiel: ${title}\nWettbewerb: ${footballItem.competition}\nDatum: ${eventToUse.date.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })}`;
+    } else {
+      optionsArray = ['Option 1', 'Option 2'];
     }
 
     form.reset({
@@ -335,30 +343,15 @@ export function AddEventDialog({
       description: description.slice(0, 500),
       tippingDeadline: getDefaultDeadlineString(eventToUse.date),
     });
-
-    setTimeout(() => {
-      document
-        .querySelectorAll(
-          'textarea[data-react-textarea-autosize="true"], input[type="datetime-local"]'
-        )
-        .forEach((el) => {
-          const event = new Event('input', { bubbles: true });
-          try {
-            el.dispatchEvent(event);
-          } catch (e) {
-            /* ignore */
-          }
-        });
-    }, 0);
-
+    triggerTextareaResize();
     toast.success('Vorschlag übernommen', {
       description: `"${title}" wurde ins Formular eingetragen. Deadline: ${form.getValues('tippingDeadline').replace('T', ' ')}`,
     });
   };
 
   const defaultTrigger = (
-    <Button size='sm' variant='ghost' className='hover:bg-primary/90'>
-      <PlusCircle className='mr-2 h-4 w-4' /> Neue Wette
+    <Button size='sm' variant='outline' className='whitespace-nowrap'>
+      <PlusCircle className='mr-2 h-4 w-4' /> Neue Wette vorschlagen
     </Button>
   );
 
@@ -370,16 +363,12 @@ export function AddEventDialog({
       open={open}
       onOpenChange={(isOpen) => {
         setOpen(isOpen);
-        if (!isOpen) {
-          resetFormToDefaults();
-        }
+        if (!isOpen) resetFormToDefaults();
       }}
     >
       <DialogTrigger asChild>
         {triggerProps ? (
-          <Button {...triggerProps} variant={triggerProps.variant || 'ghost'}>
-            {' '}
-            {/* variant fallback */}
+          <Button {...triggerProps} variant={triggerProps.variant || 'default'}>
             {triggerProps.children || (
               <>
                 <PlusCircle className='mr-2 h-4 w-4' /> Neues Event
@@ -393,31 +382,30 @@ export function AddEventDialog({
 
       <DialogContent className='sm:max-w-[640px] max-h-[90vh] flex flex-col'>
         <DialogHeader className='flex-shrink-0'>
-          <DialogTitle>Neues Event für „{groupName}“</DialogTitle>
+          <DialogTitle>Neues Event für „{groupName}“ erstellen</DialogTitle>
           <DialogDescription>
-            Manuell ausfüllen, AI-Vorschlag nutzen oder aus der Liste wählen.
-            Tipp-Deadline ist erforderlich.
+            Fülle die Felder manuell aus, nutze einen AI-Vorschlag oder wähle
+            ein Event aus der Liste.
           </DialogDescription>
         </DialogHeader>
 
-        <div className='flex-grow overflow-y-auto px-1 pr-3'>
-          <div className='px-6 pt-2 pb-4'>
+        <div className='flex-grow overflow-y-auto px-1 pr-3 scrollbar-thin scrollbar-thumb-muted-foreground/50 scrollbar-track-transparent'>
+          <div className='px-6 py-4'>
             <Form {...form}>
               <form
                 id='add-event-form'
-                className='space-y-4'
+                className='space-y-6'
                 onSubmit={form.handleSubmit(onSubmit)}
               >
-                {/* FormFields ... (wie vorher) */}
                 <FormField
                   control={form.control}
                   name='title'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Titel</FormLabel>
+                      <FormLabel>Titel des Events</FormLabel>
                       <FormControl>
                         <TextareaAutosize
-                          placeholder='Welcher Freund muss absagen beim nächsten Event?'
+                          placeholder='z.B. Nächstes F1 Rennen, Bundesliga Spieltag'
                           minRows={1}
                           maxRows={3}
                           className={textareaBaseClasses}
@@ -436,7 +424,7 @@ export function AddEventDialog({
                       <FormLabel>Beschreibung (Optional)</FormLabel>
                       <FormControl>
                         <TextareaAutosize
-                          placeholder='Genauere Definition, Regeln etc.'
+                          placeholder='Weitere Details, Regeln oder Kontext zum Event'
                           minRows={2}
                           maxRows={5}
                           className={textareaBaseClasses}
@@ -447,16 +435,16 @@ export function AddEventDialog({
                     </FormItem>
                   )}
                 />
-                <div className='grid md:grid-cols-2 gap-4'>
+                <div className='grid md:grid-cols-2 gap-x-4 gap-y-6'>
                   <FormField
                     control={form.control}
                     name='question'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Frage</FormLabel>
+                        <FormLabel>Tipp-Frage</FormLabel>
                         <FormControl>
                           <TextareaAutosize
-                            placeholder='Wer?'
+                            placeholder='Wer gewinnt? Wie lautet das Ergebnis?'
                             minRows={1}
                             maxRows={3}
                             className={textareaBaseClasses}
@@ -472,7 +460,7 @@ export function AddEventDialog({
                     name='options'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Optionen</FormLabel>
+                        <FormLabel>Antwort-Optionen</FormLabel>
                         <FormControl>
                           <TextareaAutosize
                             placeholder={'Option 1\nOption 2\n...'}
@@ -483,7 +471,7 @@ export function AddEventDialog({
                           />
                         </FormControl>
                         <FormDescription>
-                          Eine Option pro Zeile (min. 2)
+                          Eine Option pro Zeile (mind. 2).
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -512,57 +500,60 @@ export function AddEventDialog({
                 />
               </form>
             </Form>
-
-            <div className='mt-6 pt-6 border-t'>
-              <h3 className='text-lg font-semibold mb-3 flex items-center gap-2'>
-                <Sparkles className='w-5 h-5 text-muted-foreground' />
-                Event-Vorschläge übernehmen
+            <div className='mt-8 pt-6 border-t'>
+              <h3 className='text-lg font-semibold mb-4 flex items-center gap-2'>
+                <Sparkles className='w-5 h-5 text-purple-500' />{' '}
+                Event-Vorschläge
               </h3>
-              {isLoadingCombinedEvents && ( // Verwende Ladezustand vom Hook
+              {isLoadingCombinedEvents && (
                 <div className='flex items-center justify-center py-4 text-muted-foreground'>
-                  <Loader2 className='h-5 w-5 animate-spin mr-2' />
-                  <span>Lade Vorschläge...</span>
+                  <Loader2 className='h-5 w-5 animate-spin mr-2' /> Lade
+                  Vorschläge...
                 </div>
               )}
-              {dashboardErrors.combinedEvents &&
-                !isLoadingCombinedEvents && ( // Verwende Fehler vom Hook
-                  <div className='flex flex-col items-center justify-center py-4 text-destructive bg-destructive/10 rounded-md p-4'>
-                    <AlertTriangle className='h-8 w-8 mb-2' />
-                    <p className='font-medium'>
-                      Fehler beim Laden der Vorschläge
-                    </p>
-                    <p className='text-sm text-center mb-3'>
-                      {dashboardErrors.combinedEvents}
-                    </p>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      onClick={loadCombinedEvents}
-                      disabled={isLoadingCombinedEvents}
-                    >
-                      {isLoadingCombinedEvents ? (
-                        <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                      ) : null}
-                      Erneut versuchen
-                    </Button>
+              {dashboardErrors.combinedEvents && !isLoadingCombinedEvents && (
+                <div className='my-4 rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive'>
+                  <div className='flex items-start gap-3'>
+                    <AlertTriangle className='h-5 w-5 flex-shrink-0' />
+                    <div>
+                      <p className='font-semibold mb-1'>
+                        Fehler beim Laden der Vorschläge
+                      </p>
+                      <p className='text-xs mb-3'>
+                        {dashboardErrors.combinedEvents}
+                      </p>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={loadCombinedEvents}
+                        disabled={isLoadingCombinedEvents}
+                        className='border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive'
+                      >
+                        {isLoadingCombinedEvents && (
+                          <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                        )}{' '}
+                        Erneut versuchen
+                      </Button>
+                    </div>
                   </div>
-                )}
+                </div>
+              )}
               {!isLoadingCombinedEvents &&
                 !dashboardErrors.combinedEvents &&
                 internalSuggestions.length === 0 && (
                   <p className='text-sm text-muted-foreground text-center py-4'>
-                    Keine externen Event-Vorschläge verfügbar.
+                    Keine externen Event-Vorschläge für den aktuellen Zeitraum
+                    gefunden.
                   </p>
                 )}
               {!isLoadingCombinedEvents &&
                 !dashboardErrors.combinedEvents &&
                 internalSuggestions.length > 0 && (
-                  <div className='overflow-y-auto pr-1 max-h-[250px] sm:max-h-[300px]'>
+                  <div className='overflow-y-auto pr-1 max-h-[250px] sm:max-h-[300px] space-y-3 scrollbar-thin scrollbar-thumb-muted-foreground/50 scrollbar-track-transparent'>
                     <EventList
                       events={internalSuggestions}
-                      onProposeEvent={(eventId) =>
-                        handleSuggestionClick(eventId)
-                      } // Übergibt jetzt die ID
+                      onProposeEvent={handleSuggestionClick}
+                      onCardAiCreate={handleAiGenerateForSpecificEvent} // Hier den neuen Handler übergeben
                       disabled={
                         form.formState.isSubmitting ||
                         isAiLoading ||
@@ -575,30 +566,10 @@ export function AddEventDialog({
           </div>
         </div>
 
-        <DialogFooter className='flex-shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t mt-auto px-6 pb-6'>
-          <DialogClose asChild>
-            <Button type='button' variant='ghost' className='w-full sm:w-auto'>
-              Abbrechen
-            </Button>
-          </DialogClose>
-          <Button
-            type='submit'
-            form='add-event-form'
-            disabled={
-              form.formState.isSubmitting ||
-              isAiLoading ||
-              isLoadingCombinedEvents
-            }
-            className='w-full sm:w-auto'
-          >
-            {form.formState.isSubmitting ? (
-              <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-            ) : null}
-            {form.formState.isSubmitting ? 'Erstelle…' : 'Event erstellen'}
-          </Button>
+        <DialogFooter className='flex-shrink-0 flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-2 pt-4 border-t mt-auto px-6 pb-6'>
           <Button
             variant='outline'
-            onClick={generateAiSuggestion}
+            onClick={generateRandomAiSuggestion} // Umbenannt für Klarheit: Dies ist für zufällige Vorschläge
             disabled={
               isAiLoading ||
               form.formState.isSubmitting ||
@@ -611,8 +582,36 @@ export function AddEventDialog({
             ) : (
               <Sparkles className='h-4 w-4 mr-2 text-purple-500' />
             )}
-            {isAiLoading ? 'Generiere...' : 'AI Vorschlag'}
+            {isAiLoading ? 'Generiere...' : 'Zufälliger AI Vorschlag'}
           </Button>
+          <div className='flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full sm:w-auto'>
+            <DialogClose asChild>
+              <Button
+                type='button'
+                variant='ghost'
+                className='w-full sm:w-auto'
+              >
+                Abbrechen
+              </Button>
+            </DialogClose>
+            <Button
+              type='submit'
+              form='add-event-form'
+              disabled={
+                form.formState.isSubmitting ||
+                isAiLoading ||
+                isLoadingCombinedEvents
+              }
+              className='w-full sm:w-auto'
+            >
+              {form.formState.isSubmitting && (
+                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+              )}
+              {form.formState.isSubmitting
+                ? 'Erstelle Event…'
+                : 'Event erstellen'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
