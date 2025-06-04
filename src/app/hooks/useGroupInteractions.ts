@@ -24,7 +24,7 @@ const LOG_PREFIX = '[useGroupInteractions]';
 /* -------------------------------------------------------------------------- */
 
 /**
- * Gibt das Datum "heute + 1 Monat" als String im Format<y_bin_46>-MM-DDTHH:MM zurück,
+ * Gibt das Datum "heute + 1 Monat" als String im Format YYYY-MM-DDTHH:MM zurück,
  * passend für den value eines <input type="datetime-local">.
  */
 const getDefaultDeadlineString = (): string => {
@@ -35,7 +35,7 @@ const getDefaultDeadlineString = (): string => {
   const offset = dateInOneMonth.getTimezoneOffset(); // Minuten-Unterschied zu UTC
   const localDate = new Date(dateInOneMonth.getTime() - offset * 60000); // Korrigierte Zeit
 
-  // Formatieren als<y_bin_46>-MM-DDTHH:MM
+  // Formatieren als YYYY-MM-DDTHH:MM
   return localDate.toISOString().slice(0, 16);
 };
 

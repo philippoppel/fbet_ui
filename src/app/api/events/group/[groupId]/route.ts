@@ -13,10 +13,9 @@ interface UserPayload {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> } // In Next 15 ist params ein Promise
+  { params }: { params: { groupId: string } }
 ) {
-  // Erst auflösen, dann benutzen
-  const { groupId: groupIdString } = await params;
+  const { groupId: groupIdString } = params;
   const routeName = `/api/events/group/${groupIdString}`; // Für Logging
   console.log(`[ROUTE ${routeName}] GET request received.`);
 

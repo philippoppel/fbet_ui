@@ -10,6 +10,8 @@ const fakeUser = { id: 1, email: 'tester@example.com', name: 'Test-User' };
 const fakeToken = { access_token: 'fake', token_type: 'bearer' };
 const group = { id: 99, name: 'E2E-Gruppe', description: 'Test-Group' };
 
+let eventsData: any[] = [];
+
 /* ------------------------------------------------------------------
  * Helper: Gruppe in der Sidebar anklicken
  * ------------------------------------------------------------------ */
@@ -35,7 +37,7 @@ async function openGroup(page: Page) {
 /* ------------------------------------------------------------------
  * Gemeinsame Routen-Mocks
  * ------------------------------------------------------------------ */
-function mockDashboardRoutes(page: Page) {
+function mockDashboardRoutes(page: Page, eventsData: any[]) {
   /* ---------- Auth ---------- */
   page.route('**/users/login', (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(fakeToken) })
@@ -66,7 +68,11 @@ function mockDashboardRoutes(page: Page) {
 
   page.route(eventsRe, (r, req) =>
     req.method() === 'GET'
-      ? r.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      ? r.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(eventsData),
+        })
       : r.continue()
   );
 
@@ -95,7 +101,8 @@ function mockDashboardRoutes(page: Page) {
 test.describe('Add-Event-Dialog', () => {
   /* ---------- beforeEach ---------- */
   test.beforeEach(async ({ page }) => {
-    mockDashboardRoutes(page);
+    eventsData = [];
+    mockDashboardRoutes(page, eventsData);
     await loginUI(page); // UI-Login (nutzt die Auth-Mocks)
     await openGroup(page); // Sidebar-Navigation
   });
@@ -139,10 +146,12 @@ test.describe('Add-Event-Dialog', () => {
   test('erstellt erfolgreich & schließt Dialog', async ({ page }) => {
     page.route('**/events/', (route, req) => {
       if (req.method() === 'POST') {
+        const newEvent = { id: 123, title: 'UFC 300' };
+        eventsData.push(newEvent);
         route.fulfill({
           status: 201,
           contentType: 'application/json',
-          body: JSON.stringify({ id: 123, title: 'UFC 300' }),
+          body: JSON.stringify(newEvent),
         });
       } else {
         route.continue();
@@ -160,5 +169,6 @@ test.describe('Add-Event-Dialog', () => {
     });
 
     await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page.getByRole('heading', { name: /UFC 300/i })).toBeVisible();
   });
 });

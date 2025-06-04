@@ -5,7 +5,7 @@ import { getCurrentUserFromRequest } from '../../../lib/auth';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ inviteToken: string }> }
+  { params }: { params: { inviteToken: string } }
 ) {
   try {
     const currentUser = await getCurrentUserFromRequest(req);
@@ -16,7 +16,7 @@ export async function POST(
       );
     }
 
-    const { inviteToken } = await params;
+    const { inviteToken } = params;
     if (!inviteToken) {
       return NextResponse.json(
         { error: 'Invite token is missing' },
