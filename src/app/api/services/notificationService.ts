@@ -62,7 +62,7 @@ export async function sendNewEventNotificationsToGroupMembers(
       icon: '/icon1.png', // Stelle sicher, dass dieses Icon in /public existiert
       data: {
         // Daten, die der Service Worker beim Klick verwenden kann
-        url: `/dashboard?group=<span class="math-inline">\{event\.groupId\}&event\=</span>{event.id}`,
+        url: `/dashboard?group=${event.groupId}&event=${event.id}`,
       },
     });
 
