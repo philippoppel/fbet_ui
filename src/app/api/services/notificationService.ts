@@ -124,3 +124,57 @@ export async function sendNewEventNotificationsToGroupMembers(
     );
   }
 }
+
+export async function sendTestNotificationToUser(userId: number): Promise<void> {
+  if (!process.env.VAPID_PUBLIC_KEY) {
+    console.warn(
+      '[NotificationService] Cannot send push: VAPID_PUBLIC_KEY not set.'
+    );
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { pushSubscriptions: true },
+    });
+
+    if (!user || user.pushSubscriptions.length === 0) {
+      console.warn(
+        `[NotificationService] No push subscription found for user ${userId}.`
+      );
+      return;
+    }
+
+    const payload = JSON.stringify({
+      title: 'fbet Testbenachrichtigung',
+      body: 'Push-Einrichtung erfolgreich!',
+      icon: '/icon1.png',
+      data: { url: '/' },
+    });
+
+    await Promise.all(
+      user.pushSubscriptions.map((sub) =>
+        webPush
+          .sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            },
+            payload
+          )
+          .catch((err) => {
+            console.error(
+              `[NotificationService] Error sending test push to user ${userId}:`,
+              err
+            );
+          })
+      )
+    );
+  } catch (error) {
+    console.error(
+      `[NotificationService] Failed to send test notification to user ${userId}:`,
+      error
+    );
+  }
+}

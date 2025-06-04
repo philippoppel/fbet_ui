@@ -101,6 +101,7 @@ export function AppHeader({
     error: pushError, // Dies ist die Fehlermeldung vom Hook
     requestPermissionAndSubscribe,
     unsubscribeUser,
+    triggerTestNotification,
     isSubscribed: isPushSubscribed,
     isLoading: isPushLoading,
     permissionDenied: isPushPermissionDenied,
@@ -218,6 +219,7 @@ export function AppHeader({
       const success = await requestPermissionAndSubscribe();
       if (success) {
         toast.success('Push-Benachrichtigungen aktiviert!');
+        triggerTestNotification();
       } else {
         // Spezifische Behandlung, falls die Berechtigung verweigert wurde und der Hook dies nicht schon als 'pushError' gemeldet hat
         // (Der Hook sollte das aber bereits im 'pushError' State abbilden)

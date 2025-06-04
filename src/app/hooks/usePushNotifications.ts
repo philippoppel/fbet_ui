@@ -154,6 +154,11 @@ export function usePushNotifications() {
         setCurrentSubscription(subscription);
         setStatus(PushNotificationStatus.SUPPORTED_SUBSCRIBED);
         setError(null);
+        try {
+          await fetch('/api/push/test', { method: 'POST' });
+        } catch (e) {
+          console.error('[usePushNotifications] Failed to send test notification:', e);
+        }
         return true;
       } catch (err: any) {
         // ... (Fehlerbehandlung bleibt ähnlich) ...
@@ -244,6 +249,16 @@ export function usePushNotifications() {
     }
   }, [isPushApiSupported, currentSubscription, checkSubscriptionStatus]);
 
+  const triggerTestNotification = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/push/test', { method: 'POST' });
+      return res.ok;
+    } catch (e) {
+      console.error('[usePushNotifications] Failed to trigger test push:', e);
+      return false;
+    }
+  }, []);
+
   return {
     // ... (Return-Objekt bleibt gleich) ...
     status,
@@ -251,6 +266,7 @@ export function usePushNotifications() {
     requestPermissionAndSubscribe,
     unsubscribeUser,
     checkSubscriptionStatus,
+    triggerTestNotification,
     isSubscribed: status === PushNotificationStatus.SUPPORTED_SUBSCRIBED,
     canSubscribe: status === PushNotificationStatus.SUPPORTED_NOT_SUBSCRIBED,
     permissionDenied: status === PushNotificationStatus.PERMISSION_DENIED,
