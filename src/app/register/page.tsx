@@ -192,6 +192,7 @@ function RegisterContent() {
                 href={`/login?redirect=${encodeURIComponent(redirectPath || '')}`}
                 className='underline hover:text-foreground'
               >
+                <br />
                 Zum Login
               </Link>
             </p>

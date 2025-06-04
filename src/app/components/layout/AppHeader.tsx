@@ -11,8 +11,8 @@ import {
   RefreshCw,
   Flame,
   EyeOff,
-  Bell, // NEU: Icon für Benachrichtigungen an
-  BellOff, // NEU: Icon für Benachrichtigungen aus
+  Bell, // Icon für Benachrichtigungen AN
+  BellOff, // Icon für Benachrichtigungen AUS / BLOCKIERT
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
@@ -34,7 +34,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/app/components/ui/tooltip'; // NEU: Tooltip
+} from '@/app/components/ui/tooltip';
 import { useAppRefresh } from '@/app/hooks/useAppRefresh';
 import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar';
 import { UserOut, Group as GroupType } from '@/app/lib/types';
@@ -44,12 +44,11 @@ import {
   GroupWithOpenEvents,
 } from '@/app/lib/api';
 
-// NEU: Importiere den Hook und das Enum
 import {
   usePushNotifications,
   PushNotificationStatus,
 } from '@/app/hooks/usePushNotifications';
-import { toast } from 'sonner'; // Für Feedback
+import { toast } from 'sonner';
 
 const STORAGE_KEY_SEEN_NOTIFICATIONS = 'fbet_openEventNotificationSeenIds_v2';
 
@@ -95,22 +94,19 @@ export function AppHeader({
     return new Set();
   });
 
-  // NEU: Push Notification Hook aufrufen
   const {
     status: pushStatus,
-    error: pushError, // Dies ist die Fehlermeldung vom Hook
+    error: pushError,
     requestPermissionAndSubscribe,
     unsubscribeUser,
-    triggerTestNotification,
+    // triggerTestNotification, // Bleibt hier, falls du es später für Debugging brauchst
     isSubscribed: isPushSubscribed,
     isLoading: isPushLoading,
     permissionDenied: isPushPermissionDenied,
   } = usePushNotifications();
 
-  // NEU: Effekt für Fehler-Toasts vom Push Hook
   useEffect(() => {
     if (pushError) {
-      // Der Hook sollte bereits benutzerfreundliche Fehlermeldungen im 'error'-State setzen
       toast.error(pushError, { duration: 6000 });
     }
   }, [pushError]);
@@ -205,64 +201,59 @@ export function AppHeader({
     return () => clearInterval(interval);
   }, [fetchOpenEventsForHeader, user?.id]);
 
-  // NEU: Handler für den Push Notification Toggle Button
   const handleTogglePushNotifications = async () => {
-    // `pushError` wird durch den useEffect oben bereits als Toast angezeigt,
-    // hier fokussieren wir uns auf Erfolgsmeldungen oder spezifische Hinweise.
     if (isPushSubscribed) {
       const success = await unsubscribeUser();
       if (success) {
         toast.info('Push-Benachrichtigungen deaktiviert.');
       }
-      // Fehlerfall wird vom useEffect oben behandelt
     } else {
       const success = await requestPermissionAndSubscribe();
       if (success) {
         toast.success('Push-Benachrichtigungen aktiviert!');
-        triggerTestNotification();
+        // triggerTestNotification(); // <<< HIER ENTFERNT
       } else {
-        // Spezifische Behandlung, falls die Berechtigung verweigert wurde und der Hook dies nicht schon als 'pushError' gemeldet hat
-        // (Der Hook sollte das aber bereits im 'pushError' State abbilden)
         if (isPushPermissionDenied || Notification.permission === 'denied') {
           toast.warning(
             'Berechtigung für Benachrichtigungen blockiert. Bitte in den Browser-Einstellungen ändern.',
             { duration: 7000 }
           );
         }
-        // Andere Fehler beim Subscriben werden vom useEffect oben behandelt
       }
     }
   };
 
-  // NEU: Logik für den Push Notification Button
   const renderPushNotificationButton = () => {
     if (!user || pushStatus === PushNotificationStatus.NOT_SUPPORTED) {
       return null;
     }
 
-    let icon = <Bell className='h-5 w-5' />; // Angepasste Größe
+    // Standard: Benachrichtigungen sind AUS (aber aktivierbar)
+    let icon = <BellOff className='h-5 w-5 text-muted-foreground' />;
     let label = 'Push-Benachrichtigungen aktivieren';
-    let tooltipText = 'Klicke, um Push-Benachrichtigungen zu aktivieren.';
-    let currentIsDisabled = isPushLoading; // Generelle Ladezustandsprüfung
+    let tooltipText =
+      'Push-Benachrichtigungen sind deaktiviert. Klicken zum Aktivieren.';
+    let currentIsDisabled = isPushLoading;
 
     if (isPushSubscribed) {
-      icon = <BellOff className='h-5 w-5 text-muted-foreground' />;
+      // Benachrichtigungen sind AN
+      icon = <Bell className='h-5 w-5 text-primary' />; // Bell-Icon, farblich als "aktiv" markiert
       label = 'Push-Benachrichtigungen deaktivieren';
-      tooltipText = 'Push-Benachrichtigungen sind aktiviert.';
+      tooltipText =
+        'Push-Benachrichtigungen sind aktiviert. Klicken zum Deaktivieren.';
     } else if (isPushPermissionDenied) {
-      icon = <BellOff className='h-5 w-5 text-destructive' />; // Rotes Icon bei Blockade
+      // Benachrichtigungen sind BLOCKIERT
+      icon = <BellOff className='h-5 w-5 text-destructive' />; // Rotes BellOff-Icon
       label = 'Push-Benachrichtigungen blockiert';
       tooltipText = 'Berechtigung blockiert. In Browser-Einstellungen ändern.';
-      // Optional: Button deaktivieren, wenn Erlaubnis endgültig verweigert wurde
+      // Optional: Button hier explizit deaktivieren, falls gewünscht
       // currentIsDisabled = true;
-      // Oder erlaube Klick, um ggf. Browser-Dialog erneut zu triggern (führt meist zu keiner Aktion bei "denied")
-      // Der Hook und handleTogglePushNotifications fangen den Fall ab.
-    } else if (pushStatus === PushNotificationStatus.SUPPORTED_NOT_SUBSCRIBED) {
-      // Standard UI zum Aktivieren bleibt
     }
+    // Der Fall SUPPORTED_NOT_SUBSCRIBED ist bereits durch die Standardwerte oben abgedeckt.
 
     if (isPushLoading) {
       label = isPushSubscribed ? 'Deaktiviere...' : 'Aktiviere...';
+      // Optional: Hier könnte man auch ein Lade-Icon anzeigen statt Bell/BellOff
     }
 
     return (
@@ -421,7 +412,6 @@ export function AppHeader({
           >
             <RefreshCw
               className={`h-4 w-4 transition-transform ${
-                // Beibehaltung der Originalgröße für diesen Button
                 updateAvailable || isRefreshing ? 'animate-spin' : ''
               }`}
             />
