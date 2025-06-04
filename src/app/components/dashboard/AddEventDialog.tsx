@@ -35,7 +35,7 @@ import type {
 } from '@/app/lib/types';
 import { EventList } from '@/app/components/dashboard/EventList';
 import { useDashboardData } from '@/app/hooks/useDashboardData';
-import type { AiEventPayload } from '@/app/components/event/EventCard'; // Import für den Payload-Typ
+import type { AiEventPayload } from '@/app/components/event/EventCard';
 
 const extractAIFields = (text: string): Partial<AddEventFormData> => {
   const lines = text
@@ -206,7 +206,7 @@ export function AddEventDialog({
   ]);
 
   const processAndApplyAiSuggestion = (
-    aiResponseData: any, // Typ sollte genauer sein, z.B. { message: string, event_bet_on?: { date?: string } }
+    aiResponseData: any,
     successMessage: string
   ) => {
     const aiBetText =
@@ -233,27 +233,6 @@ export function AddEventDialog({
     });
     triggerTextareaResize();
     toast.success(successMessage);
-  };
-
-  const generateRandomAiSuggestion = async () => {
-    setIsAiLoading(true);
-    try {
-      // Der GET-Request an dieselbe Route führt zur Generierung eines zufälligen Events
-      const res = await fetch('/api/generate-ai-bet', { method: 'GET' });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `API-Fehler: ${res.status}`);
-      }
-      const data = await res.json();
-      processAndApplyAiSuggestion(data, 'Zufälliger AI-Vorschlag eingefügt!');
-    } catch (error: any) {
-      console.error('Fehler bei zufälliger AI-Wette:', error);
-      toast.error('Fehler bei der zufälligen AI-Wette.', {
-        description: error.message || 'Unbekannter Fehler.',
-      });
-    } finally {
-      setIsAiLoading(false);
-    }
   };
 
   const handleAiGenerateForSpecificEvent = async (payload: AiEventPayload) => {
@@ -384,8 +363,8 @@ export function AddEventDialog({
         <DialogHeader className='flex-shrink-0'>
           <DialogTitle>Neues Event für „{groupName}“ erstellen</DialogTitle>
           <DialogDescription>
-            Fülle die Felder manuell aus, nutze einen AI-Vorschlag oder wähle
-            ein Event aus der Liste.
+            Fülle die Felder manuell aus oder wähle ein Event aus der Liste, um
+            einen AI-Vorschlag dafür zu erhalten oder es direkt zu übernehmen.
           </DialogDescription>
         </DialogHeader>
 
@@ -503,7 +482,7 @@ export function AddEventDialog({
             <div className='mt-8 pt-6 border-t'>
               <h3 className='text-lg font-semibold mb-4 flex items-center gap-2'>
                 <Sparkles className='w-5 h-5 text-purple-500' />{' '}
-                Event-Vorschläge
+                Event-Vorschläge & AI-Assistenz
               </h3>
               {isLoadingCombinedEvents && (
                 <div className='flex items-center justify-center py-4 text-muted-foreground'>
@@ -553,7 +532,7 @@ export function AddEventDialog({
                     <EventList
                       events={internalSuggestions}
                       onProposeEvent={handleSuggestionClick}
-                      onCardAiCreate={handleAiGenerateForSpecificEvent} // Hier den neuen Handler übergeben
+                      onCardAiCreate={handleAiGenerateForSpecificEvent}
                       disabled={
                         form.formState.isSubmitting ||
                         isAiLoading ||
@@ -566,52 +545,30 @@ export function AddEventDialog({
           </div>
         </div>
 
-        <DialogFooter className='flex-shrink-0 flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-2 pt-4 border-t mt-auto px-6 pb-6'>
+        <DialogFooter className='flex-shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end items-center gap-2 pt-4 border-t mt-auto px-6 pb-6'>
+          {/* Der Button für "Zufälliger AI Vorschlag" wurde entfernt */}
+          <DialogClose asChild>
+            <Button type='button' variant='ghost' className='w-full sm:w-auto'>
+              Abbrechen
+            </Button>
+          </DialogClose>
           <Button
-            variant='outline'
-            onClick={generateRandomAiSuggestion} // Umbenannt für Klarheit: Dies ist für zufällige Vorschläge
+            type='submit'
+            form='add-event-form'
             disabled={
-              isAiLoading ||
               form.formState.isSubmitting ||
+              isAiLoading ||
               isLoadingCombinedEvents
             }
             className='w-full sm:w-auto'
           >
-            {isAiLoading ? (
+            {form.formState.isSubmitting && (
               <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-            ) : (
-              <Sparkles className='h-4 w-4 mr-2 text-purple-500' />
             )}
-            {isAiLoading ? 'Generiere...' : 'Zufälliger AI Vorschlag'}
+            {form.formState.isSubmitting
+              ? 'Erstelle Event…'
+              : 'Event erstellen'}
           </Button>
-          <div className='flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full sm:w-auto'>
-            <DialogClose asChild>
-              <Button
-                type='button'
-                variant='ghost'
-                className='w-full sm:w-auto'
-              >
-                Abbrechen
-              </Button>
-            </DialogClose>
-            <Button
-              type='submit'
-              form='add-event-form'
-              disabled={
-                form.formState.isSubmitting ||
-                isAiLoading ||
-                isLoadingCombinedEvents
-              }
-              className='w-full sm:w-auto'
-            >
-              {form.formState.isSubmitting && (
-                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-              )}
-              {form.formState.isSubmitting
-                ? 'Erstelle Event…'
-                : 'Event erstellen'}
-            </Button>
-          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
