@@ -1,40 +1,64 @@
-<<<<<<< HEAD
-# fbet_ui
-=======
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# fbet – Wetten unter Freunden
 
-## Getting Started
+fbet ist eine Webanwendung zum Erstellen privater Tippgruppen. Ihr könnt Events festlegen, Freunde einladen und gemeinsam wetten – ob auf Sportereignisse, Serienfinalen oder den nächsten Crypto-Hype. Das Projekt basiert auf [Next.js](https://nextjs.org/) mit TypeScript, Prisma und Tailwind CSS und lässt sich als Progressive Web App (PWA) installieren.
 
-First, run the development server:
+## Features
+
+- Registrierung und Login über JWT-Authentifizierung
+- Verwaltung von Gruppen mit Einladungslinks
+- Events anlegen, Tipps abgeben und Highscores einsehen
+- Kommentarfunktion mit GIF-Unterstützung
+- Push-Benachrichtigungen (optional)
+- Mobile App mittels Capacitor
+
+## Quickstart
+
+1. **Repository klonen und Abhängigkeiten installieren**
+   ```bash
+   npm install
+   ```
+2. **Umgebungsvariablen anlegen**
+   Erstelle eine `.env`-Datei im Projektverzeichnis und fülle mindestens folgende Werte:
+   ```env
+   DATABASE_URL=postgres://user:pass@localhost:5432/fbet
+   NEXT_PUBLIC_API_BASE_URL=
+   NEXT_PUBLIC_GIPHY_API_KEY=dein_giphy_key
+   NEXT_PUBLIC_VAPID_PUBLIC_KEY=dein_vapid_public_key
+   VAPID_PUBLIC_KEY=dein_vapid_public_key
+   VAPID_PRIVATE_KEY=dein_vapid_private_key
+   VAPID_SUBJECT=mailto:you@example.com
+   ```
+   Für die End-to-End-Tests können optional `E2E_USER_EMAIL` und `E2E_USER_PASSWORD` gesetzt werden.
+3. **Datenbank vorbereiten**
+   ```bash
+   npx prisma migrate dev
+   ```
+4. **Entwicklungsserver starten**
+   ```bash
+   npm run dev
+   ```
+   Anschließend ist die Anwendung unter [http://localhost:3000](http://localhost:3000) erreichbar.
+
+## Tests
+
+- Unit-Tests mit [Vitest](https://vitest.dev):
+  ```bash
+  npm test
+  ```
+- End-to-End-Tests mit [Playwright](https://playwright.dev):
+  ```bash
+  npm run test:e2e
+  ```
+
+## Produktion
+
+Für den Build werden automatisch Prisma-Client generiert und Migrations ausgeführt:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Lizenz
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
->>>>>>> 2672f5e (Initial commit from Create Next App)
+Dieses Repository enthält derzeit keine offizielle Lizenzdatei. Falls du den Code verwenden möchtest, stimme dich bitte mit dem Autor ab.
