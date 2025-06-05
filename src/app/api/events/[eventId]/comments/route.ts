@@ -1,10 +1,11 @@
 // src/app/api/events/[eventId]/comments/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/app/api/lib/prisma';
 import { getCurrentUserFromRequest } from '@/app/api/lib/auth';
 import { z } from 'zod';
 
-// Schema zur Validierung (unverändert)
+// Schema
 const commentSchema = z
   .object({
     text: z.string().max(1000).optional(),
@@ -15,25 +16,22 @@ const commentSchema = z
     path: ['text', 'gifUrl'],
   });
 
-// POST-Handler (Signatur anpassen)
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { eventId: string } } // ANGEPASST
-) {
-  const user = await getCurrentUserFromRequest(req);
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // const { eventId } = await context.params; // ALTE VERSION
-  const { eventId } = params; // NEUE VERSION - direkter Zugriff
+// --- POST Handler ---
+export async function POST(req: NextRequest) {
+  // Extract eventId from URL
+  const url = new URL(req.url);
+  const eventId = url.pathname.split('/').slice(-2)[0];
   const eventIdNum = parseInt(eventId, 10);
 
   if (isNaN(eventIdNum) || eventIdNum <= 0) {
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
-  // ... (Rest der POST-Logik bleibt gleich)
+  const user = await getCurrentUserFromRequest(req);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   let body;
   try {
     body = await req.json();
@@ -58,7 +56,7 @@ export async function POST(
     const createdComment = await prisma.eventComment.create({
       data: {
         text: text || null,
-        gifUrl: gifUrl || null, // Stellt sicher, dass dein Schema gifUrl hier auch hat
+        gifUrl: gifUrl || null,
         userId: user.id,
         eventId: eventIdNum,
       },
@@ -78,24 +76,6 @@ export async function POST(
     return NextResponse.json(commentToReturn, { status: 201 });
   } catch (e) {
     console.error(`Error creating comment for event ${eventIdNum}:`, e);
-    // Überprüfe, ob der Fehler vom Prisma-Client wegen der fehlenden Spalte kommt
-    if (
-      e instanceof Error &&
-      e.message.includes('column') &&
-      e.message.includes('does not exist')
-    ) {
-      console.error(
-        'Database schema mismatch detected while creating comment. Column might be missing.'
-      );
-      // Spezifischere Fehlermeldung für den Client
-      return NextResponse.json(
-        {
-          error:
-            'Failed to create comment due to a database configuration issue. Please check server logs.',
-        },
-        { status: 500 }
-      );
-    }
     return NextResponse.json(
       { error: 'Failed to create comment' },
       { status: 500 }
@@ -103,19 +83,17 @@ export async function POST(
   }
 }
 
-// GET-Handler (Signatur anpassen)
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { eventId: string } } // ANGEPASST
-) {
-  const user = await getCurrentUserFromRequest(req);
-  // const { eventId } = await context.params; // ALTE VERSION
-  const { eventId } = params; // NEUE VERSION - direkter Zugriff
+// --- GET Handler ---
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const eventId = url.pathname.split('/').slice(-2)[0];
   const eventIdNum = parseInt(eventId, 10);
 
   if (isNaN(eventIdNum) || eventIdNum <= 0) {
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
+
+  const user = await getCurrentUserFromRequest(req);
 
   try {
     const commentsFromDb = await prisma.eventComment.findMany({
@@ -129,7 +107,7 @@ export async function GET(
               where: { userId: user.id },
               select: { userId: true },
             }
-          : false, // Prisma: 'false' um Relation nicht zu laden, wenn kein User
+          : false,
       },
       orderBy: [{ likesCount: 'desc' }, { createdAt: 'asc' }],
     });
@@ -145,20 +123,6 @@ export async function GET(
     return NextResponse.json(commentsToReturn);
   } catch (e) {
     console.error(`Error fetching comments for event ${eventIdNum}:`, e);
-    // Spezifische Fehlerbehandlung für Prisma P2022 (fehlende Spalte)
-    if (e instanceof Error && 'code' in e && (e as any).code === 'P2022') {
-      console.error(
-        'Prisma Error P2022: A required column is missing in the database.',
-        (e as any).meta
-      );
-      return NextResponse.json(
-        {
-          error:
-            'Database schema mismatch. A column is missing. Please check server logs.',
-        },
-        { status: 500 }
-      );
-    }
     return NextResponse.json(
       { error: 'Failed to fetch comments' },
       { status: 500 }

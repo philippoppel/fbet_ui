@@ -31,6 +31,23 @@ const eslintConfig = [
   {
     ignores: ['node_modules/', '.next/', 'public/'],
   },
+
+  // ADD: Custom Rule Set für TS71007 und Client Components
+  {
+    files: ['**/*.tsx'],
+    rules: {
+      '@next/next/no-server-import-in-client-component': 'error', // schützt vor versehentlichem Server-Import
+      'react/jsx-no-bind': 'off', // erlaubt function props wie setOpen
+      '@typescript-eslint/ban-types': 'off', // erlaubt Funktionen als Props
+      // TS71007 suppression support (falls du ts-expect-error nutzt)
+      '@typescript-eslint/ban-ts-comment': [
+        'warn',
+        {
+          'ts-expect-error': 'allow-with-description',
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

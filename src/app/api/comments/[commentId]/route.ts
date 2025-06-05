@@ -1,22 +1,22 @@
 // src/app/api/comments/[commentId]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/app/api/lib/prisma';
 import { getCurrentUserFromRequest } from '@/app/api/lib/auth';
 
-export async function DELETE(
-  req: NextRequest,
-  context: { params: { commentId: string } }
-) {
-  const user = await getCurrentUserFromRequest(req);
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { commentId } = context.params;
+export async function DELETE(req: NextRequest) {
+  // Extract commentId from URL
+  const url = new URL(req.url);
+  const commentId = url.pathname.split('/').slice(-1)[0];
   const commentIdNum = parseInt(commentId, 10);
 
   if (isNaN(commentIdNum) || commentIdNum <= 0) {
     return NextResponse.json({ error: 'Invalid comment ID' }, { status: 400 });
+  }
+
+  const user = await getCurrentUserFromRequest(req);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
@@ -28,7 +28,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
-    // Hier könntest du noch eine Admin-Rolle prüfen: if (comment.userId !== user.id && !user.isAdmin)
+    // Check if user is owner of the comment
     if (comment.userId !== user.id) {
       return NextResponse.json(
         { error: 'Forbidden: You can only delete your own comments' },
@@ -36,12 +36,12 @@ export async function DELETE(
       );
     }
 
-    // Prisma's onDelete: Cascade auf CommentLike sollte assoziierte Likes automatisch löschen.
+    // Delete the comment (assumes cascade on likes is configured)
     await prisma.eventComment.delete({
       where: { id: commentIdNum },
     });
 
-    // Hier könntest du einen Event für Echtzeit-Updates auslösen
+    // Optionally emit event for real-time updates
     // eventEmitter.emit(`comment_${commentIdNum}_deleted`, { commentId: commentIdNum });
 
     return NextResponse.json(
