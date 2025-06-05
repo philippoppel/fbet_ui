@@ -396,11 +396,6 @@ export function CommentSection({ eventId, currentUser }: CommentSectionProps) {
         <ul className='space-y-4 max-h-[500px] overflow-y-auto pr-2 -mr-2 mb-4 scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent'>
           {comments.map((comment) => (
             <li key={comment.id} className='flex items-start space-x-3'>
-              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground'>
-                {comment.user?.name?.charAt(0).toUpperCase() ??
-                  comment.user?.email?.charAt(0).toUpperCase() ??
-                  '?'}
-              </span>
               <div className='flex-1 space-y-1'>
                 <div className='flex items-center justify-between text-xs'>
                   <span className='font-semibold text-foreground'>
