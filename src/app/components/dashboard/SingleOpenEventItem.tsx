@@ -1,3 +1,4 @@
+// src/app/components/dashboard/SingleOpenEventItem.tsx
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -23,6 +24,7 @@ import {
   Users,
   ChevronsUpDown,
   Info,
+  EyeOff,
 } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
 import { CommentSection } from '@/app/components/dashboard/CommentSection';
@@ -35,7 +37,7 @@ interface TipDetail {
 
 interface SingleOpenEventItemProps {
   event: GroupEvent;
-  user: UserOut | null | undefined;
+  user: UserOut | null | undefined; // Kann auch UserOut sein, je nach Anwendungsfall
   groupCreatedBy: number | null | undefined;
   onInitiateDeleteEvent: (event: GroupEvent) => void;
   selectedTips: Record<number, string>;
@@ -115,7 +117,6 @@ export function SingleOpenEventItem({
 
   return (
     <div className='space-y-4'>
-      {/* Event Titel, Beschreibung, Frage */}
       <div className='flex justify-between items-start gap-4'>
         <div className='flex-1 space-y-1'>
           <h4 className='text-lg font-semibold text-foreground leading-tight break-words'>
@@ -158,7 +159,6 @@ export function SingleOpenEventItem({
         )}
       </div>
 
-      {/* Optionen und Tipps anzeigen */}
       <div className='space-y-2'>
         <div className='flex items-center justify-between mb-2 text-sm text-muted-foreground'>
           <span>Optionen</span>
@@ -201,7 +201,7 @@ export function SingleOpenEventItem({
                   Dein Tipp
                 </Badge>
               )}
-              {totalVotesForOption > 0 && (
+              {userHasSubmittedTip && totalVotesForOption > 0 && (
                 <Badge
                   variant={isCurrentUserSubmittedTip ? 'outline' : 'secondary'}
                   className='text-xs whitespace-nowrap'
@@ -215,8 +215,7 @@ export function SingleOpenEventItem({
         })}
       </div>
 
-      {/* Aufklappbare Sektion für detaillierte Tipps */}
-      {totalVotesOnEvent > 0 && (
+      {userHasSubmittedTip && totalVotesOnEvent > 0 && (
         <Collapsible
           open={showDetailedTips}
           onOpenChange={setShowDetailedTips}
@@ -280,7 +279,16 @@ export function SingleOpenEventItem({
         </Collapsible>
       )}
 
-      {/* Tipp abgeben / Auswahl löschen */}
+      {!userHasSubmittedTip && totalVotesOnEvent > 0 && (
+        <div className='mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-md text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2'>
+          <EyeOff className='h-5 w-5 flex-shrink-0' />
+          <span>
+            Andere Tipps werden sichtbar, sobald du deinen eigenen Tipp
+            abgegeben hast.
+          </span>
+        </div>
+      )}
+
       {!userHasSubmittedTip && selectedOptionForTipping && (
         <div className='flex gap-2 pt-2'>
           <Button
@@ -306,10 +314,9 @@ export function SingleOpenEventItem({
         </div>
       )}
 
-      {/* Admin: Ergebnis festlegen */}
       {user?.id === groupCreatedBy &&
         !event.winningOption &&
-        userHasSubmittedTip && ( // <-- userHasSubmittedTip HINZUGEFÜGT
+        userHasSubmittedTip && (
           <div className='mt-6 border-t pt-4 border-border/60'>
             <h5 className='text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2'>
               Ergebnis festlegen (Admin)
@@ -350,7 +357,6 @@ export function SingleOpenEventItem({
           </div>
         )}
 
-      {/* Kommentar Sektion */}
       {user && <CommentSection eventId={event.id} currentUser={user} />}
     </div>
   );

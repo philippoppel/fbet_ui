@@ -37,11 +37,14 @@ import {
 } from '@/app/components/ui/tooltip';
 import { useAppRefresh } from '@/app/hooks/useAppRefresh';
 import { GroupSidebar } from '@/app/components/dashboard/GroupSidebar';
-import { UserOut, Group as GroupType } from '@/app/lib/types';
+import {
+  UserOut,
+  Group as GroupType,
+  GroupWithOpenEvents,
+} from '@/app/lib/types';
 import {
   getGroupsWithOpenEvents,
   getMyTipsAcrossAllGroups,
-  GroupWithOpenEvents,
 } from '@/app/lib/api';
 
 import {

@@ -5,32 +5,26 @@ import type {
   UserCreate,
   UfcEventItem,
   BoxingScheduleItem,
-  GroupMembership, // Behalte diesen Typ bei
-  Group, // Behalte diesen Typ bei
-  GroupCreate, // Behalte diesen Typ bei
+  GroupMembership,
+  Group,
+  GroupCreate,
   HighscoreEntry,
   Event,
   EventCreate,
   TipCreate,
-  TipOut,
+  TipOut, // Stelle sicher, dass dieser Typ die erwarteten Felder hat
   EventResultSet,
-  GroupMembershipCreate,
+  // GroupMembershipCreate, // Dieser Typ wird in den Funktionen nicht direkt als Return-Typ oder Parameter verwendet
   UserTipSelection,
   AllTipsPerEvent,
-  EventComment,
-  EventCommentCreate, // Wird ggf. nicht mehr so direkt verwendet
-} from './types'; // Stelle sicher, dass diese Typen mit den Server-Antworten übereinstimmen
+  EventComment, // Der aktualisierte Typ mit Like-Infos
+  EventCommentCreate,
+  GroupWithOpenEvents, // Hinzugefügt, da es in einer Funktion verwendet wird
+  // FootballEvent, // Wird nicht direkt in API-Funktionssignaturen verwendet, aber in MixedEvent
+} from './types';
 
-// Liest die Backend-URL aus Umgebungsvariablen.
-// Für Next.js API Routen in derselben App ist '' (leerer String) oft am besten,
-// sodass Anfragen relativ sind (z.B. /api/auth/login).
-// Wenn NEXT_PUBLIC_API_BASE_URL gesetzt ist (z.B. http://localhost:3000), funktioniert das auch.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
-/**
- * Benutzerdefinierte Fehlerklasse für API-Fehler.
- * Enthält den HTTP-Status und optionale Detailinformationen vom Backend.
- */
 export class ApiError extends Error {
   status: number;
   detail?: any;
@@ -43,15 +37,12 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Generische Hilfsfunktion zur Verarbeitung von fetch-Antworten.
- */
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let errorDetail: string | object | undefined;
     try {
       const errorData = await response.json();
-      errorDetail = errorData?.detail || errorData?.error; // Berücksichtige auch 'error' Feld
+      errorDetail = errorData?.detail || errorData?.error || errorData?.message;
     } catch (e) {
       errorDetail = response.statusText;
     }
@@ -66,9 +57,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
     response.status === 204 ||
     response.headers.get('Content-Length') === '0'
   ) {
-    // Behandle leere Antworten, wenn T dies zulässt (z.B. T ist void oder null)
-    // Für jetzt geben wir null zurück und erwarten, dass der Aufrufer damit umgeht.
-    return null as T;
+    return null as T; // Geeignet für void oder optionale Rückgaben
   }
 
   try {
@@ -82,13 +71,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 // --- Authentifizierungs-Endpunkte ---
-// (Unverändert, aber stelle sicher, dass die Pfade stimmen, z.B. /api/auth/login)
-
 export async function loginUser(
   email: string,
   password: string
 ): Promise<Token> {
-  const endpoint = `${API_BASE_URL}/api/auth/login`; // Pfad angepasst
+  const endpoint = `${API_BASE_URL}/api/auth/login`;
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -99,7 +86,6 @@ export async function loginUser(
 
 export async function getCurrentUser(token: string): Promise<UserOut> {
   const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-    // Pfad angepasst
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -108,7 +94,6 @@ export async function getCurrentUser(token: string): Promise<UserOut> {
 
 export async function registerUser(userData: UserCreate): Promise<UserOut> {
   const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-    // Pfad angepasst
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData),
@@ -116,13 +101,11 @@ export async function registerUser(userData: UserCreate): Promise<UserOut> {
   return handleResponse<UserOut>(response);
 }
 
-// --- Gruppen- & Mitgliedschafts-Endpunkte (ANGEPASST) ---
-
+// --- Gruppen- & Mitgliedschafts-Endpunkte ---
 export async function createGroup(
   token: string,
   groupData: GroupCreate
 ): Promise<Group> {
-  // Server-Route: POST /api/groups
   const response = await fetch(`${API_BASE_URL}/api/groups`, {
     method: 'POST',
     headers: {
@@ -131,13 +114,10 @@ export async function createGroup(
     },
     body: JSON.stringify(groupData),
   });
-  // Erwartet, dass die Server-Antwort den 'invite_token' enthält.
-  // Stelle sicher, dass dein 'Group' Typ dies widerspiegelt.
   return handleResponse<Group>(response);
 }
 
 export async function getMyGroups(token: string): Promise<Group[]> {
-  // Server-Route: GET /api/groups
   const response = await fetch(`${API_BASE_URL}/api/groups`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
@@ -149,7 +129,6 @@ export async function getGroupDetails(
   token: string,
   groupId: number
 ): Promise<Group> {
-  // Server-Route: GET /api/groups/{groupId}
   const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
@@ -157,20 +136,14 @@ export async function getGroupDetails(
   return handleResponse<Group>(response);
 }
 
-export async function joinGroupByInviteToken( // Umbenannt für Klarheit, war vorher joinGroupByToken
-  authToken: string, // Dein normaler Auth-Token
-  groupInviteToken: string // Der Invite-Token der Gruppe
+export async function joinGroupByInviteToken(
+  authToken: string,
+  groupInviteToken: string
 ): Promise<GroupMembership> {
-  // Der Server gibt die erstellte Mitgliedschaft zurück
-  // Server-Route: POST /api/groups/invite/{inviteToken}
   const endpointUrl = `${API_BASE_URL}/api/groups/invite/${encodeURIComponent(groupInviteToken)}`;
-
   const response = await fetch(endpointUrl, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${authToken}`,
-      // Kein 'Content-Type' oder 'body' nötig, da der Token im Pfad ist
-    },
+    headers: { Authorization: `Bearer ${authToken}` },
   });
   return handleResponse<GroupMembership>(response);
 }
@@ -179,15 +152,11 @@ export async function regenerateGroupInviteToken(
   token: string,
   groupId: number
 ): Promise<Group> {
-  // Erwartet das aktualisierte Group-Objekt mit neuem Token
-  // Server-Route: POST /api/groups/{groupId}/regenerate-token
   const response = await fetch(
     `${API_BASE_URL}/api/groups/${groupId}/regenerate-token`,
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     }
   );
   return handleResponse<Group>(response);
@@ -196,9 +165,8 @@ export async function regenerateGroupInviteToken(
 export async function addMemberToGroup(
   token: string,
   groupId: number,
-  userIdToAdd: number // Oder E-Mail, je nach Server-Implementierung
+  userIdToAdd: number
 ): Promise<GroupMembership> {
-  // Beispielhafter Server-Pfad: POST /api/groups/${groupId}/members
   const response = await fetch(
     `${API_BASE_URL}/api/groups/${groupId}/members`,
     {
@@ -207,7 +175,7 @@ export async function addMemberToGroup(
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId: userIdToAdd }), // Body anpassen
+      body: JSON.stringify({ userId: userIdToAdd }),
     }
   );
   return handleResponse<GroupMembership>(response);
@@ -217,8 +185,6 @@ export async function getGroupMembers(
   token: string,
   groupId: number
 ): Promise<UserOut[]> {
-  // Gibt typischerweise eine Liste von User-Objekten zurück
-  // Beispielhafter Server-Pfad: GET /api/groups/${groupId}/members
   const response = await fetch(
     `${API_BASE_URL}/api/groups/${groupId}/members`,
     {
@@ -232,7 +198,6 @@ export async function getGroupMembers(
 export async function getMyMemberships(
   token: string
 ): Promise<GroupMembership[]> {
-  // Beispielhafter Server-Pfad, falls benötigt: GET /api/users/me/memberships
   const response = await fetch(`${API_BASE_URL}/api/users/me/memberships`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
@@ -241,32 +206,25 @@ export async function getMyMemberships(
 }
 
 // --- Externe Daten Endpunkte ---
-
 export async function getUfcSchedule(): Promise<UfcEventItem[]> {
   const response = await fetch(
-    `${API_BASE_URL}/api/events/external/ufc-schedule` // Pfad angepasst
+    `${API_BASE_URL}/api/events/external/ufc-schedule`
   );
   return handleResponse<UfcEventItem[]>(response);
 }
 
 export async function getBoxingSchedule(): Promise<BoxingScheduleItem[]> {
   const response = await fetch(
-    `${API_BASE_URL}/api/events/external/boxing-schedule` // Pfad angepasst
+    `${API_BASE_URL}/api/events/external/boxing-schedule`
   );
   return handleResponse<BoxingScheduleItem[]>(response);
 }
 
 // --- Event- & Tipp-Endpunkte ---
-// (Pfade anpassen, falls sie unter /api/... liegen und entsprechend der Server-Logik)
-// Die Pfade hier scheinen eher spezifisch zu sein und könnten so bleiben,
-// wenn sie bereits auf deine Next.js API Routen Struktur passen.
-// z.B. /api/events/group/{groupId} etc.
-
 export async function getGroupEvents(
   token: string,
   groupId: number
 ): Promise<Event[]> {
-  // Annahme: Pfad ist /api/events/group/{groupId}
   const response = await fetch(`${API_BASE_URL}/api/events/group/${groupId}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
@@ -285,12 +243,10 @@ export async function getGroupHighscore(
       headers: { Authorization: `Bearer ${token}` },
     }
   );
-
   const data = await handleResponse<{
     groupId: number;
     highscores: HighscoreEntry[];
   }>(response);
-
   return data.highscores;
 }
 
@@ -298,7 +254,6 @@ export async function createEvent(
   token: string,
   eventData: EventCreate
 ): Promise<Event> {
-  // Annahme: Pfad ist /api/events
   const response = await fetch(`${API_BASE_URL}/api/events`, {
     method: 'POST',
     headers: {
@@ -329,7 +284,6 @@ export async function setEventResult(
   token: string,
   resultData: EventResultSet
 ): Promise<Event> {
-  // Annahme: Pfad ist /api/events/result
   const response = await fetch(`${API_BASE_URL}/api/events/result`, {
     method: 'POST',
     headers: {
@@ -345,59 +299,33 @@ export async function getMyTipsForGroup(
   token: string,
   groupId: number
 ): Promise<UserTipSelection[]> {
-  // Ruft die neue GET-Route im Backend auf
   const response = await fetch(`${API_BASE_URL}/api/tips?groupId=${groupId}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
   });
-  // handleResponse verwenden, erwartet jetzt ein Array von UserTipSelection
   return handleResponse<UserTipSelection[]>(response);
 }
+
 export async function deleteGroup(
   token: string,
   groupId: number
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}`, {
     method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) {
-    let errorDetail: string | object | undefined;
-    try {
-      const errorData = await response.json();
-      errorDetail = errorData?.detail || errorData?.error;
-    } catch (e) {
-      errorDetail = response.statusText;
-    }
-    throw new ApiError(
-      `API request failed with status ${response.status}`,
-      response.status,
-      errorDetail
-    );
-  }
+  await handleResponse<void>(response); // handleResponse kümmert sich um 204
 }
 
 export async function deleteEvent(
   token: string,
   eventId: number
 ): Promise<void> {
-  // Erwartet keinen Body zurück (204 No Content)
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}`, {
     method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
-  // handleResponse kümmert sich um die Fehlerbehandlung und den 204-Status
   await handleResponse<void>(response);
-}
-
-export interface GroupWithOpenEvents {
-  groupId: number;
-  groupName: string;
-  openEvents: { id: number; title: string }[];
 }
 
 export async function getGroupsWithOpenEvents(
@@ -416,11 +344,7 @@ export async function getAllTipsForOpenGroupEvents(
   const endpointUrl = `${API_BASE_URL}/api/tips/group-all?groupId=${groupId}`;
   const response = await fetch(endpointUrl, {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      // Für GET-Anfragen ist 'Content-Type': 'application/json' normalerweise nicht nötig,
-      // da kein Body gesendet wird. Der Server sollte die Antwort trotzdem als JSON senden.
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
   return handleResponse<AllTipsPerEvent>(response);
 }
@@ -430,18 +354,16 @@ export async function getMyTipsAcrossAllGroups(
 ): Promise<UserTipSelection[]> {
   const response = await fetch(`${API_BASE_URL}/api/tips/all`, {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
   return handleResponse<UserTipSelection[]>(response);
 }
 
+// --- Event Kommentar Endpunkte (Aktualisiert und Erweitert) ---
 export async function getEventComments(
   token: string,
   eventId: number
 ): Promise<EventComment[]> {
-  // Server-Route: GET /api/events/{eventId}/comments
   const response = await fetch(
     `${API_BASE_URL}/api/events/${eventId}/comments`,
     {
@@ -449,16 +371,21 @@ export async function getEventComments(
       headers: { Authorization: `Bearer ${token}` },
     }
   );
-  // Gibt ein Array von Kommentaren zurück
-  return handleResponse<EventComment[]>(response);
+  const comments = await handleResponse<EventComment[]>(response);
+  // Stelle sicher, dass jeder Kommentar die Felder likedByCurrentUser und likesCount hat.
+  // Die Backend-Route sollte dies bereits korrekt liefern.
+  return comments.map((comment) => ({
+    ...comment,
+    likedByCurrentUser: comment.likedByCurrentUser || false, // Default falls nicht vom Backend gesendet
+    likesCount: comment.likesCount || 0, // Default falls nicht vom Backend gesendet
+  }));
 }
 
 export async function postEventComment(
   token: string,
   eventId: number,
-  commentData: EventCommentCreate // Typ für die zu sendenden Daten
+  commentData: EventCommentCreate
 ): Promise<EventComment> {
-  // Server-Route: POST /api/events/{eventId}/comments
   const response = await fetch(
     `${API_BASE_URL}/api/events/${eventId}/comments`,
     {
@@ -470,30 +397,65 @@ export async function postEventComment(
       body: JSON.stringify(commentData),
     }
   );
-  // Gibt das neu erstellte Kommentar-Objekt zurück
+  // Die Backend-Route sollte das erstellte EventComment mit initialen Like-Infos zurückgeben
   return handleResponse<EventComment>(response);
 }
 
-// --- Datei-Upload Endpunkt (Beispiel) ---
-// Passt dies an, falls dein Upload-Endpunkt anders heißt oder eine andere Antwortstruktur hat
+// NEU: Kommentar liken
+export async function likeComment(
+  token: string,
+  commentId: number
+): Promise<{ success: boolean; message?: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/comments/${commentId}/like`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return handleResponse<{ success: boolean; message?: string }>(response);
+}
 
-// Definiere den erwarteten Rückgabetyp vom Upload-Endpunkt
+// NEU: Kommentar entliken
+export async function unlikeComment(
+  token: string,
+  commentId: number
+): Promise<{ success: boolean; message?: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/comments/${commentId}/like`,
+    {
+      // Selber Endpunkt, aber DELETE-Methode
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return handleResponse<{ success: boolean; message?: string }>(response);
+}
+
+// NEU: Kommentar löschen
+export async function deleteUserComment(
+  token: string,
+  commentId: number
+): Promise<{ success: boolean; message?: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/comments/${commentId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<{ success: boolean; message?: string }>(response);
+}
+
+// --- Datei-Upload Endpunkt ---
 interface UploadResponse {
   url: string;
-  // ggf. weitere Felder wie filename, size etc.
 }
 
 export async function uploadImage(
   token: string,
-  fileData: FormData // Erwartet FormData
+  fileData: FormData
 ): Promise<UploadResponse> {
-  // Annahme: Server-Route ist POST /api/upload
   const response = await fetch(`${API_BASE_URL}/api/upload`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      // KEIN 'Content-Type' Header hier setzen! Der Browser setzt ihn korrekt für FormData.
-    },
+    headers: { Authorization: `Bearer ${token}` }, // KEIN 'Content-Type' für FormData
     body: fileData,
   });
   return handleResponse<UploadResponse>(response);

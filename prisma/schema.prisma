@@ -20,6 +20,7 @@ model User {
   groupMemberships  GroupMembership[]
   tips              Tip[]
   comments          EventComment[]
+  commentLikes      CommentLike[] // Relation zu den Likes, die ein User gegeben hat
   leadershipStreaks LeadershipStreak[]
   pushSubscriptions PushSubscription[]
 
@@ -47,7 +48,7 @@ model GroupMembership {
   id       Int      @id @default(autoincrement())
   joinedAt DateTime @default(now()) @map("joined_at")
   userId   Int      @map("user_id")
-  user     User     @relation(fields: [userId], references: [id])
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Cascade added
   groupId  Int      @map("group_id")
   group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
@@ -85,23 +86,39 @@ model Tip {
   eventId        Int      @map("event_id")
   event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   userId         Int      @map("user_id")
-  user           User     @relation(fields: [userId], references: [id])
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Cascade added
 
   @@unique([eventId, userId], name: "unique_tip_per_user_per_event")
   @@map("tips")
 }
 
 model EventComment {
-  id        Int      @id @default(autoincrement())
-  text      String?
-  gifUrl    String?
-  createdAt DateTime @default(now()) @map("created_at")
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  eventId   Int
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  id          Int           @id @default(autoincrement())
+  text        String?
+  gifUrl      String?       @map("gif_url")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at") // Added for consistency
+  userId      Int           @map("user_id")
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade) // User, der den Kommentar erstellt hat
+  eventId     Int           @map("event_id")
+  event       Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  likes       CommentLike[] // Relation zu den Likes dieses Kommentars
+  likesCount  Int           @default(0) @map("likes_count") // Denormalisierte Anzahl der Likes für einfaches Sortieren
 
   @@map("event_comments")
+}
+
+model CommentLike {
+  id        Int          @id @default(autoincrement())
+  createdAt DateTime     @default(now()) @map("created_at")
+  userId    Int          @map("user_id")
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade) // User, der geliked hat
+  commentId Int          @map("comment_id")
+  comment   EventComment @relation(fields: [commentId], references: [id], onDelete: Cascade) // Der gelikte Kommentar
+
+  @@unique([userId, commentId], name: "uq_user_comment_like") // Ein User kann einen Kommentar nur einmal liken
+  @@map("comment_likes")
 }
 
 model LeadershipStreak {
@@ -120,14 +137,13 @@ model LeadershipStreak {
 
 model PushSubscription {
   id        String   @id @default(cuid())
-  endpoint  String   @unique // Der Endpoint des Push-Dienstes
-  p256dh    String   // Public key für die Verschlüsselung
-  auth      String   // Authentifizierungsgeheimnis
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("push_subscriptions")
 }
