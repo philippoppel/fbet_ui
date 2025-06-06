@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type {
   Group,
   Event as GroupEvent,
@@ -46,7 +46,9 @@ export function SelectedGroupView({
     },
     [interactions]
   );
-
+  const [wildcardResultInputs, setWildcardResultInputs] = useState<
+    Record<number, string>
+  >({});
   const leaderboardWinner = useMemo((): LeaderboardWinner | null => {
     if (!highscoreEntries || highscoreEntries.length === 0) return null;
 
@@ -61,6 +63,31 @@ export function SelectedGroupView({
     }
     return { name: top.name };
   }, [highscoreEntries]);
+
+  const handleWildcardResultInputChange = useCallback(
+    (eventId: number, value: string) => {
+      setWildcardResultInputs((prev) => ({ ...prev, [eventId]: value }));
+    },
+    []
+  );
+
+  const handleSetWildcardResult = useCallback(
+    async (eventId: number, wildcardResult: string) => {
+      console.log(
+        '✅ Wildcard-Result speichern für Event',
+        eventId,
+        ':',
+        wildcardResult
+      );
+
+      // JETZT AUCH WIRKLICH API-CALL MACHEN:
+      await interactions.handleSetWildcardResult(eventId, wildcardResult);
+
+      // Optional: Lokalen Input zurücksetzen
+      setWildcardResultInputs((prev) => ({ ...prev, [eventId]: '' }));
+    },
+    [interactions]
+  );
 
   return (
     <div className='space-y-8'>
@@ -95,6 +122,12 @@ export function SelectedGroupView({
           interactions.setIsAddEventDialogOpen(true)
         }
         allTipsPerEvent={allTipsPerEvent}
+        wildcardInputs={interactions.wildcardInputs}
+        onWildcardInputChangeAction={interactions.handleWildcardInputChange}
+        // 🟢 HIER FEHLT ES → einfach dazufügen:
+        wildcardResultInputs={wildcardResultInputs}
+        onWildcardResultInputChangeAction={handleWildcardResultInputChange}
+        onSetWildcardResultAction={handleSetWildcardResult}
       />
 
       <SubmittedOpenEventsCard
@@ -108,6 +141,10 @@ export function SelectedGroupView({
         isSettingResult={interactions.isSettingResult}
         onResultInputChangeAction={interactions.handleResultInputChange}
         onSetResultAction={interactions.handleSetResult}
+        // NEU:
+        wildcardResultInputs={wildcardResultInputs}
+        onWildcardResultInputChangeAction={handleWildcardResultInputChange}
+        onSetWildcardResultAction={handleSetWildcardResult}
       />
 
       <ClosedEventsCard

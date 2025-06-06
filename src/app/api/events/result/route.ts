@@ -24,7 +24,12 @@ export async function POST(req: NextRequest) {
       { error: 'Invalid input', details: parsed.error.flatten() },
       { status: 400 }
     );
+
   const { event_id, winning_option, wildcard_answer } = parsed.data;
+  const updateData: any = {};
+  if (winning_option !== undefined) updateData.winningOption = winning_option;
+  if (wildcard_answer !== undefined)
+    updateData.wildcardAnswer = wildcard_answer;
 
   /* ---------- Berechtigung ---------- */
   const eventInfo = await prisma.event.findUnique({
@@ -34,60 +39,88 @@ export async function POST(req: NextRequest) {
       options: true,
       hasWildcard: true,
       winningOption: true,
+      wildcardAnswer: true,
       group: { select: { createdById: true } },
     },
   });
+
   if (!eventInfo)
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-  if (eventInfo.winningOption)
-    return NextResponse.json({ error: 'Result already set' }, { status: 400 });
+
   if (eventInfo.group.createdById !== currentUser.id)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  if (!(eventInfo.options as string[]).includes(winning_option))
-    return NextResponse.json(
-      { error: 'Invalid winning option' },
-      { status: 400 }
-    );
-  if (wildcard_answer && !eventInfo.hasWildcard)
-    return NextResponse.json(
-      { error: 'Wildcard not configured' },
-      { status: 400 }
-    );
+
+  if (winning_option !== undefined) {
+    if (eventInfo.winningOption)
+      return NextResponse.json(
+        { error: 'Result already set' },
+        { status: 400 }
+      );
+
+    if (!(eventInfo.options as string[]).includes(winning_option))
+      return NextResponse.json(
+        { error: 'Invalid winning option' },
+        { status: 400 }
+      );
+  }
+
+  if (wildcard_answer !== undefined) {
+    if (!eventInfo.hasWildcard)
+      return NextResponse.json(
+        { error: 'Wildcard not configured' },
+        { status: 400 }
+      );
+
+    if (eventInfo.wildcardAnswer)
+      return NextResponse.json(
+        { error: 'Wildcard result already set' },
+        { status: 400 }
+      );
+  }
 
   /* ---------- Transaktion ---------- */
   const { tips } = await prisma.$transaction(async (tx) => {
     const updatedEvent = await tx.event.update({
       where: { id: event_id },
-      data: {
-        winningOption: winning_option,
-        wildcardAnswer: wildcard_answer ?? null,
-      },
+      data: updateData,
     });
 
-    const tips = await tx.tip.findMany({ where: { eventId: event_id } });
-    const winners = tips.filter((t) => t.selectedOption === winning_option);
-    const bp = basePoints(winners.length);
+    // 🟢 Bedingung ob Punkte berechnet werden:
+    const shouldCalculatePoints =
+      !updatedEvent.hasWildcard ||
+      (!!updatedEvent.winningOption && !!updatedEvent.wildcardAnswer);
 
-    await Promise.all(
-      tips.map((t) => {
-        const normal = t.selectedOption === winning_option;
-        const wcOK = wildcard_answer
-          ? (t.wildcardGuess?.trim().toLowerCase() ?? '') ===
-            wildcard_answer.trim().toLowerCase()
-          : false;
+    let tips: any[] = [];
 
-        let pts = 0;
-        let wpts = 0;
-        if (normal) pts = bp;
-        if (wcOK) wpts = bp;
-        if (normal && wcOK) pts = bp * 2;
+    if (shouldCalculatePoints) {
+      tips = await tx.tip.findMany({ where: { eventId: event_id } });
+      const winners = tips.filter(
+        (t) => t.selectedOption === updatedEvent.winningOption
+      );
+      const bp = basePoints(winners.length);
 
-        return tx.tip.update({
-          where: { id: t.id },
-          data: { points: pts, wildcardPoints: wpts },
-        });
-      })
-    );
+      await Promise.all(
+        tips.map((t) => {
+          const normal = t.selectedOption === updatedEvent.winningOption;
+          const wcOK = updatedEvent.wildcardAnswer
+            ? (t.wildcardGuess?.trim().toLowerCase() ?? '') ===
+              updatedEvent.wildcardAnswer!.trim().toLowerCase()
+            : false;
+
+          let pts = 0;
+          let wpts = 0;
+          if (normal) pts = bp;
+          if (wcOK) wpts = bp;
+          if (normal && wcOK) pts = bp * 2;
+
+          return tx.tip.update({
+            where: { id: t.id },
+            data: { points: pts, wildcardPoints: wpts },
+          });
+        })
+      );
+    }
+
     return { tips, groupId: updatedEvent.groupId };
   });
 

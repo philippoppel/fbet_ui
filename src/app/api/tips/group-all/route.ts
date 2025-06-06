@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
         eventId: true,
         selectedOption: true,
         userId: true,
+        wildcardGuess: true, // 👈 HINZUFÜGEN!
         user: {
           select: { name: true },
         },
@@ -58,7 +59,12 @@ export async function GET(req: NextRequest) {
 
     const grouped: Record<
       number,
-      { userId: number; userName: string | null; selectedOption: string }[]
+      {
+        userId: number;
+        userName: string | null;
+        selectedOption: string;
+        wildcardGuess?: string | null;
+      }[]
     > = {};
 
     tips.forEach((tip) => {
@@ -67,6 +73,7 @@ export async function GET(req: NextRequest) {
         userId: tip.userId,
         userName: tip.user?.name || null,
         selectedOption: tip.selectedOption,
+        wildcardGuess: tip.wildcardGuess, // 👈 HINZUFÜGEN!
       });
     });
 

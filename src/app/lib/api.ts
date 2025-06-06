@@ -340,13 +340,13 @@ export async function getGroupsWithOpenEvents(
 export async function getAllTipsForOpenGroupEvents(
   token: string,
   groupId: number
-): Promise<AllTipsPerEvent> {
+): Promise<any> {
   const endpointUrl = `${API_BASE_URL}/api/tips/group-all?groupId=${groupId}`;
   const response = await fetch(endpointUrl, {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
   });
-  return handleResponse<AllTipsPerEvent>(response);
+  return handleResponse<any>(response);
 }
 
 export async function getMyTipsAcrossAllGroups(

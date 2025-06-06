@@ -27,6 +27,7 @@ import { NoGroupsCard } from '@/app/components/dashboard/NoGroupsCard';
 import { deleteGroup as apiDeleteGroup } from '@/app/lib/api';
 import type { Group, MixedEvent } from '@/app/lib/types'; // MixedEvent für den Fehler importieren
 import { cn } from '@/app/lib/utils';
+import { token } from 'stylis';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function DashboardPage() {
     selectedGroupDetails,
     selectedGroupEvents,
     selectedGroupHighscore,
+    setSelectedGroupEvents,
     selectedGroupMembers,
     userSubmittedTips,
     allTipsPerEvent,
@@ -61,8 +63,9 @@ export default function DashboardPage() {
     token,
     selectedGroupId,
     selectedGroupEvents,
-    refreshGroupData: refreshSelectedGroupData,
-    updateUserTipState,
+    refreshGroupDataAction: refreshSelectedGroupData,
+    updateUserTipStateAction: updateUserTipState,
+    setEvents: setSelectedGroupEvents,
   });
 
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =

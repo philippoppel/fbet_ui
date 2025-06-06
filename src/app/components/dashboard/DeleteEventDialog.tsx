@@ -1,4 +1,3 @@
-// src/app/components/dashboard/DeleteEventDialog.tsx
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
@@ -21,7 +20,12 @@ export default function DeleteEventDialog({
   const open = !!event;
 
   return (
-    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay
           className={cn(
@@ -67,7 +71,7 @@ export default function DeleteEventDialog({
               onClick={async () => {
                 if (!event) return;
                 await onConfirm(event.id);
-                // schließt via onOpenChange → onClose()
+                // Nach dem Confirm bleibt open==true bis onClose() getriggert wird
               }}
             >
               Löschen

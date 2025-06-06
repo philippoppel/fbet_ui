@@ -34,11 +34,19 @@ interface OpenEventsCardProps {
   isSettingResult: Record<number, boolean>;
   allTipsPerEvent: AllTipsPerEvent;
   onSelectTipAction: (eventId: number, option: string) => void;
-  onSubmitTipAction: (eventId: number) => Promise<void>;
+  onSubmitTipAction: (eventId: number, wildcardGuess?: string) => Promise<void>;
   onResultInputChangeAction: (eventId: number, value: string) => void;
   onSetResultAction: (eventId: number, winningOption: string) => Promise<void>;
   onClearSelectedTipAction: (eventId: number) => void;
   onOpenAddEventDialogAction: () => void;
+  wildcardInputs: Record<number, string>;
+  onWildcardInputChangeAction: (eventId: number, value: string) => void;
+  wildcardResultInputs: Record<number, string>;
+  onWildcardResultInputChangeAction: (eventId: number, value: string) => void;
+  onSetWildcardResultAction: (
+    eventId: number,
+    wildcardResult: string
+  ) => Promise<void>;
 }
 
 export default function OpenEventsCard({
@@ -58,6 +66,11 @@ export default function OpenEventsCard({
   onSetResultAction,
   onClearSelectedTipAction,
   onOpenAddEventDialogAction,
+  wildcardInputs, // <-- HIER FEHLTE ES
+  onWildcardInputChangeAction, // <-- UND DAS
+  wildcardResultInputs,
+  onWildcardResultInputChangeAction,
+  onSetWildcardResultAction,
 }: OpenEventsCardProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -139,8 +152,13 @@ export default function OpenEventsCard({
                     onSetResultAction={onSetResultAction}
                     onClearSelectedTipAction={onClearSelectedTipAction}
                     allTipsForThisEvent={allTipsPerEvent[event.id] || []}
-                    wildcardInputs={{}}
-                    onWildcardInputChangeAction={() => {}}
+                    wildcardInputs={wildcardInputs} // <-- RICHTIG den State reinreichen!
+                    onWildcardInputChangeAction={onWildcardInputChangeAction} // <-- RICHTIG den Handler reinreichen!
+                    wildcardResultInputs={wildcardResultInputs}
+                    onWildcardResultInputChangeAction={
+                      onWildcardResultInputChangeAction
+                    }
+                    onSetWildcardResultAction={onSetWildcardResultAction}
                   />
                 </div>
               ))

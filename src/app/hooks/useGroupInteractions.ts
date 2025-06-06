@@ -1,7 +1,6 @@
-// src/app/hooks/useGroupInteractions.ts
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react'; // KORREKTUR: useEffect importieren
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,8 +15,6 @@ import {
 } from '@/app/lib/api';
 import type { EventCreate, Event as GroupEvent } from '@/app/lib/types';
 import { LoadGroupDataOptions } from '@/app/hooks/useDashboardData';
-
-const LOG = '[useGroupInteractions]';
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -53,6 +50,9 @@ const addEventFormSchema = z.object({
       (v) => new Date(v) > new Date(),
       'Deadline muss in der Zukunft liegen'
     ),
+  has_wildcard: z.boolean(),
+  wildcard_type: z.string().optional(),
+  wildcard_prompt: z.string().optional(),
 });
 
 export type AddEventFormData = z.infer<typeof addEventFormSchema>;
@@ -65,16 +65,17 @@ interface UseGroupInteractionsProps {
   token: string | null;
   selectedGroupId: number | null;
   selectedGroupEvents: GroupEvent[];
-  refreshGroupData: (
+  setEvents: React.Dispatch<React.SetStateAction<GroupEvent[]>>;
+  refreshGroupDataAction: (
     groupId: number,
     opts?: LoadGroupDataOptions
   ) => Promise<void>;
-  updateUserTipState: (eventId: number, option: string) => void;
+  updateUserTipStateAction: (eventId: number, option: string) => void;
 }
 
 export interface UseGroupInteractionsReturn {
-  /* state */
   selectedTips: Record<number, string>;
+  wildcardInputs: Record<number, string>;
   resultInputs: Record<number, string>;
   isSubmittingTip: Record<number, boolean>;
   isSettingResult: Record<number, boolean>;
@@ -82,17 +83,24 @@ export interface UseGroupInteractionsReturn {
   eventToDelete: GroupEvent | null;
   isDeletingSpecificEvent: boolean;
 
-  /* RHF */
   addEventForm: ReturnType<typeof useForm<AddEventFormData>>;
 
-  /* actions */
   handleOptionSelect: (eventId: number, option: string) => void;
   handleClearSelectedTip: (eventId: number) => void;
+  handleWildcardInputChange: (eventId: number, value: string) => void;
   handleSubmitTip: (eventId: number) => Promise<void>;
+  handleSetWildcardResult: (
+    eventId: number,
+    wildcardResult: string
+  ) => Promise<void>;
+
   handleResultInputChange: (eventId: number, val: string) => void;
   handleSetResult: (eventId: number, winning: string) => Promise<void>;
+
   setIsAddEventDialogOpen: (open: boolean) => void;
+
   handleAddEventSubmit: (v: AddEventFormData) => Promise<void>;
+
   handleInitiateDeleteEvent: (e: GroupEvent) => void;
   handleConfirmDeleteEvent: (eventId: number) => Promise<void>;
   resetDeleteEventDialog: () => void;
@@ -105,13 +113,15 @@ export interface UseGroupInteractionsReturn {
 export function useGroupInteractions({
   token,
   selectedGroupId,
+  setEvents,
   selectedGroupEvents,
-  refreshGroupData,
-  updateUserTipState,
+  refreshGroupDataAction,
+  updateUserTipStateAction,
 }: UseGroupInteractionsProps): UseGroupInteractionsReturn {
-  /* --------------------- state --------------------- */
-
   const [selectedTips, setSelectedTips] = useState<Record<number, string>>({});
+  const [wildcardInputs, setWildcardInputs] = useState<Record<number, string>>(
+    {}
+  );
   const [resultInputs, setResultInputs] = useState<Record<number, string>>({});
   const [isSubmittingTip, setIsSubmittingTip] = useState<
     Record<number, boolean>
@@ -123,7 +133,8 @@ export function useGroupInteractions({
   const [eventToDelete, setEventToDelete] = useState<GroupEvent | null>(null);
   const [isDeletingSpecificEvent, setIsDeletingSpecificEvent] = useState(false);
 
-  /* --------------------- form ---------------------- */
+  // KORREKTUR 1: useState muss INNERHALB der Hook-Funktion aufgerufen werden.
+  const [needsRefreshAfterDelete, setNeedsRefreshAfterDelete] = useState(false);
 
   const addEventForm = useForm<AddEventFormData>({
     resolver: zodResolver(addEventFormSchema),
@@ -136,7 +147,64 @@ export function useGroupInteractions({
     },
   });
 
-  /* ------------------ tip helpers ------------------ */
+  const handleSetWildcardResult = useCallback(
+    async (eventId: number, wildcardResult: string) => {
+      if (!token || !selectedGroupId) return;
+
+      setIsSettingResult((p) => ({ ...p, [eventId]: true }));
+
+      try {
+        await setEventResult(token, {
+          event_id: eventId,
+          wildcard_answer: wildcardResult,
+        } as any);
+
+        toast.success('Wildcard-Ergebnis gespeichert');
+
+        setResultInputs((p) => {
+          const n = { ...p };
+          delete n[eventId];
+          return n;
+        });
+
+        await refreshGroupDataAction(selectedGroupId, {
+          keepExistingDetailsWhileRefreshingSubData: true,
+          showLoadingSpinner: false,
+        });
+      } catch (e) {
+        const msg =
+          e instanceof ApiError
+            ? `${e.status}: ${e.detail}`
+            : e instanceof Error
+              ? e.message
+              : '';
+        toast.error('Fehler beim Speichern der Wildcard', { description: msg });
+      } finally {
+        setIsSettingResult((p) => ({ ...p, [eventId]: false }));
+      }
+    },
+    [token, selectedGroupId, refreshGroupDataAction]
+  );
+
+  // KORREKTUR 2: useEffect muss INNERHALB der Hook-Funktion aufgerufen werden.
+  useEffect(() => {
+    if (!eventToDelete && needsRefreshAfterDelete) {
+      if (selectedGroupId) {
+        console.log('Dialog geschlossen, starte Daten-Refresh...');
+        // KORREKTUR 3: Den korrekten Funktionsnamen aus den Props verwenden.
+        refreshGroupDataAction(selectedGroupId, {
+          keepExistingDetailsWhileRefreshingSubData: false,
+          showLoadingSpinner: true,
+        });
+      }
+      setNeedsRefreshAfterDelete(false);
+    }
+  }, [
+    eventToDelete,
+    needsRefreshAfterDelete,
+    refreshGroupDataAction, // KORREKTUR 3: Korrekten Namen in der Dependency-Liste
+    selectedGroupId,
+  ]);
 
   const handleOptionSelect = (eventId: number, option: string) =>
     setSelectedTips((p) => ({ ...p, [eventId]: option }));
@@ -148,24 +216,37 @@ export function useGroupInteractions({
       return n;
     });
 
+  const handleWildcardInputChange = (eventId: number, value: string) =>
+    setWildcardInputs((p) => ({ ...p, [eventId]: value }));
+
   const handleSubmitTip = useCallback(
     async (eventId: number) => {
       const option = selectedTips[eventId];
       if (!option || !token || !selectedGroupId) return;
+
+      const wildcardGuess = wildcardInputs[eventId] || '';
 
       setIsSubmittingTip((p) => ({ ...p, [eventId]: true }));
       try {
         const saved = await submitTip(token, {
           event_id: eventId,
           selected_option: option,
+          wildcard_guess: wildcardGuess,
         });
-        updateUserTipState(saved.eventId, saved.selectedOption);
+        updateUserTipStateAction(saved.eventId, saved.selectedOption);
         toast.success('Tipp gespeichert');
         handleClearSelectedTip(eventId);
-        await refreshGroupData(selectedGroupId, {
+        setWildcardInputs((p) => {
+          const n = { ...p };
+          delete n[eventId];
+          return n;
+        });
+        await refreshGroupDataAction(selectedGroupId, {
           keepExistingDetailsWhileRefreshingSubData: true,
           showLoadingSpinner: false,
         });
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (e) {
         const msg =
           e instanceof ApiError
@@ -178,10 +259,15 @@ export function useGroupInteractions({
         setIsSubmittingTip((p) => ({ ...p, [eventId]: false }));
       }
     },
-    [selectedTips, token, selectedGroupId, refreshGroupData, updateUserTipState]
+    [
+      selectedTips,
+      wildcardInputs,
+      token,
+      selectedGroupId,
+      refreshGroupDataAction,
+      updateUserTipStateAction,
+    ]
   );
-
-  /* ------------------ result helpers --------------- */
 
   const handleResultInputChange = (id: number, val: string) =>
     setResultInputs((p) => ({ ...p, [id]: val }));
@@ -202,7 +288,7 @@ export function useGroupInteractions({
           delete n[eventId];
           return n;
         });
-        await refreshGroupData(selectedGroupId, {
+        await refreshGroupDataAction(selectedGroupId, {
           keepExistingDetailsWhileRefreshingSubData: true,
           showLoadingSpinner: false,
         });
@@ -218,10 +304,8 @@ export function useGroupInteractions({
         setIsSettingResult((p) => ({ ...p, [eventId]: false }));
       }
     },
-    [token, selectedGroupId, refreshGroupData]
+    [token, selectedGroupId, refreshGroupDataAction]
   );
-
-  /* ------------------ add event -------------------- */
 
   const handleAddEventSubmit = useCallback(
     async (v: AddEventFormData) => {
@@ -247,6 +331,9 @@ export function useGroupInteractions({
         question: v.question,
         options,
         tippingDeadline: v.tippingDeadline,
+        has_wildcard: v.has_wildcard,
+        wildcard_prompt: v.wildcard_prompt,
+        wildcard_type: v.wildcard_type as any,
       };
 
       try {
@@ -254,7 +341,7 @@ export function useGroupInteractions({
         toast.success('Event erstellt');
         addEventForm.reset();
         setIsAddEventDialogOpen(false);
-        await refreshGroupData(selectedGroupId, {
+        await refreshGroupDataAction(selectedGroupId, {
           keepExistingDetailsWhileRefreshingSubData: false,
           showLoadingSpinner: true,
         });
@@ -268,10 +355,8 @@ export function useGroupInteractions({
         toast.error('Event konnte nicht erstellt werden', { description: msg });
       }
     },
-    [token, selectedGroupId, addEventForm, refreshGroupData]
+    [token, selectedGroupId, addEventForm, refreshGroupDataAction]
   );
-
-  /* ------------------- delete ---------------------- */
 
   const handleInitiateDeleteEvent = (e: GroupEvent) => setEventToDelete(e);
 
@@ -285,25 +370,21 @@ export function useGroupInteractions({
       try {
         await apiDeleteEvent(token, eventId);
         toast.success('Event gelöscht');
+        setNeedsRefreshAfterDelete(true);
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
         toast.error('Fehler beim Löschen', { description: msg });
       } finally {
         setIsDeletingSpecificEvent(false);
         resetDeleteEventDialog();
-        await refreshGroupData(selectedGroupId, {
-          keepExistingDetailsWhileRefreshingSubData: false,
-          showLoadingSpinner: true,
-        });
       }
     },
-    [token, selectedGroupId, refreshGroupData]
+    [token, selectedGroupId]
   );
-
-  /* ------------------------------------------------- */
 
   return {
     selectedTips,
+    wildcardInputs,
     resultInputs,
     isSubmittingTip,
     isSettingResult,
@@ -315,6 +396,7 @@ export function useGroupInteractions({
 
     handleOptionSelect,
     handleClearSelectedTip,
+    handleWildcardInputChange,
     handleSubmitTip,
 
     handleResultInputChange,
@@ -327,5 +409,6 @@ export function useGroupInteractions({
     handleInitiateDeleteEvent,
     handleConfirmDeleteEvent,
     resetDeleteEventDialog,
+    handleSetWildcardResult,
   };
 }

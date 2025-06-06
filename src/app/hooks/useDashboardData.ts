@@ -42,6 +42,7 @@ export interface UseDashboardDataReturn {
   selectedGroupEvents: GroupEvent[];
   selectedGroupHighscore: HighscoreEntry[];
   selectedGroupMembers: UserOut[];
+  setSelectedGroupEvents: React.Dispatch<React.SetStateAction<GroupEvent[]>>;
   userSubmittedTips: Record<number, string>;
   allTipsPerEvent: AllTipsPerEvent;
   loadingInitial: boolean;
@@ -268,9 +269,30 @@ export function useDashboardData(): UseDashboardDataReturn {
           setUserSubmittedTips({});
         }
 
-        if (allGroupTipsRes.status === 'fulfilled')
-          setAllTipsPerEvent(allGroupTipsRes.value as AllTipsPerEvent);
-        else {
+        if (allGroupTipsRes.status === 'fulfilled') {
+          const rawAllTipsPerEvent = allGroupTipsRes.value as Record<
+            string,
+            any[]
+          >;
+
+          const mappedAllTipsPerEvent: AllTipsPerEvent = {};
+          console.log('[DEBUG allGroupTipsRes.value]', allGroupTipsRes.value);
+
+          for (const [eventIdStr, tipsArray] of Object.entries(
+            rawAllTipsPerEvent
+          )) {
+            const eventId = parseInt(eventIdStr, 10);
+
+            mappedAllTipsPerEvent[eventId] = tipsArray.map((tip) => ({
+              userId: tip.userId,
+              userName: tip.userName,
+              selectedOption: tip.selectedOption,
+              wildcardGuess: tip.wildcardGuess,
+            }));
+          }
+
+          setAllTipsPerEvent(mappedAllTipsPerEvent);
+        } else {
           setErrors((prev) => ({
             ...prev,
             allGroupTips:
@@ -621,6 +643,7 @@ export function useDashboardData(): UseDashboardDataReturn {
     selectedGroupId,
     selectedGroupDetails,
     selectedGroupEvents,
+    setSelectedGroupEvents,
     selectedGroupHighscore,
     selectedGroupMembers,
     userSubmittedTips,

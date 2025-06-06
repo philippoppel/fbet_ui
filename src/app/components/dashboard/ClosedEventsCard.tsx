@@ -277,19 +277,31 @@ export default function ClosedEventsCard({
                               Punkteverteilung
                             </h5>
                             <ul className='space-y-1 text-sm'>
-                              {event.awardedPoints.map((p) => (
-                                <li
-                                  key={p.userId}
-                                  className='flex justify-between text-foreground'
-                                >
-                                  <span>
-                                    {p.userName || `User ${p.userId}`}
-                                  </span>
-                                  <span className='font-medium'>
-                                    {p.points ?? 0} Pkt.
-                                  </span>
-                                </li>
-                              ))}
+                              {event.awardedPoints.map((p) => {
+                                const wildcardPoints =
+                                  (p as any).wildcardPoints ?? 0;
+                                const hasWildcard =
+                                  event.hasWildcard && wildcardPoints > 0;
+
+                                return (
+                                  <li
+                                    key={p.userId}
+                                    className='flex justify-between text-foreground'
+                                  >
+                                    <span>
+                                      {p.userName || `User ${p.userId}`}
+                                    </span>
+                                    <span className='font-medium'>
+                                      {p.points ?? 0} Pkt.
+                                      {hasWildcard && (
+                                        <span className='ml-2 text-xs text-primary/80'>
+                                          (+ Wildcard 🎯)
+                                        </span>
+                                      )}
+                                    </span>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           </div>
                         )}

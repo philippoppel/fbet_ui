@@ -32,6 +32,12 @@ interface SubmittedOpenEventsCardProps {
   isSettingResult: Record<number, boolean>;
   onResultInputChangeAction: (eventId: number, value: string) => void;
   onSetResultAction: (eventId: number, winningOption: string) => Promise<void>;
+  wildcardResultInputs: Record<number, string>;
+  onWildcardResultInputChangeAction: (eventId: number, value: string) => void;
+  onSetWildcardResultAction: (
+    eventId: number,
+    wildcardResult: string
+  ) => Promise<void>;
 }
 
 export default function SubmittedOpenEventsCard({
@@ -45,6 +51,9 @@ export default function SubmittedOpenEventsCard({
   isSettingResult,
   onResultInputChangeAction,
   onSetResultAction,
+  wildcardResultInputs,
+  onWildcardResultInputChangeAction,
+  onSetWildcardResultAction,
 }: SubmittedOpenEventsCardProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -108,6 +117,11 @@ export default function SubmittedOpenEventsCard({
                   onClearSelectedTipAction={() => {}}
                   wildcardInputs={{}}
                   onWildcardInputChangeAction={() => {}}
+                  wildcardResultInputs={wildcardResultInputs}
+                  onWildcardResultInputChangeAction={
+                    onWildcardResultInputChangeAction
+                  }
+                  onSetWildcardResultAction={onSetWildcardResultAction}
                 />
               </div>
             ))}

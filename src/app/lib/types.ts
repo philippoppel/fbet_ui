@@ -94,6 +94,7 @@ export interface EventPointDetail {
   userName: string | null;
   selectedOption: string;
   points: number | null;
+  wildcardPoints?: number | null;
 }
 
 export interface Event extends Omit<PrismaEventModel, 'options' | 'creator'> {
@@ -118,13 +119,15 @@ export interface EventCreate {
 }
 
 export interface EventResultSet {
-  event_id: number; // Snake Case
-  winning_option: string; // Snake Case
+  event_id: number;
+  winning_option: string;
+  wildcard_answer?: string | null;
 }
 
 export interface TipCreate {
   event_id: number; // Snake Case
   selected_option: string; // Snake Case
+  wildcard_guess?: string; // <--- HIER hinzufügen!
 }
 
 // TipOut ist die Antwort vom Server nach dem Erstellen eines Tipps
@@ -156,6 +159,7 @@ export type AllTipsPerEvent = Record<
     userId: number;
     userName: string | null;
     selectedOption: string;
+    wildcardGuess?: string | null;
   }[]
 >;
 

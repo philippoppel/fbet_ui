@@ -3,8 +3,8 @@ import { z } from 'zod';
 /* ---------- Ergebnis setzen ---------- */
 export const eventResultSetSchema = z.object({
   event_id: z.number().int().positive(),
-  winning_option: z.string().min(1),
-  wildcard_answer: z.string().optional(), // ➊
+  winning_option: z.string().min(1).optional(),
+  wildcard_answer: z.string().optional(),
 });
 
 /* ---------- Event anlegen ------------ */
@@ -25,7 +25,18 @@ export const eventCreateSchema = z.object({
 
   /* Wildcard-Felder */
   has_wildcard: z.boolean().default(false),
-  wildcard_type: z.enum(['EXACT_SCORE', 'ROUND_FINISH', 'GENERIC']).optional(),
+  wildcard_type: z
+    .string()
+    .transform((v) => (v === '' ? undefined : v))
+    .optional()
+    .refine(
+      (v) =>
+        v === undefined ||
+        v === 'EXACT_SCORE' ||
+        v === 'ROUND_FINISH' ||
+        v === 'GENERIC',
+      { message: 'Invalid wildcard type' }
+    ),
   wildcard_prompt: z.string().optional(),
 });
 export type EventCreateInput = z.infer<typeof eventCreateSchema>;
