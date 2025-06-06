@@ -7,26 +7,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/*───────────────────────────────*/
-/* ENUMS                         */
-/*───────────────────────────────*/
+/**
+ * ─────────────────────────
+ */
+/**
+ * ENUMS
+ */
+/**
+ * ─────────────────────────
+ */
 enum WildcardType {
-  EXACT_SCORE    // z. B. 3:1
-  ROUND_FINISH   // KO-/TKO-Runde
-  GENERIC        // freie Eingabe
+  EXACT_SCORE
+  ROUND_FINISH
+  GENERIC
 }
 
-/*───────────────────────────────*/
-/* MODELS                        */
-/*───────────────────────────────*/
+/**
+ * ─────────────────────────
+ */
+/**
+ * MODELS
+ */
+/**
+ * ─────────────────────────
+ */
 model User {
-  id                Int                @id @default(autoincrement())
-  email             String             @unique
-  name              String?
-  hashedPassword    String             @map("hashed_password")
-  isActive          Boolean            @default(true) @map("is_active")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt      @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  email          String   @unique
+  name           String?
+  hashedPassword String   @map("hashed_password")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
   createdGroups     Group[]            @relation("GroupCreator")
   createdEvents     Event[]            @relation("EventCreator")
   groupMemberships  GroupMembership[]
@@ -40,15 +53,17 @@ model User {
 }
 
 model Group {
-  id                Int                @id @default(autoincrement())
-  name              String
-  description       String?
-  imageUrl          String?            @map("image_url")
-  inviteToken       String?            @unique           @map("invite_token")
-  createdAt         DateTime           @default(now())   @map("created_at")
-  updatedAt         DateTime           @updatedAt        @map("updated_at")
-  createdById       Int                @map("created_by_id")
-  creator           User               @relation("GroupCreator", fields: [createdById], references: [id])
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  imageUrl    String?  @map("image_url")
+  inviteToken String?  @unique @map("invite_token")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdById Int  @map("created_by_id")
+  creator     User @relation("GroupCreator", fields: [createdById], references: [id])
+
   memberships       GroupMembership[]
   events            Event[]
   leadershipStreaks LeadershipStreak[]
@@ -58,41 +73,45 @@ model Group {
 
 model GroupMembership {
   id       Int      @id @default(autoincrement())
-  joinedAt DateTime @default(now())     @map("joined_at")
-  userId   Int      @map("user_id")
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  groupId  Int      @map("group_id")
-  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  groupId Int   @map("group_id")
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([userId, groupId], name: "uq_user_group")
   @@map("group_memberships")
 }
 
 model Event {
-  id              Int            @id @default(autoincrement())
-  title           String
-  description     String?
-  question        String
-  options         Json
+  id          Int     @id @default(autoincrement())
+  title       String
+  description String?
+  question    String
+  options     Json
 
-  winningOption   String?         @map("winning_option")
-  wildcardAnswer  String?         @map("wildcard_answer")   // NEU
+  winningOption  String? @map("winning_option")
+  wildcardAnswer String? @map("wildcard_answer")
 
-  /* Wildcard-Metadaten ------------- */
-  hasWildcard     Boolean         @default(false)  @map("has_wildcard")
-  wildcardType    WildcardType?                 @map("wildcard_type")
-  wildcardPrompt  String?                       @map("wildcard_prompt")
+  hasWildcard    Boolean       @default(false) @map("has_wildcard")
+  wildcardType   WildcardType? @map("wildcard_type")
+  wildcardPrompt String?       @map("wildcard_prompt")
 
-  eventDateTime   DateTime?       @map("event_datetime")
-  tippingDeadline DateTime?       @map("tipping_deadline")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt      @map("updated_at")
-  groupId         Int             @map("group_id")
-  group           Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdById     Int             @map("created_by_id")
-  creator         User            @relation("EventCreator", fields: [createdById], references: [id])
-  tips            Tip[]
-  comments        EventComment[]
+  eventDateTime   DateTime? @map("event_datetime")
+  tippingDeadline DateTime? @map("tipping_deadline")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  groupId Int   @map("group_id")
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  createdById Int  @map("created_by_id")
+  creator     User @relation("EventCreator", fields: [createdById], references: [id])
+
+  tips     Tip[]
+  comments EventComment[]
 
   @@map("events")
 }
@@ -100,42 +119,48 @@ model Event {
 model Tip {
   id             Int      @id @default(autoincrement())
   selectedOption String   @map("selected_option")
-  wildcardGuess  String?  @map("wildcard_guess")   // NEU
+  wildcardGuess  String?  @map("wildcard_guess")
   points         Int?
-  wildcardPoints Int?     @default(0)              @map("wildcard_points")
-  createdAt      DateTime @default(now())          @map("created_at")
-  updatedAt      DateTime @updatedAt               @map("updated_at")
-  eventId        Int      @map("event_id")
-  event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId         Int      @map("user_id")
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wildcardPoints Int?     @default(0) @map("wildcard_points")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  eventId Int   @map("event_id")
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId], name: "unique_tip_per_user_per_event")
   @@map("tips")
 }
 
 model EventComment {
-  id          Int           @id @default(autoincrement())
-  text        String?
-  gifUrl      String?        @map("gif_url")
-  createdAt   DateTime       @default(now())       @map("created_at")
-  updatedAt   DateTime       @updatedAt            @map("updated_at")
-  userId      Int            @map("user_id")
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  eventId     Int            @map("event_id")
-  event       Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  text      String?
+  gifUrl    String?  @map("gif_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  likes       CommentLike[]
-  likesCount  Int            @default(0)           @map("likes_count")
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  eventId Int   @map("event_id")
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  likes      CommentLike[]
+  likesCount Int           @default(0) @map("likes_count")
 
   @@map("event_comments")
 }
 
 model CommentLike {
-  id        Int          @id @default(autoincrement())
-  createdAt DateTime     @default(now())           @map("created_at")
-  userId    Int          @map("user_id")
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   commentId Int          @map("comment_id")
   comment   EventComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
@@ -144,13 +169,15 @@ model CommentLike {
 }
 
 model LeadershipStreak {
-  id             Int       @id @default(autoincrement())
-  groupId        Int       @map("group_id")
-  group          Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  userId         Int       @map("user_id")
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id      Int   @id @default(autoincrement())
+  groupId Int   @map("group_id")
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   becameLeaderOn DateTime  @map("became_leader_on")
-  endedOn        DateTime? @map("ended_on")
+  endedOn        DateTime?
 
   @@unique([groupId, userId, becameLeaderOn], name: "uq_group_user_streak_start")
   @@index([groupId, endedOn], name: "idx_group_active_streak")
@@ -164,8 +191,9 @@ model PushSubscription {
   auth      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("push_subscriptions")
 }
