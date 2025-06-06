@@ -282,9 +282,9 @@ export function SingleOpenEventItem({
 
       {/* Tipp bestätigt */}
       {userHasSubmittedTip && !event.winningOption && (
-        <div className='mt-3 p-3 bg-green-50 border rounded-md text-sm flex gap-2'>
+        <div className='mt-3 p-3 bg-emerald-100 dark:bg-emerald-900 border border-emerald-200 dark:border-emerald-700 rounded-md text-sm flex gap-2 items-center text-foreground'>
           <CheckCircle className='h-5 w-5 flex-shrink-0' />
-          Dein Tipp: „{currentUserTipForThisEvent}“
+          <span>Dein Tipp: „{currentUserTipForThisEvent}“</span>
         </div>
       )}
 
