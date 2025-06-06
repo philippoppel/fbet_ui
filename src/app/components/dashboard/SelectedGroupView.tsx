@@ -35,7 +35,7 @@ export function SelectedGroupView({
   user,
   interactions,
   userSubmittedTips,
-  allTipsPerEvent, // Wird hier empfangen
+  allTipsPerEvent,
   highscoreEntries,
   onDeleteGroup,
   onImageChanged,
@@ -48,30 +48,18 @@ export function SelectedGroupView({
   );
 
   const leaderboardWinner = useMemo((): LeaderboardWinner | null => {
-    if (!highscoreEntries || highscoreEntries.length === 0) {
-      return null;
-    }
-    const sortedScores = [...highscoreEntries].sort(
-      (a, b) => b.points - a.points
-    );
-    const topPlayer = sortedScores[0];
+    if (!highscoreEntries || highscoreEntries.length === 0) return null;
 
-    if (topPlayer && topPlayer.name != null) {
-      const coWinners = sortedScores.filter(
-        (p) => p.points === topPlayer.points
-      );
-      if (coWinners.length > 1) {
-        const names = coWinners
-          .map((p) => p.name)
-          .filter((name) => name != null) as string[];
-        if (names.length > 0) {
-          return { name: names.join(' & ') };
-        }
-      } else {
-        return { name: topPlayer.name };
-      }
+    const sorted = [...highscoreEntries].sort((a, b) => b.points - a.points);
+    const top = sorted[0];
+    if (!top?.name) return null;
+
+    const coWinners = sorted.filter((e) => e.points === top.points);
+    if (coWinners.length > 1) {
+      const names = coWinners.map((e) => e.name!).join(' & ');
+      return { name: names };
     }
-    return null;
+    return { name: top.name };
   }, [highscoreEntries]);
 
   return (
@@ -97,27 +85,29 @@ export function SelectedGroupView({
         resultInputs={interactions.resultInputs}
         isSubmittingTip={interactions.isSubmittingTip}
         isSettingResult={interactions.isSettingResult}
-        onSelectTip={interactions.handleOptionSelect}
-        onSubmitTip={interactions.handleSubmitTip}
-        onResultInputChange={interactions.handleResultInputChange}
-        onSetResult={interactions.handleSetResult}
-        onClearSelectedTip={interactions.handleClearSelectedTip}
-        onInitiateDeleteEvent={interactions.handleInitiateDeleteEvent}
-        onOpenAddEventDialog={() => interactions.setIsAddEventDialogOpen(true)}
-        allTipsPerEvent={allTipsPerEvent} // <<< KORREKTUR HIER: Prop weitergeben
+        onSelectTipAction={interactions.handleOptionSelect}
+        onSubmitTipAction={interactions.handleSubmitTip}
+        onResultInputChangeAction={interactions.handleResultInputChange}
+        onSetResultAction={interactions.handleSetResult}
+        onClearSelectedTipAction={interactions.handleClearSelectedTip}
+        onInitiateDeleteEventAction={interactions.handleInitiateDeleteEvent}
+        onOpenAddEventDialogAction={() =>
+          interactions.setIsAddEventDialogOpen(true)
+        }
+        allTipsPerEvent={allTipsPerEvent}
       />
 
       <SubmittedOpenEventsCard
         events={events}
         user={user}
         groupCreatedBy={group.createdById}
-        onInitiateDeleteEvent={interactions.handleInitiateDeleteEvent}
+        onInitiateDeleteEventAction={interactions.handleInitiateDeleteEvent}
         userSubmittedTips={userSubmittedTips}
         allTipsPerEvent={allTipsPerEvent}
         resultInputs={interactions.resultInputs}
         isSettingResult={interactions.isSettingResult}
-        onResultInputChange={interactions.handleResultInputChange}
-        onSetResult={interactions.handleSetResult}
+        onResultInputChangeAction={interactions.handleResultInputChange}
+        onSetResultAction={interactions.handleSetResult}
       />
 
       <ClosedEventsCard

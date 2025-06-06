@@ -1,4 +1,3 @@
-// src/app/components/dashboard/OpenEventsCard.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -6,7 +5,7 @@ import type {
   Event as GroupEvent,
   UserOut,
   AllTipsPerEvent,
-} from '@/app/lib/types'; // AllTipsPerEvent importiert
+} from '@/app/lib/types';
 import {
   Card,
   CardContent,
@@ -27,43 +26,43 @@ interface OpenEventsCardProps {
   events: GroupEvent[];
   user: UserOut | null | undefined;
   groupCreatedBy: number | null | undefined;
-  onInitiateDeleteEvent: (event: GroupEvent) => void;
+  onInitiateDeleteEventAction: (event: GroupEvent) => void;
   selectedTips: Record<number, string>;
   userSubmittedTips: Record<number, string>;
   resultInputs: Record<number, string>;
   isSubmittingTip: Record<number, boolean>;
   isSettingResult: Record<number, boolean>;
-  allTipsPerEvent: AllTipsPerEvent; // NEUE PROP
-  onSelectTip: (eventId: number, option: string) => void;
-  onSubmitTip: (eventId: number) => Promise<void>;
-  onResultInputChange: (eventId: number, value: string) => void;
-  onSetResult: (eventId: number, winningOption: string) => Promise<void>;
-  onClearSelectedTip: (eventId: number) => void;
-  onOpenAddEventDialog: () => void;
+  allTipsPerEvent: AllTipsPerEvent;
+  onSelectTipAction: (eventId: number, option: string) => void;
+  onSubmitTipAction: (eventId: number) => Promise<void>;
+  onResultInputChangeAction: (eventId: number, value: string) => void;
+  onSetResultAction: (eventId: number, winningOption: string) => Promise<void>;
+  onClearSelectedTipAction: (eventId: number) => void;
+  onOpenAddEventDialogAction: () => void;
 }
 
 export default function OpenEventsCard({
   events,
   user,
   groupCreatedBy,
-  onInitiateDeleteEvent,
+  onInitiateDeleteEventAction,
   selectedTips,
   userSubmittedTips,
   resultInputs,
   isSubmittingTip,
   isSettingResult,
-  allTipsPerEvent, // NEUE PROP empfangen
-  onSelectTip,
-  onSubmitTip,
-  onResultInputChange,
-  onSetResult,
-  onClearSelectedTip,
-  onOpenAddEventDialog,
+  allTipsPerEvent,
+  onSelectTipAction,
+  onSubmitTipAction,
+  onResultInputChangeAction,
+  onSetResultAction,
+  onClearSelectedTipAction,
+  onOpenAddEventDialogAction,
 }: OpenEventsCardProps) {
   const [isOpen, setIsOpen] = useState(true);
 
   const eventsToDisplay = events.filter(
-    (event) => event && !event.winningOption && !userSubmittedTips[event.id]
+    (e) => e && !e.winningOption && !userSubmittedTips[e.id]
   );
 
   return (
@@ -79,7 +78,7 @@ export default function OpenEventsCard({
           <div className='flex gap-2 items-center'>
             {user && (
               <Button
-                onClick={onOpenAddEventDialog}
+                onClick={onOpenAddEventDialogAction}
                 variant='outline'
                 size='sm'
                 className='flex items-center gap-1.5 sm:gap-2 text-primary hover:bg-primary/10 hover:text-primary border-primary/40'
@@ -128,18 +127,20 @@ export default function OpenEventsCard({
                     event={event}
                     user={user}
                     groupCreatedBy={groupCreatedBy}
-                    onInitiateDeleteEvent={onInitiateDeleteEvent}
+                    onInitiateDeleteEventAction={onInitiateDeleteEventAction}
                     selectedTips={selectedTips}
                     userSubmittedTips={userSubmittedTips}
                     resultInputs={resultInputs}
                     isSubmittingTip={isSubmittingTip}
                     isSettingResult={isSettingResult}
-                    onSelectTip={onSelectTip}
-                    onSubmitTip={onSubmitTip}
-                    onResultInputChange={onResultInputChange}
-                    onSetResult={onSetResult}
-                    onClearSelectedTip={onClearSelectedTip}
-                    allTipsForThisEvent={allTipsPerEvent[event.id] || []} // NEU: Prop übergeben
+                    onSelectTipAction={onSelectTipAction}
+                    onSubmitTipAction={onSubmitTipAction}
+                    onResultInputChangeAction={onResultInputChangeAction}
+                    onSetResultAction={onSetResultAction}
+                    onClearSelectedTipAction={onClearSelectedTipAction}
+                    allTipsForThisEvent={allTipsPerEvent[event.id] || []}
+                    wildcardInputs={{}}
+                    onWildcardInputChangeAction={() => {}}
                   />
                 </div>
               ))
