@@ -110,8 +110,16 @@ export async function POST(req: NextRequest) {
           let pts = 0;
           let wpts = 0;
           if (normal) pts = bp;
-          if (wcOK) wpts = bp;
-          if (normal && wcOK) pts = bp * 2;
+          if (normal && wcOK) {
+            pts = bp * 2;
+            wpts = bp; // oder wpts = bp * 2 → je nach Anzeige
+          } else if (normal) {
+            pts = bp;
+            wpts = 0;
+          } else {
+            pts = 0;
+            wpts = 0;
+          }
 
           return tx.tip.update({
             where: { id: t.id },
