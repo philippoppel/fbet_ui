@@ -37,98 +37,77 @@ import { EventList } from '@/app/components/dashboard/EventList';
 import { useDashboardData } from '@/app/hooks/useDashboardData';
 import type { AiEventPayload } from '@/app/components/event/EventCard';
 
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
 const extractAIFields = (text: string): Partial<AddEventFormData> => {
   const lines = text
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
+
   let title = '',
     question = '',
     description = '';
-  let options: string[] = [];
-  let parsingState: 'none' | 'options' | 'description' = 'none';
+  const options: string[] = [];
+  let state: 'none' | 'options' | 'description' = 'none';
 
-  for (const line of lines) {
-    const lowerLine = line.toLowerCase();
-    if (lowerLine.startsWith('titel:')) {
+  lines.forEach((line) => {
+    const lower = line.toLowerCase();
+    if (lower.startsWith('titel:')) {
       title = line
-        .substring(line.indexOf(':') + 1)
+        .slice(line.indexOf(':') + 1)
         .trim()
         .replace(/^"|"$/g, '');
-      parsingState = 'none';
-    } else if (lowerLine.startsWith('frage:')) {
+      state = 'none';
+    } else if (lower.startsWith('frage:')) {
       question = line
-        .substring(line.indexOf(':') + 1)
+        .slice(line.indexOf(':') + 1)
         .trim()
         .replace(/^"|"$/g, '');
-      parsingState = 'none';
-    } else if (lowerLine.startsWith('optionen:')) {
-      parsingState = 'options';
-    } else if (lowerLine.startsWith('beschreibung:')) {
-      description = line.substring(line.indexOf(':') + 1).trim();
-      parsingState = 'description';
-    } else if (parsingState === 'options') {
-      if (line.match(/^(\*|\-|\d+\.|[A-Z]\))\s+/)) {
-        options.push(line.replace(/^(\*|\-|\d+\.|[A-Z]\))\s*/, '').trim());
-      } else if (
-        line.length > 0 &&
-        !['titel:', 'frage:', 'beschreibung:', 'optionen:'].some((kw) =>
-          lowerLine.startsWith(kw)
-        )
-      ) {
-        options.push(line.trim());
-      } else if (
-        ['titel:', 'frage:', 'beschreibung:'].some((kw) =>
-          lowerLine.startsWith(kw)
-        )
-      ) {
-        parsingState = 'none';
-      }
-    } else if (parsingState === 'description') {
-      if (
-        !['titel:', 'frage:', 'optionen:'].some((kw) =>
-          lowerLine.startsWith(kw)
-        )
-      ) {
-        description += '\n' + line;
-      } else {
-        parsingState = 'none';
-      }
+      state = 'none';
+    } else if (lower.startsWith('optionen:')) {
+      state = 'options';
+    } else if (lower.startsWith('beschreibung:')) {
+      description = line.slice(line.indexOf(':') + 1).trim();
+      state = 'description';
+    } else if (state === 'options') {
+      options.push(line.replace(/^(\*|\-|\d+\.|[A-Z]\))\s*/, '').trim());
+    } else if (state === 'description') {
+      description += `\n${line}`;
     }
-  }
+  });
+
   return {
     title: title.trim(),
-    question: question.trim() || title.trim(),
+    question: (question || title).trim(),
     description: description.trim(),
     options: options.join('\n'),
   };
 };
 
-const getDefaultDeadlineString = (eventDateInput?: Date): string => {
+const getDefaultDeadlineString = (eventDate?: Date): string => {
   const now = new Date();
-  let deadlineDate: Date;
+  let deadline =
+    eventDate && eventDate > now ? new Date(eventDate) : new Date();
 
-  if (eventDateInput && eventDateInput.getTime() > now.getTime()) {
-    deadlineDate = new Date(eventDateInput);
-  } else {
-    deadlineDate = new Date(now);
-    if (eventDateInput && eventDateInput.getTime() <= now.getTime()) {
-      deadlineDate.setDate(deadlineDate.getDate() + 7);
-    } else if (!eventDateInput) {
-      deadlineDate.setDate(deadlineDate.getDate() + 1);
-    }
-    deadlineDate.setHours(23, 59, 0, 0);
+  if (deadline <= now) {
+    deadline.setDate(deadline.getDate() + 1);
+    deadline.setHours(23, 59, 0, 0);
   }
 
-  const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-  if (deadlineDate.getTime() < twoHoursFromNow.getTime()) {
-    deadlineDate = twoHoursFromNow;
-  }
+  const minDeadline = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  if (deadline < minDeadline) deadline = minDeadline;
 
-  const offset = deadlineDate.getTimezoneOffset();
-  const localDeadline = new Date(deadlineDate.getTime() - offset * 60000);
-  return localDeadline.toISOString().slice(0, 16);
+  return new Date(deadline.getTime() - deadline.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
 };
+
+/* -------------------------------------------------------------------------- */
+/* Props                                                                      */
+/* -------------------------------------------------------------------------- */
 
 type AddEventDialogProps = {
   groupName: string;
@@ -139,6 +118,10 @@ type AddEventDialogProps = {
   triggerProps?: ButtonProps & { children?: React.ReactNode };
 };
 
+/* -------------------------------------------------------------------------- */
+/* Component                                                                  */
+/* -------------------------------------------------------------------------- */
+
 export function AddEventDialog({
   groupName,
   open,
@@ -148,15 +131,19 @@ export function AddEventDialog({
   triggerProps,
 }: AddEventDialogProps) {
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [internalSuggestions, setInternalSuggestions] = useState<MixedEvent[]>(
-    []
-  );
+  const [suggestions, setSuggestions] = useState<MixedEvent[]>([]);
+
   const {
     retrievedCombinedEvents,
     loadCombinedEvents,
     isLoadingCombinedEvents,
-    errors: dashboardErrors,
+    errors,
   } = useDashboardData();
+
+  /* ---------- Helpers ---------- */
+
+  const textareaBase =
+    'flex w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring resize-none';
 
   const triggerTextareaResize = useCallback(() => {
     setTimeout(() => {
@@ -164,18 +151,13 @@ export function AddEventDialog({
         .querySelectorAll(
           'textarea[data-react-textarea-autosize="true"], input[type="datetime-local"]'
         )
-        .forEach((el) => {
-          const event = new Event('input', { bubbles: true });
-          try {
-            el.dispatchEvent(event);
-          } catch (e) {
-            /* ignore */
-          }
-        });
-    }, 0);
+        .forEach((el) =>
+          el.dispatchEvent(new Event('input', { bubbles: true }))
+        );
+    });
   }, []);
 
-  const resetFormToDefaults = useCallback(() => {
+  const resetForm = useCallback(() => {
     form.reset({
       title: '',
       description: '',
@@ -186,56 +168,54 @@ export function AddEventDialog({
     triggerTextareaResize();
   }, [form, triggerTextareaResize]);
 
+  /* ---------- Effects ---------- */
+
   useEffect(() => {
     if (open) {
       if (
         retrievedCombinedEvents.length === 0 &&
         !isLoadingCombinedEvents &&
-        !dashboardErrors.combinedEvents
+        !errors.combinedEvents
       ) {
         loadCombinedEvents();
       }
-      setInternalSuggestions(retrievedCombinedEvents);
+      setSuggestions(retrievedCombinedEvents);
     }
   }, [
     open,
     retrievedCombinedEvents,
-    loadCombinedEvents,
     isLoadingCombinedEvents,
-    dashboardErrors.combinedEvents,
+    errors.combinedEvents,
+    loadCombinedEvents,
   ]);
 
-  const processAndApplyAiSuggestion = (
-    aiResponseData: any,
-    successMessage: string
-  ) => {
-    const aiBetText =
-      aiResponseData.message || aiResponseData.generated_bet_text || '';
-    const suggestion = extractAIFields(aiBetText);
+  /* ---------- AI ---------- */
 
-    if (!suggestion.title && !suggestion.question) {
-      toast.error('AI konnte keine gültige Wette erzeugen.', {
-        description: 'Das Format der AI-Antwort war unerwartet.',
-      });
+  const applyAiSuggestion = (data: any, msg: string) => {
+    const extracted = extractAIFields(
+      data.message || data.generated_bet_text || ''
+    );
+    if (!extracted.title && !extracted.question) {
+      toast.error('AI lieferte kein verwertbares Ergebnis');
       return;
     }
 
-    const eventDateForDeadline = aiResponseData.event_bet_on?.date
-      ? new Date(aiResponseData.event_bet_on.date)
+    const deadlineDate = data.event_bet_on?.date
+      ? new Date(data.event_bet_on.date)
       : undefined;
 
     form.reset({
-      title: suggestion.title || '',
-      question: suggestion.question || suggestion.title || '',
-      description: suggestion.description || '',
-      options: suggestion.options || '',
-      tippingDeadline: getDefaultDeadlineString(eventDateForDeadline),
+      title: extracted.title ?? '',
+      question: extracted.question ?? '',
+      description: extracted.description ?? '',
+      options: extracted.options ?? '',
+      tippingDeadline: getDefaultDeadlineString(deadlineDate),
     });
     triggerTextareaResize();
-    toast.success(successMessage);
+    toast.success(msg);
   };
 
-  const handleAiGenerateForSpecificEvent = async (payload: AiEventPayload) => {
+  const handleAiGenerate = async (payload: AiEventPayload) => {
     setIsAiLoading(true);
     try {
       const res = await fetch('/api/generate-ai-bet', {
@@ -243,132 +223,110 @@ export function AddEventDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        toast.error('API-Fehler beim Generieren der Wette für dieses Event.', {
-          description: errorData.error || `Status: ${res.status}`,
-        });
-        throw new Error(errorData.error || `API-Fehler: ${res.status}`);
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Status: ${res.status}`);
       }
-      const data = await res.json();
-      processAndApplyAiSuggestion(
-        data,
-        'AI-Vorschlag für ausgewähltes Event eingefügt!'
-      );
-    } catch (error: any) {
-      console.error('Fehler bei AI-Wette für spezifisches Event:', error);
-      toast.error('Fehler bei der AI-Wette für spezifisches Event.', {
-        description: error.message || 'Ein unbekannter Fehler ist aufgetreten.',
-      });
+      applyAiSuggestion(await res.json(), 'AI-Vorschlag übernommen');
+    } catch (e: any) {
+      toast.error('AI-Fehler', { description: e.message });
     } finally {
       setIsAiLoading(false);
     }
   };
 
-  const handleSuggestionClick = (suggestedEventId: string) => {
-    const eventToUse = internalSuggestions.find(
-      (e) => e.id === suggestedEventId
-    );
-    if (!eventToUse) {
-      toast.error('Fehler bei Übernahme des Vorschlags.');
-      return;
-    }
+  /* ---------- Suggestion click ---------- */
 
-    let title = eventToUse.title;
-    let description = `Vorgeschlagenes Event: ${title}`;
+  const handleSuggestionClick = (id: string) => {
+    const ev = suggestions.find((s) => s.id === id);
+    if (!ev) return toast.error('Vorschlag nicht gefunden');
+
+    let title = ev.title;
     let question = 'Wer gewinnt?';
-    let optionsArray: string[] = [];
+    let desc = `Vorgeschlagenes Event: ${title}`;
+    let opts: string[] = [];
 
-    if (eventToUse.sport === 'ufc' && eventToUse.original) {
-      const ufcItem = eventToUse.original as UfcEventItem;
-      question = `Wer gewinnt den Kampf: ${ufcItem.summary || title}?`;
-      const fighters = ufcItem.summary?.split(' vs ');
-      optionsArray =
-        fighters && fighters.length === 2
+    if (ev.sport === 'ufc' && ev.original) {
+      const u = ev.original as UfcEventItem;
+      question = `Wer gewinnt den Kampf: ${u.summary || title}?`;
+      const fighters = u.summary?.split(' vs ');
+      opts =
+        fighters?.length === 2
           ? [`${fighters[0].trim()} gewinnt`, `${fighters[1].trim()} gewinnt`]
           : ['Kämpfer 1 gewinnt', 'Kämpfer 2 gewinnt'];
-      description = `UFC Event: ${ufcItem.summary || title}\nOrt: ${ufcItem.location || 'N/A'}\nDatum: ${eventToUse.date.toLocaleString('de-DE')}`;
-    } else if (eventToUse.sport === 'boxing' && eventToUse.original) {
-      const boxingItem = eventToUse.original as BoxingScheduleItem;
-      question = `Wer gewinnt den Boxkampf: ${boxingItem.details || title}?`;
-      const fighters = boxingItem.details?.split(' vs ');
-      optionsArray =
-        fighters && fighters.length === 2
+      desc = `UFC: ${u.summary}\nOrt: ${u.location}\nDatum: ${ev.date.toLocaleString('de-DE')}`;
+    } else if (ev.sport === 'boxing' && ev.original) {
+      const b = ev.original as BoxingScheduleItem;
+      question = `Wer gewinnt den Boxkampf: ${b.details}?`;
+      const fighters = b.details?.split(' vs ');
+      opts =
+        fighters?.length === 2
           ? [
               `${fighters[0].trim()} gewinnt`,
               `${fighters[1].trim()} gewinnt`,
               'Unentschieden',
             ]
           : ['Boxer 1 gewinnt', 'Boxer 2 gewinnt', 'Unentschieden'];
-      description = `Boxkampf: ${boxingItem.details || title}\nOrt: ${boxingItem.location || 'N/A'}${boxingItem.broadcaster ? `, Übertragung: ${boxingItem.broadcaster}` : ''}\nDatum: ${eventToUse.date.toLocaleString('de-DE')}`;
-    } else if (eventToUse.sport === 'football' && eventToUse.original) {
-      const footballItem = eventToUse.original as FootballEvent;
-      question = `Wie endet das Spiel ${footballItem.homeTeam} vs ${footballItem.awayTeam}?`;
-      optionsArray = [
-        `${footballItem.homeTeam} gewinnt`,
-        `${footballItem.awayTeam} gewinnt`,
+      desc = `Boxen: ${b.details}\nOrt: ${b.location}`;
+    } else if (ev.sport === 'football' && ev.original) {
+      const f = ev.original as FootballEvent;
+      question = `Wie endet ${f.homeTeam} vs ${f.awayTeam}?`;
+      opts = [
+        `${f.homeTeam} gewinnt`,
+        `${f.awayTeam} gewinnt`,
         'Unentschieden',
       ];
-      description = `Fußballspiel: ${title}\nWettbewerb: ${footballItem.competition}\nDatum: ${eventToUse.date.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })}`;
+      desc = `Fußballspiel: ${title}\nWettbewerb: ${f.competition}`;
     } else {
-      optionsArray = ['Option 1', 'Option 2'];
+      opts = ['Option 1', 'Option 2'];
     }
 
     form.reset({
       title: title.slice(0, 250),
       question: question.slice(0, 250),
-      options: optionsArray.join('\n'),
-      description: description.slice(0, 500),
-      tippingDeadline: getDefaultDeadlineString(eventToUse.date),
+      description: desc.slice(0, 500),
+      options: opts.join('\n'),
+      tippingDeadline: getDefaultDeadlineString(ev.date),
     });
     triggerTextareaResize();
-    toast.success('Vorschlag übernommen', {
-      description: `"${title}" wurde ins Formular eingetragen. Deadline: ${form.getValues('tippingDeadline').replace('T', ' ')}`,
-    });
+    toast.success('Vorschlag übernommen');
   };
 
-  const defaultTrigger = (
+  /* ---------- UI ---------- */
+
+  const triggerDefault = (
     <Button size='sm' variant='outline' className='whitespace-nowrap'>
       <PlusCircle className='mr-2 h-4 w-4' /> Neue Wette vorschlagen
     </Button>
   );
 
-  const textareaBaseClasses =
-    'flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none';
-
   return (
     <Dialog
       open={open}
-      onOpenChange={(isOpen) => {
-        setOpen(isOpen);
-        if (!isOpen) resetFormToDefaults();
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) resetForm();
       }}
     >
       <DialogTrigger asChild>
         {triggerProps ? (
           <Button {...triggerProps} variant={triggerProps.variant || 'default'}>
-            {triggerProps.children || (
-              <>
-                <PlusCircle className='mr-2 h-4 w-4' /> Neues Event
-              </>
-            )}
+            {triggerProps.children}
           </Button>
         ) : (
-          defaultTrigger
+          triggerDefault
         )}
       </DialogTrigger>
 
       <DialogContent className='sm:max-w-[640px] max-h-[90vh] flex flex-col'>
-        <DialogHeader className='flex-shrink-0'>
-          <DialogTitle>Neues Event für „{groupName}“ erstellen</DialogTitle>
+        <DialogHeader>
+          <DialogTitle>Neues Event für „{groupName}“</DialogTitle>
           <DialogDescription>
-            Fülle die Felder manuell aus oder wähle ein Event aus der Liste, um
-            einen AI-Vorschlag dafür zu erhalten oder es direkt zu übernehmen.
+            Trage die Details ein oder übernimm einen Vorschlag.
           </DialogDescription>
         </DialogHeader>
 
-        <div className='flex-grow overflow-y-auto px-1 pr-3 scrollbar-thin scrollbar-thumb-muted-foreground/50 scrollbar-track-transparent'>
+        <div className='flex-grow overflow-y-auto px-1 pr-3'>
           <div className='px-6 py-4'>
             <Form {...form}>
               <form
@@ -376,18 +334,18 @@ export function AddEventDialog({
                 className='space-y-6'
                 onSubmit={form.handleSubmit(onSubmit)}
               >
+                {/* Titel */}
                 <FormField
                   control={form.control}
                   name='title'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Titel des Events</FormLabel>
+                      <FormLabel>Titel</FormLabel>
                       <FormControl>
                         <TextareaAutosize
-                          placeholder='z.B. Nächstes F1 Rennen, Bundesliga Spieltag'
                           minRows={1}
                           maxRows={3}
-                          className={textareaBaseClasses}
+                          className={textareaBase}
                           {...field}
                         />
                       </FormControl>
@@ -395,18 +353,19 @@ export function AddEventDialog({
                     </FormItem>
                   )}
                 />
+
+                {/* Beschreibung */}
                 <FormField
                   control={form.control}
                   name='description'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Beschreibung (Optional)</FormLabel>
+                      <FormLabel>Beschreibung</FormLabel>
                       <FormControl>
                         <TextareaAutosize
-                          placeholder='Weitere Details, Regeln oder Kontext zum Event'
                           minRows={2}
                           maxRows={5}
-                          className={textareaBaseClasses}
+                          className={textareaBase}
                           {...field}
                         />
                       </FormControl>
@@ -414,19 +373,20 @@ export function AddEventDialog({
                     </FormItem>
                   )}
                 />
-                <div className='grid md:grid-cols-2 gap-x-4 gap-y-6'>
+
+                <div className='grid md:grid-cols-2 gap-4'>
+                  {/* Frage */}
                   <FormField
                     control={form.control}
                     name='question'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tipp-Frage</FormLabel>
+                        <FormLabel>Frage</FormLabel>
                         <FormControl>
                           <TextareaAutosize
-                            placeholder='Wer gewinnt? Wie lautet das Ergebnis?'
                             minRows={1}
                             maxRows={3}
-                            className={textareaBaseClasses}
+                            className={textareaBase}
                             {...field}
                           />
                         </FormControl>
@@ -434,124 +394,115 @@ export function AddEventDialog({
                       </FormItem>
                     )}
                   />
+
+                  {/* Optionen */}
                   <FormField
                     control={form.control}
                     name='options'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Antwort-Optionen</FormLabel>
+                        <FormLabel>Optionen</FormLabel>
                         <FormControl>
                           <TextareaAutosize
-                            placeholder={'Option 1\nOption 2\n...'}
                             minRows={3}
                             maxRows={6}
-                            className={`${textareaBaseClasses} whitespace-pre-wrap`}
+                            placeholder='Option 1\nOption 2'
+                            className={`${textareaBase} whitespace-pre-wrap`}
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          Eine Option pro Zeile (mind. 2).
+                          Eine Option pro Zeile (mind. 2)
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+
+                {/* Deadline */}
                 <FormField
                   control={form.control}
                   name='tippingDeadline'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipp-Deadline</FormLabel>
+                      <FormLabel>Deadline</FormLabel>
                       <FormControl>
-                        <Input
-                          type='datetime-local'
-                          className='block w-full border-input'
-                          {...field}
-                        />
+                        <Input type='datetime-local' {...field} />
                       </FormControl>
-                      <FormDescription>
-                        Bis wann dürfen Tipps abgegeben werden?
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </form>
             </Form>
+
+            {/* Vorschläge & AI */}
             <div className='mt-8 pt-6 border-t'>
               <h3 className='text-lg font-semibold mb-4 flex items-center gap-2'>
-                <Sparkles className='w-5 h-5 text-purple-500' />{' '}
-                Event-Vorschläge & AI-Assistenz
+                <Sparkles className='w-5 h-5 text-purple-500' /> Vorschläge & AI
               </h3>
+
               {isLoadingCombinedEvents && (
                 <div className='flex items-center justify-center py-4 text-muted-foreground'>
-                  <Loader2 className='h-5 w-5 animate-spin mr-2' /> Lade
-                  Vorschläge...
+                  <Loader2 className='h-5 w-5 animate-spin mr-2' /> Lade …
                 </div>
               )}
-              {dashboardErrors.combinedEvents && !isLoadingCombinedEvents && (
-                <div className='my-4 rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive'>
+
+              {errors.combinedEvents && !isLoadingCombinedEvents && (
+                <div className='my-4 rounded-md border bg-destructive/10 p-4 text-destructive text-sm'>
                   <div className='flex items-start gap-3'>
-                    <AlertTriangle className='h-5 w-5 flex-shrink-0' />
+                    <AlertTriangle className='h-5 w-5' />
                     <div>
-                      <p className='font-semibold mb-1'>
+                      <p className='font-semibold'>
                         Fehler beim Laden der Vorschläge
                       </p>
-                      <p className='text-xs mb-3'>
-                        {dashboardErrors.combinedEvents}
-                      </p>
+                      <p className='text-xs mb-3'>{errors.combinedEvents}</p>
                       <Button
                         variant='outline'
                         size='sm'
                         onClick={loadCombinedEvents}
-                        disabled={isLoadingCombinedEvents}
-                        className='border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive'
                       >
-                        {isLoadingCombinedEvents && (
-                          <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                        )}{' '}
                         Erneut versuchen
                       </Button>
                     </div>
                   </div>
                 </div>
               )}
+
               {!isLoadingCombinedEvents &&
-                !dashboardErrors.combinedEvents &&
-                internalSuggestions.length === 0 && (
+                !errors.combinedEvents &&
+                suggestions.length === 0 && (
                   <p className='text-sm text-muted-foreground text-center py-4'>
-                    Keine externen Event-Vorschläge für den aktuellen Zeitraum
-                    gefunden.
+                    Keine Vorschläge vorhanden
                   </p>
                 )}
-              {!isLoadingCombinedEvents &&
-                !dashboardErrors.combinedEvents &&
-                internalSuggestions.length > 0 && (
-                  <div className='overflow-y-auto pr-1 max-h-[250px] sm:max-h-[300px] space-y-3 scrollbar-thin scrollbar-thumb-muted-foreground/50 scrollbar-track-transparent'>
-                    <EventList
-                      events={internalSuggestions}
-                      onProposeEvent={handleSuggestionClick}
-                      onCardAiCreate={handleAiGenerateForSpecificEvent}
-                      disabled={
-                        form.formState.isSubmitting ||
-                        isAiLoading ||
-                        isLoadingCombinedEvents
-                      }
-                    />
-                  </div>
-                )}
+
+              {suggestions.length > 0 && (
+                <div className='overflow-y-auto pr-1 max-h-[300px] space-y-3'>
+                  <EventList
+                    events={suggestions}
+                    onProposeEvent={handleSuggestionClick}
+                    onCardAiCreate={handleAiGenerate}
+                    disabled={
+                      form.formState.isSubmitting ||
+                      isAiLoading ||
+                      isLoadingCombinedEvents
+                    }
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <DialogFooter className='flex-shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end items-center gap-2 pt-4 border-t mt-auto px-6 pb-6'>
-          {/* Der Button für "Zufälliger AI Vorschlag" wurde entfernt */}
+        <DialogFooter className='mt-auto border-t pt-4 px-6 flex flex-col-reverse sm:flex-row gap-2'>
           <DialogClose asChild>
-            <Button type='button' variant='ghost' className='w-full sm:w-auto'>
+            <Button variant='ghost' className='w-full sm:w-auto'>
               Abbrechen
             </Button>
           </DialogClose>
+
           <Button
             type='submit'
             form='add-event-form'
@@ -565,9 +516,7 @@ export function AddEventDialog({
             {form.formState.isSubmitting && (
               <Loader2 className='h-4 w-4 mr-2 animate-spin' />
             )}
-            {form.formState.isSubmitting
-              ? 'Erstelle Event…'
-              : 'Event erstellen'}
+            {form.formState.isSubmitting ? 'Erstelle …' : 'Event erstellen'}
           </Button>
         </DialogFooter>
       </DialogContent>

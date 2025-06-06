@@ -1,194 +1,129 @@
-// src/app/api/services/eventService.ts
-import { Prisma } from '@prisma/client';
-import type { Event as PrismaEventFromPrismaClient } from '@prisma/client'; // Behalte diesen Alias für Klarheit
+import { Prisma, Event as PrismaEvent } from '@prisma/client';
 import { prisma } from '@/app/api/lib/prisma';
-
-import type {
+import {
   EventCreate as AppEventCreate,
   EventPointDetail,
-  Event as ClientEvent, // Dein Frontend-Event-Typ
-  UserOut, // Importiere UserOut für den Creator-Typ
+  Event as ClientEvent,
+  UserOut,
 } from '@/app/lib/types';
 import { sendNewEventNotificationsToGroupMembers } from '@/app/api/services/notificationService';
 
 export async function getEventsForGroup(
   groupId: number
 ): Promise<ClientEvent[]> {
-  console.log(
-    `[eventService] Getting events for groupId: ${groupId} including tip and creator details.`
-  );
-  const eventsFromDb = await prisma.event.findMany({
+  const events = await prisma.event.findMany({
     where: { groupId },
-    orderBy: {
-      createdAt: 'desc',
-    },
+    orderBy: { createdAt: 'desc' },
     include: {
       tips: {
-        // Beibehaltung der Tip-Details
         select: {
           userId: true,
           selectedOption: true,
           points: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
+          wildcardGuess: true,
+          wildcardPoints: true,
+          user: { select: { id: true, name: true, email: true } },
         },
       },
-      creator: {
-        // NEU: Creator-Informationen mitladen
-        select: {
-          id: true,
-          name: true,
-          // email: true, // Füge Email hinzu, falls UserOut es für creator benötigt
-        },
-      },
-    },
-  });
-
-  return eventsFromDb.map((event) => {
-    const awardedPoints: EventPointDetail[] = event.tips.map((tip) => {
-      let userName = `User ${tip.userId}`;
-      if (tip.user.name && tip.user.name.trim() !== '') {
-        userName = tip.user.name.trim();
-      } else if (tip.user.email) {
-        userName = tip.user.email.split('@')[0];
-      }
-      return {
-        userId: tip.userId,
-        userName,
-        selectedOption: tip.selectedOption,
-        points: tip.points,
-      };
-    });
-
-    // Stelle sicher, dass prismaOptions korrekt behandelt wird
-    const prismaOptions = event.options;
-    const clientOptions =
-      Array.isArray(prismaOptions) &&
-      prismaOptions.every((opt) => typeof opt === 'string')
-        ? (prismaOptions as string[])
-        : Array.isArray(prismaOptions) && prismaOptions.length === 0 // Leeres Array ist auch gültig
-          ? []
-          : null; // Oder [] wenn null nicht erlaubt ist laut ClientEvent
-
-    // Destrukturieren, nachdem prismaOptions extrahiert wurde
-    const { tips, options, creator, ...eventData } = event;
-
-    // Erstelle das Creator-Objekt gemäß der Definition in ClientEvent (Pick<UserOut, 'id' | 'name'>)
-    const eventCreator: Pick<UserOut, 'id' | 'name'> = {
-      id: creator.id,
-      name: creator.name,
-    };
-
-    return {
-      ...eventData,
-      options: clientOptions,
-      awardedPoints,
-      creator: eventCreator, // NEU: Creator-Objekt hinzufügen
-    };
-  });
-}
-
-// ... (Rest der Datei bleibt gleich)
-
-export async function getEventById(
-  eventId: number
-): Promise<PrismaEventFromPrismaClient | null> {
-  return prisma.event.findUnique({
-    where: { id: eventId },
-    include: {
-      // Optional: Creator hier auch mitladen, falls benötigt
-      creator: {
-        select: { id: true, name: true },
-      },
-    },
-  });
-}
-
-export async function createEvent(
-  eventData: AppEventCreate,
-  creatorId: number
-): Promise<PrismaEventFromPrismaClient> {
-  // Rückgabetyp könnte auch ClientEvent sein, wenn Transformation gewünscht
-  const dataToCreate: Prisma.EventCreateInput = {
-    title: eventData.title,
-    description: eventData.description,
-    question: eventData.question,
-    options: eventData.options as Prisma.JsonArray,
-    group: { connect: { id: eventData.group_id } },
-    creator: { connect: { id: creatorId } },
-    tippingDeadline: eventData.tippingDeadline
-      ? new Date(eventData.tippingDeadline)
-      : undefined,
-  };
-
-  const newEvent = await prisma.event.create({
-    data: dataToCreate,
-    include: {
-      // Wichtig, um den Creator für die Benachrichtigung und ggf. Rückgabe zu haben
       creator: { select: { id: true, name: true } },
     },
   });
 
-  if (newEvent) {
-    prisma.group
-      .findUnique({ where: { id: newEvent.groupId } })
-      .then((group) => {
-        if (group) {
-          const eventWithDetailsForNotification = {
-            ...newEvent,
-            groupName: group.name,
-            // creatorName: newEvent.creator.name, // newEvent.creator ist jetzt verfügbar
-          };
-          sendNewEventNotificationsToGroupMembers(
-            eventWithDetailsForNotification,
-            creatorId
-          ).catch((err) =>
-            console.error(
-              '[EventService] Error in sendNewEventNotificationsToGroupMembers:',
-              err
-            )
-          );
-        } else {
-          console.error(
-            `[EventService] Group not found for event ${newEvent.id} during notification dispatch.`
-          );
-        }
-      })
-      .catch((err) =>
-        console.error(
-          '[EventService] Error fetching group for notification dispatch:',
-          err
-        )
-      );
+  return events.map((e) => {
+    const awardedPoints: EventPointDetail[] = e.tips.map((t) => ({
+      userId: t.userId,
+      userName:
+        t.user.name?.trim() ||
+        t.user.email?.split('@')[0] ||
+        `User ${t.userId}`,
+      selectedOption: t.selectedOption,
+      wildcardGuess: t.wildcardGuess,
+      points: t.points,
+      wildcardPoints: t.wildcardPoints,
+    }));
+
+    const options =
+      Array.isArray(e.options) && e.options.every((o) => typeof o === 'string')
+        ? (e.options as string[])
+        : [];
+
+    const { tips, options: _, creator, ...rest } = e;
+
+    return {
+      ...rest,
+      options,
+      awardedPoints,
+      creator: { id: creator.id, name: creator.name } as Pick<
+        UserOut,
+        'id' | 'name'
+      >,
+      hasWildcard: e.hasWildcard,
+      wildcardType: e.wildcardType,
+      wildcardPrompt: e.wildcardPrompt,
+      wildcardAnswer: e.wildcardAnswer,
+    };
+  });
+}
+
+export function getEventById(id: number): Promise<PrismaEvent | null> {
+  return prisma.event.findUnique({
+    where: { id },
+    include: { creator: { select: { id: true, name: true } } },
+  });
+}
+
+export async function createEvent(
+  data: AppEventCreate,
+  creatorId: number
+): Promise<PrismaEvent> {
+  const newEvent = await prisma.event.create({
+    data: {
+      title: data.title,
+      description: data.description,
+      question: data.question,
+      options: data.options as Prisma.JsonArray,
+      tippingDeadline: data.tippingDeadline
+        ? new Date(data.tippingDeadline)
+        : null,
+      hasWildcard: data.has_wildcard ?? false,
+      wildcardType: data.wildcard_type ?? null,
+      wildcardPrompt: data.wildcard_prompt ?? null,
+      group: { connect: { id: data.group_id } },
+      creator: { connect: { id: creatorId } },
+    },
+    include: { creator: { select: { id: true, name: true } } },
+  });
+
+  const group = await prisma.group.findUnique({
+    where: { id: newEvent.groupId },
+    select: { name: true },
+  });
+
+  if (group) {
+    await sendNewEventNotificationsToGroupMembers(
+      { ...newEvent, groupName: group.name },
+      creatorId
+    ).catch((e) =>
+      console.error('[eventService] push notification failed:', e)
+    );
   }
-  // Wenn der Rückgabetyp ClientEvent sein soll, müsstest du hier ähnlich wie in getEventsForGroup transformieren.
-  // Da PrismaEventFromPrismaClient zurückgegeben wird, ist die Struktur anders.
+
   return newEvent;
 }
 
 export async function setEventResult(
-  eventId: number,
-  winningOption: string
-): Promise<PrismaEventFromPrismaClient | null> {
+  id: number,
+  winningOption: string,
+  wildcardAnswer?: string | null
+): Promise<PrismaEvent | null> {
   try {
-    const updatedEvent = await prisma.event.update({
-      where: { id: eventId },
-      data: { winningOption },
-      // include: { creator: { select: { id: true, name: true } } } // Falls ClientEvent zurückgegeben werden soll
+    return await prisma.event.update({
+      where: { id },
+      data: { winningOption, wildcardAnswer },
     });
-    return updatedEvent;
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2025' // "Record to update not found"
-    ) {
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025')
       return null;
-    }
-    throw error;
+    throw e;
   }
 }

@@ -1,204 +1,102 @@
 // src/app/api/events/result/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../lib/prisma';
-import { getCurrentUserFromRequest, AuthenticatedUser } from '../../lib/auth';
+import { getCurrentUserFromRequest } from '../../lib/auth';
 import { eventResultSetSchema } from '../../lib/eventSchema';
-// NEUER IMPORT:
-import { updateLeadershipStreaks } from '../../services/leadershipService'; // Pfad ggf. anpassen
+import { updateLeadershipStreaks } from '../../services/leadershipService';
+
+const basePoints = (winnerCount: number) =>
+  winnerCount === 1 ? 5 : Math.max(1, 5 - (winnerCount - 1));
 
 export async function POST(req: NextRequest) {
   const routeName = '/api/events/result';
   console.log(`[ROUTE ${routeName}] POST request received.`);
 
-  let currentUser: AuthenticatedUser | null = null;
-  try {
-    currentUser = await getCurrentUserFromRequest(req);
-    if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-  } catch (authCatchError) {
-    console.error(
-      `[ROUTE ${routeName}] CRITICAL: Error during auth:`,
-      authCatchError
-    );
-    return NextResponse.json(
-      { error: 'Authentication service error' },
-      { status: 500 }
-    );
-  }
+  /* ---------- Auth ---------- */
+  const currentUser = await getCurrentUserFromRequest(req);
+  if (!currentUser)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  let parsedData: { event_id: number; winning_option: string };
-  try {
-    const json = await req.json();
-    const parsed = eventResultSetSchema.safeParse(json);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: parsed.error.flatten() },
-        { status: 400 }
-      );
-    }
-    parsedData = parsed.data;
-  } catch (parseError) {
+  /* ---------- Payload ---------- */
+  const parsed = eventResultSetSchema.safeParse(await req.json());
+  if (!parsed.success)
     return NextResponse.json(
-      { error: 'Invalid request body' },
+      { error: 'Invalid input', details: parsed.error.flatten() },
       { status: 400 }
     );
-  }
+  const { event_id, winning_option, wildcard_answer } = parsed.data;
 
-  const { event_id: eventId, winning_option: winningOption } = parsedData;
+  /* ---------- Berechtigung ---------- */
+  const eventInfo = await prisma.event.findUnique({
+    where: { id: event_id },
+    select: {
+      groupId: true,
+      options: true,
+      hasWildcard: true,
+      winningOption: true,
+      group: { select: { createdById: true } },
+    },
+  });
+  if (!eventInfo)
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  if (eventInfo.winningOption)
+    return NextResponse.json({ error: 'Result already set' }, { status: 400 });
+  if (eventInfo.group.createdById !== currentUser.id)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!(eventInfo.options as string[]).includes(winning_option))
+    return NextResponse.json(
+      { error: 'Invalid winning option' },
+      { status: 400 }
+    );
+  if (wildcard_answer && !eventInfo.hasWildcard)
+    return NextResponse.json(
+      { error: 'Wildcard not configured' },
+      { status: 400 }
+    );
 
-  try {
-    const eventForAuth = await prisma.event.findUnique({
-      // Umbenannt für Klarheit
-      where: { id: eventId },
-      select: {
-        groupId: true,
-        options: true,
-        winningOption: true,
-        group: { select: { createdById: true } },
+  /* ---------- Transaktion ---------- */
+  const { tips } = await prisma.$transaction(async (tx) => {
+    const updatedEvent = await tx.event.update({
+      where: { id: event_id },
+      data: {
+        winningOption: winning_option,
+        wildcardAnswer: wildcard_answer ?? null,
       },
     });
 
-    if (!eventForAuth)
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-    if (eventForAuth.winningOption !== null)
-      return NextResponse.json(
-        { error: 'Result for this event has already been set.' },
-        { status: 400 }
-      );
-    if (
-      !eventForAuth.group ||
-      eventForAuth.group.createdById !== currentUser.id
-    )
-      return NextResponse.json(
-        { error: 'Only the group creator can set event results.' },
-        { status: 403 }
-      );
-    if (
-      !Array.isArray(eventForAuth.options) ||
-      !(eventForAuth.options as string[]).includes(winningOption)
-    )
-      return NextResponse.json(
-        { error: `'${winningOption}' is not a valid option for this event.` },
-        { status: 400 }
-      );
+    const tips = await tx.tip.findMany({ where: { eventId: event_id } });
+    const winners = tips.filter((t) => t.selectedOption === winning_option);
+    const bp = basePoints(winners.length);
 
-    console.log(
-      `[ROUTE ${routeName}] Auth and validation successful for event ${eventId}.`
-    );
+    await Promise.all(
+      tips.map((t) => {
+        const normal = t.selectedOption === winning_option;
+        const wcOK = wildcard_answer
+          ? (t.wildcardGuess?.trim().toLowerCase() ?? '') ===
+            wildcard_answer.trim().toLowerCase()
+          : false;
 
-    const transactionResult = await prisma.$transaction(async (tx) => {
-      const updatedEvent = await tx.event.update({
-        where: { id: eventId },
-        data: { winningOption: winningOption },
-        // Wichtig: groupId hier selektieren, falls sie für die Antwort benötigt wird
-        // oder wenn sie nicht standardmäßig im updatedEvent-Objekt enthalten wäre.
-        // Standardmäßig sind Scalar-Felder wie groupId aber enthalten.
-      });
-      console.log(
-        `[ROUTE ${routeName}] Event ${eventId} updated with winningOption: ${winningOption}.`
-      );
+        let pts = 0;
+        let wpts = 0;
+        if (normal) pts = bp;
+        if (wcOK) wpts = bp;
+        if (normal && wcOK) pts = bp * 2;
 
-      const allTipsForEvent = await tx.tip.findMany({
-        where: { eventId: eventId },
-        select: { id: true, userId: true, selectedOption: true },
-      });
-      console.log(
-        `[ROUTE ${routeName}] Found ${allTipsForEvent.length} tips for event ${eventId}.`
-      );
-
-      if (allTipsForEvent.length === 0) {
-        console.log(
-          `[ROUTE ${routeName}] No tips submitted for this event. No points to calculate.`
-        );
-        return {
-          updatedEvent,
-          pointsUpdatedCount: 0,
-          groupId: updatedEvent.groupId,
-        }; // groupId für Außenseite
-      }
-
-      const winningTips = allTipsForEvent.filter(
-        (tip) => tip.selectedOption === winningOption
-      );
-      const correctTipstersCount = winningTips.length;
-      console.log(
-        `[ROUTE ${routeName}] ${correctTipstersCount} users tipped correctly.`
-      );
-
-      let pointsUpdatedCount = 0;
-      for (const tip of allTipsForEvent) {
-        let pointsToAward = 0;
-        if (tip.selectedOption === winningOption) {
-          pointsToAward = 2;
-          if (correctTipstersCount === 1) pointsToAward += 3;
-          else if (correctTipstersCount >= 2 && correctTipstersCount <= 3)
-            pointsToAward += 2;
-          else if (correctTipstersCount >= 4 && correctTipstersCount <= 5)
-            pointsToAward += 1;
-        }
-        await tx.tip.update({
-          where: { id: tip.id },
-          data: { points: pointsToAward },
+        return tx.tip.update({
+          where: { id: t.id },
+          data: { points: pts, wildcardPoints: wpts },
         });
-        // Zähle nur, wenn Punkte tatsächlich > 0 sind oder sich geändert haben (hier vereinfacht)
-        if (pointsToAward > 0) {
-          pointsUpdatedCount++;
-        }
-      }
-      console.log(
-        `[ROUTE ${routeName}] Points calculation done for ${allTipsForEvent.length} tips, ${pointsUpdatedCount} received points.`
-      );
-      return {
-        updatedEvent,
-        pointsUpdatedCount,
-        groupId: updatedEvent.groupId,
-      }; // groupId für Außenseite
-    });
+      })
+    );
+    return { tips, groupId: updatedEvent.groupId };
+  });
 
-    // --- Leadership Streaks aktualisieren NACH erfolgreicher Transaktion ---
-    if (transactionResult && transactionResult.groupId) {
-      try {
-        await updateLeadershipStreaks(transactionResult.groupId, prisma);
-        console.log(
-          `[ROUTE ${routeName}] Leadership streaks successfully updated for group ${transactionResult.groupId}.`
-        );
-      } catch (streakError) {
-        console.error(
-          `[ROUTE ${routeName}] Error updating leadership streaks for group ${transactionResult.groupId}:`,
-          streakError
-        );
-        // Fehler beim Streak-Update sollte die Hauptantwort nicht blockieren
-      }
-    } else {
-      console.warn(
-        `[ROUTE ${routeName}] Could not update leadership streaks: groupId not available from transaction result.`
-      );
-    }
-
-    // Sende nur die relevanten Teile des Events zurück oder eine Erfolgsmeldung
-    return NextResponse.json(
-      {
-        message: 'Event result processed and points awarded.',
-        eventId: transactionResult.updatedEvent.id,
-        winningOption: transactionResult.updatedEvent.winningOption,
-        pointsUpdatedForWinners: transactionResult.pointsUpdatedCount,
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error(
-      `[ROUTE ${routeName}] Error processing event result for event ${eventId}:`,
-      error
-    );
-    const errorMessage =
-      error instanceof Error ? error.message : 'An unknown error occurred';
-    return NextResponse.json(
-      {
-        error: 'Could not set event result or calculate points.',
-        details: errorMessage,
-      },
-      { status: 500 }
-    );
+  /* ---------- Leadership Streaks ---------- */
+  try {
+    await updateLeadershipStreaks(eventInfo.groupId, prisma);
+  } catch (err) {
+    console.error('[Streak] update error:', err);
   }
+
+  return NextResponse.json({ ok: true, winners: tips.length });
 }

@@ -106,10 +106,15 @@ export interface Event extends Omit<PrismaEventModel, 'options' | 'creator'> {
 export interface EventCreate {
   title: string;
   description?: string | null;
-  group_id: number; // Beachte Snake Case
   question: string;
   options: string[];
-  tippingDeadline?: string; // ISO String
+
+  group_id: number;
+  tippingDeadline?: string | Date | null;
+
+  has_wildcard?: boolean;
+  wildcard_type?: 'EXACT_SCORE' | 'ROUND_FINISH' | 'GENERIC';
+  wildcard_prompt?: string | null;
 }
 
 export interface EventResultSet {

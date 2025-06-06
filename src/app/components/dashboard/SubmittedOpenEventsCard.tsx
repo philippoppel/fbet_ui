@@ -1,11 +1,13 @@
+// src/app/components/dashboard/SubmittedOpenEventsCard.tsx
 'use client';
 
 import React, { useState } from 'react';
 import type {
   Event as GroupEvent,
   UserOut,
-  AllTipsPerEvent, // Behält Record<eventId, Record<userId, tip>>
+  AllTipsPerEvent,
 } from '@/app/lib/types';
+
 import {
   Card,
   CardContent,
@@ -19,32 +21,49 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from '@/app/components/ui/collapsible';
+
 import { SingleOpenEventItem } from '@/app/components/dashboard/SingleOpenEventItem';
+
+/* -------------------------------------------------------------------------- */
+/* Props                                                                      */
+/* -------------------------------------------------------------------------- */
 
 interface SubmittedOpenEventsCardProps {
   events: GroupEvent[];
   user: UserOut;
   groupCreatedBy: number | null | undefined;
-  onInitiateDeleteEvent: (event: GroupEvent) => void;
-  userSubmittedTips: Record<number, string>; // Record<eventId, tip>
-  allTipsPerEvent: AllTipsPerEvent; // Record<eventId, Record<userId, tip>>
+
+  /* actions  – benennung nach Next-15-Konvention */
+  onInitiateDeleteEventAction: (event: GroupEvent) => void;
+  onResultInputChangeAction: (eventId: number, value: string) => void;
+  onSetResultAction: (eventId: number, winningOption: string) => Promise<void>;
+  onWildcardInputChangeAction: (eventId: number, value: string) => void;
+
+  /* state */
+  userSubmittedTips: Record<number, string>;
+  allTipsPerEvent: AllTipsPerEvent;
   resultInputs: Record<number, string>;
+  wildcardInputs: Record<number, string>;
   isSettingResult: Record<number, boolean>;
-  onResultInputChange: (eventId: number, value: string) => void;
-  onSetResult: (eventId: number, winningOption: string) => Promise<void>;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Component                                                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function SubmittedOpenEventsCard({
   events,
   user,
   groupCreatedBy,
-  onInitiateDeleteEvent,
+  onInitiateDeleteEventAction,
+  onResultInputChangeAction,
+  onSetResultAction,
+  onWildcardInputChangeAction,
   userSubmittedTips,
   allTipsPerEvent,
   resultInputs,
+  wildcardInputs,
   isSettingResult,
-  onResultInputChange,
-  onSetResult,
 }: SubmittedOpenEventsCardProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -58,10 +77,10 @@ export default function SubmittedOpenEventsCard({
   return (
     <Card className='bg-muted/30 border border-border rounded-xl shadow-sm'>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className='flex flex-row items-center justify-between gap-2 cursor-pointer'>
+        <CardHeader className='flex items-center justify-between gap-2 cursor-pointer'>
           <div className='flex items-center gap-2 flex-grow'>
-            <Eye className='h-5 w-5 text-blue-500 dark:text-blue-300 flex-shrink-0' />
-            <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
+            <Eye className='h-5 w-5 text-blue-500 dark:text-blue-300' />
+            <CardTitle className='text-base sm:text-lg font-semibold'>
               Meine Tipps für offene Wetten ({submittedEvents.length})
             </CardTitle>
           </div>
@@ -69,7 +88,7 @@ export default function SubmittedOpenEventsCard({
             <Button
               variant='ghost'
               size='icon'
-              className='h-8 w-8 text-muted-foreground hover:text-foreground flex-shrink-0'
+              className='h-8 w-8 text-muted-foreground hover:text-foreground'
             >
               <ChevronsUpDown className='h-4 w-4' />
               <span className='sr-only'>Toggle</span>
@@ -78,40 +97,35 @@ export default function SubmittedOpenEventsCard({
         </CardHeader>
 
         <CollapsibleContent>
-          <CardContent
-            className={
-              submittedEvents.length === 0
-                ? 'py-10 flex justify-center items-center flex-col text-center px-4'
-                : 'p-4 sm:p-6 space-y-6' // Added space-y-6 for separation
-            }
-          >
-            {submittedEvents.length === 0 && (
-              <p className='text-muted-foreground'>
-                Du hast noch keine Tipps für offene Wetten abgegeben.
-              </p>
-            )}
+          <CardContent className='p-4 sm:p-6 space-y-6'>
             {submittedEvents.map((event) => (
               <div
                 key={event.id}
                 className='rounded-xl border bg-card shadow-sm hover:shadow-md p-4 sm:p-6'
               >
                 <SingleOpenEventItem
+                  /* basics */
                   event={event}
                   user={user}
                   groupCreatedBy={groupCreatedBy}
-                  onInitiateDeleteEvent={onInitiateDeleteEvent}
+                  /* delete */
+                  onInitiateDeleteEventAction={onInitiateDeleteEventAction}
+                  /* tip-interactions deaktiviert, weil hier nur „bereits getippt“-Ansicht */
                   selectedTips={{}}
-                  userSubmittedTips={userSubmittedTips}
-                  // HIER DIE ÄNDERUNG: || {} wird zu || []
-                  allTipsForThisEvent={allTipsPerEvent[event.id] || []}
-                  resultInputs={resultInputs}
                   isSubmittingTip={{}}
+                  onSelectTipAction={() => {}}
+                  onSubmitTipAction={async () => {}}
+                  onClearSelectedTipAction={() => {}}
+                  /* result / wildcard management */
+                  resultInputs={resultInputs}
+                  wildcardInputs={wildcardInputs}
                   isSettingResult={isSettingResult}
-                  onSelectTip={() => {}}
-                  onSubmitTip={async () => {}}
-                  onResultInputChange={onResultInputChange}
-                  onSetResult={onSetResult}
-                  onClearSelectedTip={() => {}}
+                  onResultInputChangeAction={onResultInputChangeAction}
+                  onWildcardInputChangeAction={onWildcardInputChangeAction}
+                  onSetResultAction={onSetResultAction}
+                  /* votes */
+                  userSubmittedTips={userSubmittedTips}
+                  allTipsForThisEvent={allTipsPerEvent[event.id] ?? []}
                 />
               </div>
             ))}
