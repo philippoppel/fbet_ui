@@ -1,6 +1,10 @@
 'use client';
 
-import type { HighscoreEntry, UserOut } from '@/app/lib/types'; // HighscoreEntry muss leaderSince? enthalten
+import { useMemo, useState } from 'react';
+import { useAuth } from '@/app/context/AuthContext';
+import type { HighscoreEntry, UserOut } from '@/app/lib/types';
+import { cn } from '@/app/lib/utils';
+import { updateName } from '@/app/lib/api';
 import {
   Card,
   CardContent,
@@ -8,10 +12,18 @@ import {
   CardTitle,
 } from '@/app/components/ui/card';
 import { Badge } from '@/app/components/ui/badge';
-import { Trophy, User, Users, TriangleAlert } from 'lucide-react';
 import { Skeleton } from '@/app/components/ui/skeleton';
-import { useMemo } from 'react';
-import { cn } from '@/app/lib/utils';
+import { Trophy, Pencil, User, Users, TriangleAlert } from 'lucide-react';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/app/components/ui/dialog';
+import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
 import {
   Tooltip,
   TooltipContent,
@@ -19,30 +31,19 @@ import {
   TooltipTrigger,
 } from '@/app/components/ui/tooltip';
 
-// Hilfsfunktion zur Formatierung der "führt seit" Dauer
 function formatLeaderSince(
   leaderSinceDate?: Date | string | null
 ): string | null {
   if (!leaderSinceDate) return null;
   const date = new Date(leaderSinceDate);
-  if (isNaN(date.getTime())) return null; // Ungültiges Datum
-
+  if (isNaN(date.getTime())) return null;
   const now = new Date();
-  const diffTime = now.getTime() - date.getTime(); // Differenz in Millisekunden
-
-  // Nur positive Differenzen (Führung muss in der Vergangenheit begonnen haben)
+  const diffTime = now.getTime() - date.getTime();
   if (diffTime < 0) return null;
-
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return 'Führt seit heute';
-  } else if (diffDays === 1) {
-    return 'Führt seit gestern';
-  } else {
-    // Alternative: return `Führt seit ${date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
-    return `Führt seit ${diffDays} Tagen`;
-  }
+  if (diffDays === 0) return 'Führt seit heute';
+  if (diffDays === 1) return 'Führt seit gestern';
+  return `Führt seit ${diffDays} Tagen`;
 }
 
 export function HighscoreCard({
@@ -51,17 +52,20 @@ export function HighscoreCard({
   isLoading,
   error,
   currentUserId,
-  groupLeaderId, // groupLeaderId wird aktuell nicht mehr für ein Symbol verwendet,
-  // aber die Prop bleibt erhalten, falls sie später benötigt wird
-  // oder von der Elternkomponente noch übergeben wird.
+  onReload,
 }: {
-  highscore: HighscoreEntry[]; // Stellen Sie sicher, dass dieser Typ `leaderSince?` enthält
+  highscore: HighscoreEntry[];
   members: UserOut[];
   isLoading: boolean;
   error: string | null;
   currentUserId: number | undefined | null;
-  groupLeaderId: number | undefined | null;
+  onReload?: () => Promise<void> | void; // reload hook
 }) {
+  const { token } = useAuth();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
   const displayList = useMemo(() => {
     const sortedList = highscore ?? [];
     let rank = 0;
@@ -75,7 +79,6 @@ export function HighscoreCard({
       } else if (index > 0 && entry.points === lastPoints) {
         playersAtRank++;
       } else if (index === 0) {
-        // Nur wenn Punkte > -Infinity (d.h. es gibt überhaupt Punkte/Einträge)
         rank = entry.points > -Infinity || sortedList.length > 0 ? 1 : 0;
         playersAtRank = 1;
       }
@@ -100,8 +103,8 @@ export function HighscoreCard({
         name: entry.name,
         points: entry.points,
         isNameFallback,
-        rank: rank, // Stelle sicher, dass Rang 0 nicht fälschlicherweise als 1 interpretiert wird, wenn alle 0 Pkt haben
-        leaderSince: entry.leaderSince, // Wichtig: leaderSince durchreichen
+        rank: rank,
+        leaderSince: entry.leaderSince,
       };
     });
   }, [highscore]);
@@ -114,15 +117,81 @@ export function HighscoreCard({
         id='highscore-card'
         className='bg-muted/30 border border-border rounded-xl shadow-sm h-full flex flex-col overflow-hidden'
       >
-        <CardHeader className='flex flex-row items-center gap-2 pb-3 pt-4 px-4 sm:px-5'>
-          <Trophy className='h-5 w-5 text-primary' />
-          <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
-            Rangliste
-          </CardTitle>
+        <CardHeader className='flex flex-row items-center justify-between pb-3 pt-4 px-4 sm:px-5'>
+          <div className='flex items-center gap-2'>
+            <Trophy className='h-5 w-5 text-primary' />
+            <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
+              Rangliste
+            </CardTitle>
+          </div>
+          {currentUserId && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      className='flex items-center gap-2'
+                    >
+                      <Pencil className='h-4 w-4' />
+                      Namen ändern
+                    </Button>
+                  </DialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Name ändern</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Deinen Namen ändern</DialogTitle>
+                </DialogHeader>
+                <div className='space-y-4'>
+                  <Input
+                    type='text'
+                    placeholder='Neuer Name'
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                  />
+                </div>
+                <DialogFooter className='mt-4'>
+                  <Button
+                    disabled={isSaving || !newName.trim()}
+                    onClick={async () => {
+                      try {
+                        setIsSaving(true);
+                        if (!token) {
+                          throw new Error(
+                            'Kein Token gefunden. Bitte neu einloggen.'
+                          );
+                        }
+                        await updateName(newName.trim(), token);
+                        setDialogOpen(false);
+                        setNewName('');
+                        if (onReload) {
+                          await onReload();
+                        } else if (typeof window !== 'undefined') {
+                          window.location.reload();
+                        }
+                      } catch (err: any) {
+                        alert(`Fehler: ${err.message}`);
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                  >
+                    {isSaving ? 'Speichern...' : 'Speichern'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
+
         <CardContent className='flex-1 overflow-y-auto p-0 flex flex-col'>
           {isLoading ? (
-            // ... Skeleton Loader ...
             <div className='w-full p-2 sm:p-0'>
               <div className='sticky top-0 z-10 bg-muted/50 backdrop-blur-sm'>
                 <div className='flex items-center justify-between h-10 px-3 sm:px-4 text-sm font-medium border-b border-border/70'>
@@ -148,14 +217,12 @@ export function HighscoreCard({
               </div>
             </div>
           ) : error ? (
-            // ... Fehleranzeige ...
             <div className='flex flex-col items-center justify-center h-full text-destructive px-4 text-center py-10 m-auto'>
               <TriangleAlert className='h-10 w-10 mb-3 opacity-70' />
               <p className='text-sm font-semibold'>Fehler beim Laden:</p>
               <p className='text-sm text-destructive/80 mt-1'>{error}</p>
             </div>
           ) : memberCount === 0 ? (
-            // ... Keine Mitglieder ...
             <div className='flex flex-col items-center justify-center h-full text-muted-foreground px-4 text-center py-10 m-auto'>
               <Users className='h-12 w-12 opacity-40 mb-4' />
               <p className='text-sm'>
@@ -166,8 +233,7 @@ export function HighscoreCard({
               </p>
             </div>
           ) : displayList.length === 0 ||
-            displayList.every((e) => e.rank === 0) ? ( // Auch wenn nur Rang 0 existiert
-            // ... Rangliste leer ...
+            displayList.every((e) => e.rank === 0) ? (
             <div className='flex flex-col items-center justify-center h-full text-muted-foreground px-4 text-center py-10 m-auto'>
               <Trophy className='h-12 w-12 opacity-40 mb-4' />
               <p className='text-sm'>
@@ -193,7 +259,7 @@ export function HighscoreCard({
                 <tbody className='divide-y divide-border/30'>
                   {displayList.map((entry) => {
                     const isPointsLeader =
-                      entry.rank === 1 && entry.points > -Infinity; // Nur Rang 1, wenn auch Punkte vorhanden sind
+                      entry.rank === 1 && entry.points > -Infinity;
                     const leaderSinceText = isPointsLeader
                       ? formatLeaderSince(entry.leaderSince)
                       : null;
@@ -206,11 +272,11 @@ export function HighscoreCard({
                           currentUserId === entry.user_id &&
                             'bg-primary/10 dark:bg-primary/20 font-semibold',
                           isPointsLeader &&
-                            'bg-yellow-500/15 dark:bg-yellow-500/25 hover:bg-yellow-500/20 dark:hover:bg-yellow-500/30' // Stärkere Hervorhebung für Führenden
+                            'bg-yellow-500/15 dark:bg-yellow-500/25 hover:bg-yellow-500/20 dark:hover:bg-yellow-500/30'
                         )}
                       >
                         <td className='py-2.5 px-3 sm:px-4 text-center'>
-                          {entry.rank > 0 && ( // Badge nur anzeigen, wenn Rang > 0
+                          {entry.rank > 0 && (
                             <Badge
                               variant='secondary'
                               className={cn(
@@ -224,7 +290,7 @@ export function HighscoreCard({
                               )}
                             >
                               {isPointsLeader
-                                ? '👑' // Krone für den Führenden
+                                ? '👑'
                                 : entry.rank === 3
                                   ? '🥉'
                                   : entry.rank}
@@ -232,13 +298,8 @@ export function HighscoreCard({
                           )}
                         </td>
                         <td className='py-2.5 px-3 sm:px-4'>
-                          {' '}
-                          {/* td nicht mehr flex, damit div-Struktur funktioniert */}
                           <div>
-                            {' '}
-                            {/* Container für Name und "führt seit" Text */}
                             <div className='flex items-center gap-1.5'>
-                              {/* Kein Admin-Symbol mehr hier */}
                               {entry.isNameFallback && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -256,7 +317,7 @@ export function HighscoreCard({
                                   'truncate text-foreground/90',
                                   entry.isNameFallback && 'opacity-60 italic',
                                   isPointsLeader &&
-                                    'font-bold text-yellow-700 dark:text-yellow-600' // Name des Führenden hervorheben
+                                    'font-bold text-yellow-700 dark:text-yellow-600'
                                 )}
                                 title={entry.name}
                               >
@@ -276,7 +337,7 @@ export function HighscoreCard({
                             entry.points === 0 &&
                               'text-muted-foreground/70 font-normal',
                             isPointsLeader &&
-                              'text-yellow-700 dark:text-yellow-600' // Punkte des Führenden hervorheben
+                              'text-yellow-700 dark:text-yellow-600'
                           )}
                         >
                           {entry.points}

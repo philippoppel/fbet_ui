@@ -460,3 +460,22 @@ export async function uploadImage(
   });
   return handleResponse<UploadResponse>(response);
 }
+
+export async function updateName(
+  newName: string,
+  token: string
+): Promise<void> {
+  const res = await fetch('/api/auth/me', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name: newName }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to update name');
+  }
+}
