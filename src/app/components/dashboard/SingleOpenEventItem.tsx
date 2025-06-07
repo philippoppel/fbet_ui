@@ -374,7 +374,7 @@ export function SingleOpenEventItem({
         </div>
       )}
 
-      {totalVotesOnEvent > 0 && (
+      {totalVotesOnEvent > 0 && userHasSubmittedTip && (
         <Collapsible
           open={showDetailedTips}
           onOpenChange={setShowDetailedTips}
