@@ -147,9 +147,11 @@ export function GroupHeaderCard({
                   </div>
                 )}
                 {group.description && (
-                  <div className='flex items-center gap-x-1'>
+                  <div className='flex items-center gap-x-1 max-w-full'>
                     <Info className='h-4 w-4' />
-                    <span className='truncate'>{group.description}</span>
+                    <span className='break-words whitespace-normal'>
+                      {group.description}
+                    </span>
                   </div>
                 )}
               </div>
