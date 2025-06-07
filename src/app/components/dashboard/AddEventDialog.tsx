@@ -545,6 +545,7 @@ export const AddEventDialog = ({
                         onProposeEvent={handleSuggestionClick}
                         onCardAiCreate={handleAiGenerate}
                         disabled={
+                          !form.formState.isValid ||
                           form.formState.isSubmitting ||
                           isAiLoading ||
                           isLoadingCombinedEvents
