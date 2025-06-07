@@ -15,7 +15,7 @@ test.describe('CreateGroup-Seite (nach Login)', () => {
   /* ---------- Gemeinsame Mocks & Login ---------- */
   test.beforeEach(async ({ page }) => {
     /* 1) Login-Endpunkt */
-    await page.route('**/users/login', async (route: Route, req: Request) => {
+    await page.route('**/api/auth/login', async (route: Route, req: Request) => {
       if (req.method() === 'POST') {
         await route.fulfill({
           status: 200,
@@ -27,8 +27,8 @@ test.describe('CreateGroup-Seite (nach Login)', () => {
       }
     });
 
-    /* 2) /users/me – liefert sofort den User */
-    await page.route('**/users/me', async (route) =>
+    /* 2) /auth/me – liefert sofort den User */
+    await page.route('**/api/auth/me', async (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',

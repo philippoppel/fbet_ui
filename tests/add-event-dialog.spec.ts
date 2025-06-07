@@ -37,10 +37,10 @@ async function openGroup(page: Page) {
  * ------------------------------------------------------------------ */
 function mockDashboardRoutes(page: Page) {
   /* ---------- Auth ---------- */
-  page.route('**/users/login', (r) =>
+  page.route('**/api/auth/login', (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(fakeToken) })
   );
-  page.route('**/users/me', (r) =>
+  page.route('**/api/auth/me', (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(fakeUser) })
   );
 

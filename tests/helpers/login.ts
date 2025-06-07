@@ -16,11 +16,13 @@ export async function loginUI(page: Page) {
   await page.goto('/login');
 
   // 2) Felder über <label> finden und füllen
-  await page.getByLabel(/^e-mail$/i).fill(email);
-  await page.getByLabel(/^passwort$/i).fill(pw);
+  // Beim Rendern kann das Label Sonderzeichen enthalten. Über die Platzhalter
+  // treffen wir die Felder zuverlässiger.
+  await page.getByPlaceholder('name@example.com').fill(email);
+  await page.getByPlaceholder('••••••••').fill(pw);
 
   // 3) Absenden
-  await page.getByRole('button', { name: /^login$/i }).click();
+  await page.getByRole('button', { name: /anmelden/i }).click();
 
   // 4) Auf Redirect ODER Dashboard-Root warten (max. 20 s)
   await Promise.race([

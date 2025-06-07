@@ -7,21 +7,26 @@ dotenv.config(); // .env laden
 export default async function globalSetup() {
   console.log('\n--- Starting Global E2E Setup ---');
 
+  // Ermöglicht das Überspringen des Setups, z.B. in lokalen Umgebungen ohne Backend
+  if (process.env.SKIP_GLOBAL_SETUP === 'true') {
+    console.log('SKIP_GLOBAL_SETUP=true – überspringe Einrichtung.');
+    return;
+  }
+
   /* ---------- Konfiguration aus ENV ------------------------ */
   const apiBase = process.env.API_BASE_URL ?? 'http://127.0.0.1:8000';
   const email = process.env.E2E_USER_EMAIL;
   const pw = process.env.E2E_USER_PASSWORD;
 
   if (!email || !pw) {
-    throw new Error(
-      'Bitte E2E_USER_EMAIL und E2E_USER_PASSWORD in der Umgebung setzen (.env).'
-    );
+    console.warn('E2E_USER_EMAIL oder E2E_USER_PASSWORD fehlt – Setup wird übersprungen.');
+    return;
   }
 
   const api = await pwRequest.newContext(); // Playwright-API-Client
 
   /* ---------- 1. Login-Versuch ----------------------------- */
-  const loginRes = await api.post(`${apiBase}/users/login`, {
+  const loginRes = await api.post(`${apiBase}/api/auth/login`, {
     form: { username: email, password: pw },
   });
 
@@ -36,7 +41,7 @@ export default async function globalSetup() {
   );
 
   /* ---------- 2. Registrierung ----------------------------- */
-  const regRes = await api.post(`${apiBase}/users/`, {
+  const regRes = await api.post(`${apiBase}/api/auth/register`, {
     headers: { 'Content-Type': 'application/json' },
     data: { email, name: 'E2E Bot', password: pw },
   });
