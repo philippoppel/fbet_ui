@@ -336,13 +336,6 @@ export const AddEventDialog = ({
     toast.success('Vorschlag übernommen');
   };
 
-  /* ------------------ UI ------------------ */
-  const defaultTrigger = (
-    <Button size='sm' variant='outline' className='whitespace-nowrap'>
-      <PlusCircle className='mr-2 h-4 w-4' /> Neue Wette vorschlagen
-    </Button>
-  );
-
   return (
     <Dialog
       open={open}
@@ -351,16 +344,6 @@ export const AddEventDialog = ({
         if (!o) resetForm();
       }}
     >
-      <DialogTrigger asChild>
-        {triggerProps ? (
-          <Button {...triggerProps} variant={triggerProps.variant || 'default'}>
-            {triggerProps.children}
-          </Button>
-        ) : (
-          defaultTrigger
-        )}
-      </DialogTrigger>
-
       <DialogContent className='sm:max-w-[640px] max-h-[90vh] flex flex-col'>
         <DialogHeader>
           <DialogTitle>Neues Event für „{groupName}“</DialogTitle>

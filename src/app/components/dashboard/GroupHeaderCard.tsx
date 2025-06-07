@@ -22,7 +22,6 @@ import { GroupActionsMenu } from '@/app/components/dashboard/GroupActionMenu';
 type LeaderboardWinner = {
   name: string | null;
   leaderSince?: string | Date | null; // Datum (ISO-String oder Date-Objekt), seit wann Nr. 1
-  // points?: number;
 };
 
 type GroupHeaderCardProps = {
@@ -105,14 +104,12 @@ export function GroupHeaderCard({
       >
         {group.imageUrl && (
           <div className='relative w-full h-64 sm:h-72 md:h-60 bg-muted/20 dark:bg-black/20'>
-            {' '}
-            {/* Höhe leicht angepasst & Hintergrund für object-contain */}
             <Image
               src={group.imageUrl}
               alt={group.name}
               fill
               sizes='(max-width: 768px) 100vw, 768px'
-              className='object-contain rounded-b-none rounded-t-xl' // Geändert zu object-contain
+              className='object-contain rounded-b-none rounded-t-xl'
               priority
             />
           </div>
@@ -128,7 +125,7 @@ export function GroupHeaderCard({
             <CardTitle
               className={cn(
                 'font-extrabold text-foreground group-hover:text-primary transition-colors duration-300',
-                'text-lg xs:text-xl sm:text-2xl md:text-3xl', // Etwas größer
+                'text-lg xs:text-xl sm:text-2xl md:text-3xl',
                 'whitespace-nowrap overflow-hidden text-ellipsis'
               )}
               title={group.name || 'Unbenannte Gruppe'}
@@ -136,24 +133,19 @@ export function GroupHeaderCard({
               {group.name || 'Unbenannte Gruppe'}
             </CardTitle>
 
-            {/* Info zum Erstplatzierten in der Rangliste - stärker hervorgehoben */}
             {leaderboardWinner?.name && (
               <div
                 className={cn(
-                  'text-sm sm:text-base flex items-center transition-colors duration-300 font-medium', // Standardgröße
-                  'text-primary group-hover:text-primary/90', // Farbe geändert zu Primary
-                  // Vertikaler Abstand angepasst
+                  'text-sm sm:text-base flex items-center transition-colors duration-300 font-medium',
+                  'text-primary group-hover:text-primary/90',
                   group.description || daysAsLeaderDisplay
                     ? 'mt-1.5 mb-2'
                     : 'my-1.5'
                 )}
               >
-                <Trophy className='h-5 w-5 mr-2 text-amber-500 flex-shrink-0' />{' '}
-                {/* Icon leicht vergrößert */}
+                <Trophy className='h-5 w-5 mr-2 text-amber-500 flex-shrink-0' />
                 <div className='flex flex-col sm:flex-row sm:items-center sm:gap-x-1.5'>
                   <span className='font-semibold text-foreground'>
-                    {' '}
-                    {/* Name in Vordergrundfarbe und fett */}
                     Spitzenreiter: {leaderboardWinner.name}
                   </span>
                   {daysAsLeaderDisplay && (
@@ -193,7 +185,6 @@ export function GroupHeaderCard({
               </div>
             )}
 
-            {/* ... (Restliche Info-Messages bleiben gleich) ... */}
             {!group.description &&
               !group.inviteToken &&
               !leaderboardWinner?.name && (
@@ -211,9 +202,8 @@ export function GroupHeaderCard({
               )}
           </div>
 
-          {/* ... (Action Buttons bleiben gleich) ... */}
           <div className='flex items-center gap-x-1 xs:gap-x-2 flex-shrink-0'>
-            {/* Mobile-Only: Button "Zur Rangliste" */}
+            {/* Dieser Teil bleibt für Mobile unverändert */}
             <div className='flex sm:hidden mt-2'>
               <Button
                 size='sm'
@@ -246,6 +236,7 @@ export function GroupHeaderCard({
         </CardHeader>
       </Card>
 
+      {/* Dialog für das Einladen von Freunden */}
       {group.inviteToken && (
         <InviteDialog
           open={isInviteDialogOpen}
@@ -254,6 +245,19 @@ export function GroupHeaderCard({
           inviteToken={group.inviteToken}
         />
       )}
+
+      {/* NEU HINZUGEFÜGT:
+        Der Dialog zum Hinzufügen von Events. Er wird hier "angedockt"
+        und über die Props `isAddEventDialogOpen` und `onSetAddEventDialogOpen`
+        gesteuert, die vom GroupActionsMenu ausgelöst werden.
+      */}
+      <AddEventDialog
+        open={isAddEventDialogOpen}
+        setOpen={onSetAddEventDialogOpen}
+        groupName={group.name}
+        form={addEventForm}
+        onSubmit={onAddEventSubmit}
+      />
     </>
   );
 }
