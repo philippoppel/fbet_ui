@@ -2,13 +2,28 @@ import { vi, describe, it, expect, afterEach } from 'vitest';
 
 vi.mock('@/app/api/lib/prisma', () => ({
   prisma: {
-    event: { findMany: vi.fn(), update: vi.fn() },
+    event: { findMany: vi.fn(), update: vi.fn(), create: vi.fn(), findUnique: vi.fn() },
+    group: { findUnique: vi.fn() },
   },
 }));
 
+vi.mock('@/app/api/services/notificationService.ts', () => ({
+  sendNewEventNotificationsToGroupMembers: vi.fn(() => ({
+    catch: vi.fn(() => Promise.resolve()),
+  })),
+}));
+
 const { prisma } = await import('@/app/api/lib/prisma');
-const { getEventsForGroup, setEventResult } = await import('./eventService');
+const {
+  getEventsForGroup,
+  setEventResult,
+  createEvent,
+  getEventById,
+} = await import('./eventService');
 const { Prisma } = await import('@prisma/client');
+const {
+  sendNewEventNotificationsToGroupMembers,
+} = await import('@/app/api/services/notificationService.ts');
 
 describe('eventService', () => {
   afterEach(() => {
@@ -116,6 +131,58 @@ describe('eventService', () => {
       const err = new Error('fail');
       (prisma.event.update as any).mockRejectedValue(err);
       await expect(setEventResult(1, 'A')).rejects.toThrow('fail');
+    });
+  });
+
+  describe('getEventById', () => {
+    it('fetches event with creator', async () => {
+      const ev = { id: 4, creator: { id: 2, name: 'Bob' } };
+      (prisma.event.findUnique as any).mockResolvedValue(ev);
+      const result = await getEventById(4);
+      expect(prisma.event.findUnique).toHaveBeenCalledWith({
+        where: { id: 4 },
+        include: { creator: { select: { id: true, name: true } } },
+      });
+      expect(result).toBe(ev);
+    });
+  });
+
+  describe('createEvent', () => {
+    it('creates event and sends notification when group exists', async () => {
+      const data = {
+        title: 'Title',
+        description: 'Desc',
+        question: 'Q',
+        options: ['A'],
+        group_id: 9,
+      } as any;
+      const created = { id: 99, groupId: 9, creator: { id: 1, name: 'Alice' } };
+      (prisma.event.create as any).mockResolvedValue(created);
+      (prisma.group.findUnique as any).mockResolvedValue({ name: 'My Group' });
+
+      const result = await createEvent(data, 1);
+
+      expect(prisma.event.create).toHaveBeenCalled();
+      expect(prisma.group.findUnique).toHaveBeenCalledWith({
+        where: { id: created.groupId },
+        select: { name: true },
+      });
+      expect(sendNewEventNotificationsToGroupMembers).toHaveBeenCalledWith(
+        { ...created, groupName: 'My Group' },
+        1
+      );
+      expect(result).toBe(created);
+    });
+
+    it('skips notification when group missing', async () => {
+      const data = { title: 'T', question: 'Q', options: [], group_id: 2 } as any;
+      const created = { id: 1, groupId: 2, creator: { id: 1, name: 'A' } };
+      (prisma.event.create as any).mockResolvedValue(created);
+      (prisma.group.findUnique as any).mockResolvedValue(null);
+
+      await createEvent(data, 1);
+
+      expect(sendNewEventNotificationsToGroupMembers).not.toHaveBeenCalled();
     });
   });
 });
