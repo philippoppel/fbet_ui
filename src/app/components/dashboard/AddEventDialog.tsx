@@ -570,12 +570,7 @@ export const AddEventDialog = ({
                         events={suggestions}
                         onProposeEvent={handleSuggestionClick}
                         onCardAiCreate={handleAiGenerate}
-                        disabled={
-                          !form.formState.isValid ||
-                          form.formState.isSubmitting ||
-                          isAiLoading ||
-                          isLoadingCombinedEvents
-                        }
+                        disabled={isAiLoading || isLoadingCombinedEvents}
                       />
                     </div>
                   )}
