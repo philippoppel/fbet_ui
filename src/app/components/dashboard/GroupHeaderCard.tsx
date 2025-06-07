@@ -213,46 +213,24 @@ export function GroupHeaderCard({
 
           {/* ... (Action Buttons bleiben gleich) ... */}
           <div className='flex items-center gap-x-1 xs:gap-x-2 flex-shrink-0'>
-            <div className='hidden sm:flex sm:items-center sm:gap-x-1.5 md:gap-x-2'>
-              <AddEventDialog
-                groupName={group.name}
-                open={isAddEventDialogOpen}
-                setOpen={onSetAddEventDialogOpen}
-                form={addEventForm}
-                onSubmit={onAddEventSubmit}
-                triggerProps={{
-                  variant: 'outline',
-                  size: 'sm',
-                  className: cn(
-                    'bg-transparent hover:bg-primary/10 border-primary/30 text-primary hover:text-primary dark:border-primary/40 dark:hover:bg-primary/10 transition-all duration-200',
-                    'flex items-center overflow-hidden px-2 md:px-3'
-                  ),
-                  children: (
-                    <>
-                      <PlusCircle className='h-4 w-4 flex-shrink-0 sm:mr-1 md:mr-1.5' />
-                      <span className='whitespace-nowrap overflow-hidden text-ellipsis hidden xs:inline'>
-                        Event
-                      </span>
-                    </>
-                  ),
-                }}
-              />
-
+            {/* Mobile-Only: Button "Zur Rangliste" */}
+            <div className='flex sm:hidden mt-2'>
               <Button
                 size='sm'
-                onClick={() => setIsInviteDialogOpen(true)}
-                disabled={!group.inviteToken}
-                aria-label='Freunde einladen'
+                variant='outline'
+                onClick={() => {
+                  const el = document.getElementById('highscore-card');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
                 className={cn(
-                  'text-white disabled:opacity-50 transition-all duration-200',
-                  'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500',
-                  'flex items-center overflow-hidden px-2 md:px-3'
+                  'w-full justify-center',
+                  'bg-transparent hover:bg-primary/10 border-primary/30 text-primary hover:text-primary dark:border-primary/40 dark:hover:bg-primary/10 transition-all duration-200'
                 )}
               >
-                <Share2 className='h-4 w-4 flex-shrink-0 sm:mr-1 md:mr-1.5' />
-                <span className='whitespace-nowrap overflow-hidden text-ellipsis hidden xs:inline'>
-                  Einladen
-                </span>
+                <Trophy className='h-4 w-4 mr-2' />
+                Zur Rangliste
               </Button>
             </div>
 

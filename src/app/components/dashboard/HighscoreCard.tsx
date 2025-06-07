@@ -110,7 +110,10 @@ export function HighscoreCard({
 
   return (
     <TooltipProvider delayDuration={100}>
-      <Card className='bg-muted/30 border border-border rounded-xl shadow-sm h-full flex flex-col overflow-hidden'>
+      <Card
+        id='highscore-card'
+        className='bg-muted/30 border border-border rounded-xl shadow-sm h-full flex flex-col overflow-hidden'
+      >
         <CardHeader className='flex flex-row items-center gap-2 pb-3 pt-4 px-4 sm:px-5'>
           <Trophy className='h-5 w-5 text-primary' />
           <CardTitle className='text-base sm:text-lg font-semibold text-foreground'>
