@@ -358,13 +358,39 @@ export const AddEventDialog = ({
               <form
                 id='add-event-form'
                 className='space-y-6'
-                onSubmit={form.handleSubmit((vals) => {
-                  vals.has_wildcard = Boolean(vals.wildcard_prompt?.trim());
-                  vals.wildcard_type = vals.has_wildcard
-                    ? inferWildcardType(vals.wildcard_prompt || '')
-                    : '';
-                  onSubmit(vals);
-                })}
+                // NEUER CODE MIT DEBUGGING
+                onSubmit={form.handleSubmit(
+                  // 1. Das ist deine Funktion für den Erfolgsfall
+                  (vals) => {
+                    console.log(
+                      '✅ Formular-Validierung ERFOLGREICH. Werte:',
+                      vals
+                    );
+
+                    vals.has_wildcard = Boolean(vals.wildcard_prompt?.trim());
+                    vals.wildcard_type = vals.has_wildcard
+                      ? inferWildcardType(vals.wildcard_prompt || '')
+                      : '';
+
+                    console.log('Werte nach Aufbereitung:', vals);
+                    console.log(
+                      'Rufe jetzt die übergebene onSubmit-Funktion auf...'
+                    );
+
+                    onSubmit(vals);
+                  },
+                  // 2. DAS IST DER ENTSCHEIDENDE TEIL: Die Funktion für den Fehlerfall
+                  (errors) => {
+                    console.error(
+                      '❌ Formular-Validierung FEHLGESCHLAGEN. Fehler:',
+                      errors
+                    );
+                    toast.error('Validierungsfehler', {
+                      description:
+                        'Bitte überprüfe die Formularfelder. Details sind in der Konsole.',
+                    });
+                  }
+                )}
               >
                 <FormField
                   control={form.control}

@@ -233,9 +233,12 @@ export default function ClosedEventsCard({
                           </h5>
                           <ul className='space-y-1 text-sm'>
                             {[...tipDistribution.entries()].map(
-                              ([option, count]) => (
+                              (
+                                [option, count],
+                                index // <-- index hier hinzufügen
+                              ) => (
                                 <li
-                                  key={option}
+                                  key={`${option}-${index}`} // <-- index an den key anhängen
                                   className='flex justify-between text-foreground'
                                 >
                                   <span>{option}</span>

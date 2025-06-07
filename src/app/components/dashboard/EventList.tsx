@@ -10,7 +10,7 @@ import { getSportIcon } from '@/app/lib/utils';
 type EventListProps = {
   events: MixedEvent[];
   onProposeEvent: (eventId: string) => void;
-  onCardAiCreate?: (payload: AiEventPayload) => void; // Nimmt den Payload entgegen
+  onCardAiCreate?: (payload: AiEventPayload) => void;
   disabled: boolean;
 };
 
@@ -30,8 +30,8 @@ export function EventList({
 
   return (
     <ul className='space-y-3 sm:space-y-4'>
-      {events.map((event) => {
-        // Badge-Logik bleibt erhalten, um den korrekten Badge-Typ für AiEventPayload zu bestimmen
+      {/* HIER DIE ÄNDERUNG: (event) -> (event, index) */}
+      {events.map((event, index) => {
         let displayBadge: string = event.sport || 'Event';
         let specificBadgeForAi: AiEventPayload['badge'] =
           event.sport as AiEventPayload['badge'];
@@ -52,33 +52,31 @@ export function EventList({
             specificBadgeForAi = 'Fußball';
             break;
           default:
-            // displayBadge bleibt event.sport oder 'Event'
-            // specificBadgeForAi bleibt event.sport (oder was auch immer MixedEvent.sport ist)
             break;
         }
 
         const icon = getSportIcon(event.sport);
 
-        // Diese Funktion wird von der EventCard aufgerufen, wenn der AI-Button geklickt wird.
-        // Sie ruft dann onCardAiCreate (aus AddEventDialog) mit dem spezifischen Payload auf.
         const handleCardAiRequest = () => {
           if (onCardAiCreate) {
             onCardAiCreate({
               title: event.title,
               subtitle: event.subtitle,
-              badge: specificBadgeForAi, // Stellt sicher, dass der korrekte Typ verwendet wird
+              badge: specificBadgeForAi,
             });
           }
         };
 
         return (
           <EventCard
-            key={event.id}
+            // HIER DIE ÄNDERUNG: Ein robuster Key, der immer eindeutig ist.
+            key={event.id || `event-fallback-${index}-${event.title}`}
             title={event.title}
             subtitle={event.subtitle}
             disabled={disabled}
-            onClick={() => onProposeEvent(event.id)}
-            onAiCreateClick={onCardAiCreate ? handleCardAiRequest : undefined} // Gebe den Handler weiter
+            // Die onClick-Logik muss auch den Fallback berücksichtigen, falls event.id nicht existiert
+            onClick={() => onProposeEvent(event.id || `fallback-${index}`)}
+            onAiCreateClick={onCardAiCreate ? handleCardAiRequest : undefined}
             badge={displayBadge}
             icon={icon}
           />

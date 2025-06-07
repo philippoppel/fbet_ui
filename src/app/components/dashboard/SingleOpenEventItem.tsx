@@ -209,9 +209,9 @@ export function SingleOpenEventItem({
 
       {!event.winningOption && !userHasSubmittedTip && (
         <div className='space-y-2 mt-3'>
-          {event.options?.map((option) => (
+          {event.options?.map((option, index) => (
             <Button
-              key={option}
+              key={`${option}-${index}`}
               variant={
                 selectedOptionForTipping === option ? 'default' : 'outline'
               }
@@ -395,13 +395,13 @@ export function SingleOpenEventItem({
           </CollapsibleTrigger>
 
           <CollapsibleContent className='mt-3 space-y-3 p-4 bg-muted/50 rounded-md border border-border/60'>
-            {event.options?.map((opt) => {
+            {event.options?.map((opt, index) => {
               const tippersForOption = allTipsForThisEvent.filter(
                 (tip) => tip.selectedOption === opt
               );
 
               return (
-                <div key={`detail-${opt}`} className='space-y-1'>
+                <div key={`detail-${opt}-${index}`} className='space-y-1'>
                   <div className='flex justify-between items-center mb-1'>
                     <p className='font-medium text-foreground break-words'>
                       {opt}

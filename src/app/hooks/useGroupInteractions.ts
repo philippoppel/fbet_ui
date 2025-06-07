@@ -50,7 +50,7 @@ const addEventFormSchema = z.object({
       (v) => new Date(v) > new Date(),
       'Deadline muss in der Zukunft liegen'
     ),
-  has_wildcard: z.boolean(),
+  has_wildcard: z.boolean().optional(),
   wildcard_type: z.string().optional(),
   wildcard_prompt: z.string().optional(),
 });
