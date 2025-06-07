@@ -228,6 +228,15 @@ export const AddEventDialog = ({
       data.message || data.generated_bet_text || ''
     );
 
+    // --> WICHTIG: Überschreibe wildcard_prompt, wenn explizit mitgekommen!
+    if (data.wildcard_prompt) {
+      extracted.wildcard_prompt = data.wildcard_prompt;
+      extracted.has_wildcard = Boolean(data.wildcard_prompt?.trim());
+      extracted.wildcard_type = data.wildcard_prompt
+        ? inferWildcardType(data.wildcard_prompt)
+        : '';
+    }
+
     if (!extracted.title && !extracted.question) {
       toast.error('AI lieferte kein verwertbares Ergebnis');
       return;
@@ -243,12 +252,11 @@ export const AddEventDialog = ({
       description: extracted.description ?? '',
       options: extracted.options ?? '',
       tippingDeadline: getDefaultDeadlineString(deadlineDate),
-      has_wildcard: Boolean(extracted.wildcard_prompt?.trim()),
+      has_wildcard: extracted.has_wildcard,
       wildcard_prompt: extracted.wildcard_prompt ?? '',
-      wildcard_type: extracted.wildcard_prompt
-        ? inferWildcardType(extracted.wildcard_prompt)
-        : '',
+      wildcard_type: extracted.wildcard_type ?? '',
     });
+
     triggerTextareaResize();
     toast.success(msg);
   };

@@ -136,81 +136,83 @@ interface ParsedAIBet {
   question: string;
   description: string;
   options: string[];
+  wildcard_prompt?: string;
 }
+
 function extractAIFieldsFromServer(text: string): Partial<ParsedAIBet> {
-  const lines = text
-    .split('\n')
-    .map((l) => l.trim())
+  const sections = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split(/(?=^Titel:|^Frage:|^Beschreibung:|^Optionen:|^Wildcard:)/gm)
+    .map((s) => s.trim())
     .filter(Boolean);
+
   let title = '';
   let question = '';
   let description = '';
   let options: string[] = [];
-  let parsingState: 'none' | 'options' | 'description' = 'none';
-  for (const line of lines) {
-    const lowerLine = line.toLowerCase();
-    if (lowerLine.startsWith('titel:')) {
-      title = line.substring('titel:'.length).trim().replace(/^"|"$/g, '');
-      parsingState = 'none';
-    } else if (lowerLine.startsWith('frage:')) {
-      question = line.substring('frage:'.length).trim().replace(/^"|"$/g, '');
-      parsingState = 'none';
-    } else if (lowerLine.startsWith('beschreibung:')) {
-      description = line.substring('beschreibung:'.length).trim();
-      parsingState = 'description';
-    } else if (lowerLine.startsWith('optionen:')) {
-      parsingState = 'options';
-    } else if (parsingState === 'options') {
-      if (
-        line.length > 0 &&
-        !['titel:', 'frage:', 'beschreibung:', 'optionen:'].some((kw) =>
-          lowerLine.startsWith(kw)
-        )
-      ) {
-        options.push(line.replace(/^(\*|\-|\d+\.|[A-Z]\))\s*/, '').trim());
-      } else if (
-        ['titel:', 'frage:', 'beschreibung:'].some((kw) =>
-          lowerLine.startsWith(kw)
-        )
-      ) {
-        parsingState = 'none'; // Reset state if a new field starts
-        // Re-parse current line for new field
-        if (lowerLine.startsWith('titel:'))
-          title = line.substring('titel:'.length).trim().replace(/^"|"$/g, '');
-        else if (lowerLine.startsWith('frage:'))
-          question = line
-            .substring('frage:'.length)
+  let wildcard_prompt = '';
+
+  for (const section of sections) {
+    const lowerSection = section.toLowerCase();
+    if (lowerSection.startsWith('titel:')) {
+      title = section.substring('Titel:'.length).trim().replace(/^"|"$/g, '');
+    } else if (lowerSection.startsWith('frage:')) {
+      question = section
+        .substring('Frage:'.length)
+        .trim()
+        .replace(/^"|"$/g, '');
+    } else if (lowerSection.startsWith('beschreibung:')) {
+      description = section.substring('Beschreibung:'.length).trim();
+    } else if (lowerSection.startsWith('optionen:')) {
+      const optionLines = section
+        .substring('Optionen:'.length)
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) =>
+          line
+            .replace(/^(\[|\*|\-|\d+\.|[A-Z]\))?\s*/, '')
+            .replace(/\]$/, '')
             .trim()
-            .replace(/^"|"$/g, '');
-        else if (lowerLine.startsWith('beschreibung:')) {
-          description = line.substring('beschreibung:'.length).trim();
-          parsingState = 'description';
-        }
-      }
-    } else if (parsingState === 'description') {
-      if (
-        !['titel:', 'frage:', 'optionen:'].some((kw) =>
-          lowerLine.startsWith(kw)
-        )
-      ) {
-        description += '\n' + line;
-      } else {
-        // Reset state if a new field starts
-        parsingState = 'none';
-        // Re-parse current line for new field
-        if (lowerLine.startsWith('titel:'))
-          title = line.substring('titel:'.length).trim().replace(/^"|"$/g, '');
-        else if (lowerLine.startsWith('frage:'))
-          question = line
-            .substring('frage:'.length)
-            .trim()
-            .replace(/^"|"$/g, '');
-        else if (lowerLine.startsWith('optionen:')) parsingState = 'options';
-      }
+        );
+      options = optionLines;
+    } else if (lowerSection.startsWith('wildcard:')) {
+      wildcard_prompt = section.substring('Wildcard:'.length).trim();
     }
   }
-  description = description.trim();
-  return { title, question: question || title, description, options };
+
+  return {
+    title,
+    question: question || title,
+    description,
+    options,
+    wildcard_prompt,
+  };
+}
+
+function extractDateFromSubtitle(subtitle: string | undefined): string {
+  if (!subtitle) return new Date(0).toISOString();
+
+  const dateMatch = subtitle.match(
+    /(\d{2})\.(\d{2})\.(\d{4}),\s*(\d{2}):(\d{2})/
+  );
+  if (dateMatch) {
+    const [, day, month, year, hour, minute] = dateMatch;
+    const parsedDate = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute)
+    );
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString();
+    }
+  }
+
+  // Fallback
+  return new Date(0).toISOString();
 }
 
 // HTTP-Methode von GET auf POST ändern
@@ -251,12 +253,9 @@ export async function POST(req: NextRequest) {
       eventToBetOn = {
         type: type,
         originalEventType: 'CardPayload',
-        // Für CardPayloads ist das Datum oft nicht bekannt.
-        // Wir verwenden ein "Null-Datum" oder aktuelles Datum und passen den Prompt an.
-        date: new Date(0).toISOString(), // Signalisiert "Datum nicht spezifiziert"
+        date: extractDateFromSubtitle(requestBody.subtitle),
         eventName: requestBody.title,
         subtitle: requestBody.subtitle,
-        // Versuch, Teams aus dem Titel zu extrahieren, falls es Fußball ist und " vs " vorkommt
         homeTeam:
           type === 'football' && requestBody.title.includes(' vs ')
             ? requestBody.title.split(' vs ')[0].trim()
@@ -265,7 +264,15 @@ export async function POST(req: NextRequest) {
           type === 'football' && requestBody.title.includes(' vs ')
             ? requestBody.title.split(' vs ')[1].trim()
             : undefined,
-        originalObject: requestBody, // Speichere den ursprünglichen Payload
+        fighter1:
+          type === 'ufc' && requestBody.title.includes(' vs ')
+            ? requestBody.title.split(' vs ')[0].trim()
+            : undefined,
+        fighter2:
+          type === 'ufc' && requestBody.title.includes(' vs ')
+            ? requestBody.title.split(' vs ')[1].trim()
+            : undefined,
+        originalObject: requestBody,
       };
     } else {
       // Fallback: Zufälliges Event auswählen (bisherige Logik)
@@ -455,31 +462,83 @@ Gib **nur** diesen Text zurück, ohne zusätzliche Einleitungen, Erklärungen od
             day: 'numeric',
           });
 
-    const userContent = `Generiere eine kreative, lustige und **ausgefallene** Wettidee auf Deutsch für eine Freundesgruppe. Die Wette muss sich **spezifisch und eindeutig** auf das folgende Sportereignis beziehen:
-Sportereignis-Details:
-${eventContextString}
+    const userContent = `Du bist ein extrem kreativer und humorvoller Assistent, der sich auf Deutsch sehr ungewöhnliche, lustige und spezifische Wettideen für Freundesgruppen ausdenkt, die sich auf ein konkretes Sportereignis beziehen.
 
-Die Wette soll sich **nicht** nur darum drehen, wer gewinnt. Konzentriere dich auf Nebenaspekte, spezifische Aktionen, Statistiken oder kuriose Vorkommnisse, die während des Events passieren könnten und zur genannten Sportart passen.
-Wenn die Sportart als "unknown" angegeben ist oder das Datum sehr vage ist, sei besonders kreativ und formuliere eine Wettidee, die zum gegebenen Titel/Eventnamen passt, auch wenn Details fehlen.
+Die Sportart des Events wird im Kontext genannt (z.B. Fußball, Boxen, UFC). Wenn der Typ "unknown" oder das Datum vage ist (z.B. "Datum nicht spezifiziert"), versuche aus dem Titel und Zusatzinfos eine plausible Annahme zur Sportart zu treffen oder eine allgemeinere, kreative Wette zu formulieren, die zum Event-Titel passt.
+
+Deine Wetten gehen immer über einfache Sieg- oder Ergebniswetten hinaus. Sie beziehen sich auf kuriose Details, spezifische Vorkommnisse oder Nebenaspekte des Events.
 
 Gib die Antwort **nur** in diesem exakten Format zurück, ohne zusätzliche Erklärungen, Einleitungen oder Markdown (außer für die Feldnamen selbst):
 
-Titel: [Formuliere hier eine spezifische und ausgefallene Wettfrage für das oben genannte Event ${eventNameForPrompt}. Berücksichtige die Sportart und Details des Events. Der Titel sollte das Event erkennbar machen.]
-Beschreibung: [Erkläre hier kurz die Regeln oder Details der Wette, bezogen auf das Event und die im Titel gestellte Frage. Stelle sicher, dass die Beschreibung das Event klar benennt, falls nicht schon im Titel geschehen und erwähne ggf. das Datum als "${dateForPrompt}".]
-Optionen:
-[Option A - eine klare Antwortmöglichkeit auf die Frage im Titel]
-[Option B - eine andere klare Antwortmöglichkeit]
-[Option C - ggf. eine weitere klare Antwortmöglichkeit]
+---
 
-WICHTIG:
-1. Die Frage im 'Titel' und die 'Beschreibung' müssen sich **klar und eindeutig** auf das gegebene Sportereignis beziehen und das Event identifizierbar machen (z.B. "${eventNameForPrompt}" erwähnen).
-2. Der 'Titel' soll eine **ausgefallene Wettfrage** sein, passend zur Sportart.
-3. Die 'Optionen' müssen die Frage im 'Titel' **direkt, eindeutig und als voneinander abgrenzbare Auswahlmöglichkeiten** beantworten. Mindestens zwei Optionen.
-4. **Beispiele für gute Titel/Optionen-Paare (passe die Ideen an die jeweilige Sportart an!):**
-   - Fußball: Titel: "In welchem 15-Minuten-Intervall fällt das erste Tor bei ${eventNameForPrompt}?" Optionen: [1-15 Min], [16-30 Min], [Kein Tor in 1. HZ]
-   - Boxen/UFC: Titel: "Endet der Hauptkampf ${eventToBetOn.fighter1 && eventToBetOn.fighter2 ? eventToBetOn.fighter1 + ' vs ' + eventToBetOn.fighter2 : eventNameForPrompt} durch Knockout/TKO?" Optionen: [Ja], [Nein, durch Punktentscheidung], [Nein, durch Aufgabe/Submission]
-   **Vermeide unspezifische Optionen oder Optionen, die selbst Bedingungen sind.**
-5. Vermeide generische Fragen. Je spezifischer für das Event "${eventNameForPrompt}", desto besser! Auch wenn das Datum nur als "${dateForPrompt}" bekannt ist, beziehe dich klar auf den Event-Namen/Titel.`;
+Titel: [Wettfrage]
+
+Beschreibung: [Details zur Wette — mindestens **2 vollständige, interessante Sätze**, die das Event spannend machen und den Kontext erklären. Diese Beschreibung darf NIEMALS leer sein. Wenn du keine Beschreibung generieren kannst, liefere KEINE Antwort.]
+
+Optionen:
+
+[Option 1]
+
+[Option 2]
+
+[usw.]
+
+Wildcard: [Zusatzfrage, die unabhängig von den Optionen beantwortet werden kann.]
+
+---
+
+Beziehe dich im Titel und in der Beschreibung **klar und eindeutig** auf das folgende Sportereignis:
+
+Sportereignis-Details:
+${eventContextString}
+
+---
+
+Spezielle Hinweise:
+
+1. Der 'Titel' soll eine **ausgefallene Wettfrage** sein, passend zur Sportart und Event-Details.  
+   Beispiel: "Endet der Hauptkampf ${eventToBetOn.fighter1 && eventToBetOn.fighter2 ? eventToBetOn.fighter1 + ' vs ' + eventToBetOn.fighter2 : eventNameForPrompt} durch Knockout/TKO?"
+
+2. Die 'Beschreibung' MUSS mindestens **2 vollständige Sätze** enthalten, die das Event auch für Laien spannend erklären. Erwähne den Eventnamen (${eventNameForPrompt}) und ggf. das Datum ("${dateForPrompt}").  
+   Beispiele für Satzanfänge:  
+   - "Bei ${eventNameForPrompt} treffen zwei der explosivsten Kämpfer der Gewichtsklasse aufeinander."  
+   - "Das Event verspricht jede Menge Action, da ${eventToBetOn.fighter1 || 'Kämpfer A'} für seine aggressiven Takedowns bekannt ist."
+
+3. Die 'Optionen' müssen die Frage im 'Titel' **direkt und eindeutig** beantworten. Keine vagen Optionen.
+
+4. **Beispiel für eine komplette gute Antwort:**
+
+---
+
+Titel: Wie viele erfolgreiche Takedowns wird Khamzat Chimaev in seinem Kampf bei UFC Fight Night: Usman vs Buckley landen?
+
+Beschreibung: Bei UFC Fight Night: Usman vs Buckley treffen zwei herausragende Kämpfer aufeinander. Khamzat Chimaev ist bekannt für seinen dominanten Ringerstil und seine explosiven Takedowns. Die Fans dürfen gespannt sein, wie oft er seinen Gegner im Laufe des Kampfes zu Boden bringt.
+
+Optionen:
+
+[0-1]
+
+[2-3]
+
+[Mehr als 3]
+
+Wildcard: Wie viele Sekunden dauert der Kampf insgesamt an?
+
+---
+
+5. **Regel zur Validierung:**  
+→ **Wenn die 'Beschreibung' leer ist oder weniger als 2 vollständige Sätze enthält, ist die Antwort UNGÜLTIG. Gib in diesem Fall KEINE Antwort zurück!**
+
+6. **Kein zusätzliches Blabla!** Nur exakt das vorgegebene Format.
+
+7. Falls dir für die 'Beschreibung' nur wenige Informationen zur Verfügung stehen (z.B. nur ein Event-Titel und keine bekannten Kämpfer oder Details), erfinde eine unterhaltsame und plausible Beschreibung, die das Event für Freunde spannend und witzig wirken lässt. Du darfst fantasievolle Elemente ergänzen, um mindestens 2 vollständige Sätze zu erzeugen.
+
+---
+
+Zusatzhinweis: Du darfst kreativ sein und humorvolle oder unerwartete Aspekte in die Wette einbauen — Hauptsache, sie sind **klar und eindeutig beziehbar auf das Event**.
+
+`;
 
     const response = await groq.chat.completions.create({
       model: 'llama3-70b-8192',
@@ -487,7 +546,7 @@ WICHTIG:
         { role: 'system', content: systemContent },
         { role: 'user', content: userContent },
       ],
-      temperature: 0.95, // Ggf. Temperatur leicht erhöhen für mehr Kreativität bei vagen Inputs
+      temperature: 1.2, // Ggf. Temperatur leicht erhöhen für mehr Kreativität bei vagen Inputs
     });
 
     const rawAIMessage = response.choices?.[0]?.message?.content;
@@ -496,7 +555,11 @@ WICHTIG:
     if (
       !parsedFields.title ||
       !parsedFields.options ||
-      parsedFields.options.length < 2
+      parsedFields.options.length < 2 ||
+      !parsedFields.description ||
+      parsedFields.description
+        .split(/[.!?](\s|$)/)
+        .filter((s) => s.trim().length > 0).length < 2
     ) {
       console.error(
         '[generate-ai-bet POST] Serverseitige Validierung der AI-Antwort fehlgeschlagen.',
@@ -523,7 +586,8 @@ WICHTIG:
 
     return NextResponse.json({
       message: `Titel: ${parsedFields.title}\nBeschreibung: ${parsedFields.description || ''}\nOptionen:\n${parsedFields.options.join('\n')}`,
-      event_bet_on: eventDataForResponse, // Das Event, auf das sich die Wette bezieht (kann aus Payload oder random sein)
+      wildcard_prompt: parsedFields.wildcard_prompt || '',
+      event_bet_on: eventDataForResponse,
     });
   } catch (error: any) {
     let errorMessage = 'Interner Serverfehler bei der AI-Wettgenerierung.';
