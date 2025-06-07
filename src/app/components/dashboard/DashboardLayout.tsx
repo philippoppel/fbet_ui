@@ -126,7 +126,6 @@ export function DashboardLayout({
                   isLoading={isGroupDataLoading} // Korrigiert: Sollte den aktuellen Ladezustand reflektieren
                   error={null} // Wenn kein Fehler, dann null
                   currentUserId={currentUserId}
-                  groupLeaderId={groupLeaderIdForSelectedGroup} // NEU
                 />
               ) : selectedGroupId && errors.groupData && !isGroupDataLoading ? (
                 <Card className='flex flex-col items-center justify-center h-48 text-center shadow-sm border border-dashed p-4'>
@@ -145,7 +144,6 @@ export function DashboardLayout({
                   isLoading={true}
                   error={null}
                   currentUserId={currentUserId}
-                  groupLeaderId={groupLeaderIdForSelectedGroup} // Oder null, wenn noch nicht bekannt
                 />
               ) : !selectedGroupId && !loadingInitial ? (
                 <HighscorePlaceholder />

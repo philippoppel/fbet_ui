@@ -1,7 +1,7 @@
 // public/sw.js
 
 // Dein bestehender Cache-Name und URLs
-const APP_SHELL_CACHE_NAME = 'fbet-app-shell-v2.1.4'; // Behalte deinen aktuellen Cache-Namen
+const APP_SHELL_CACHE_NAME = 'fbet-app-shell-v2.1.5'; // Behalte deinen aktuellen Cache-Namen
 const urlsToCacheForAppShell = [
   '/',
   '/manifest.json',
