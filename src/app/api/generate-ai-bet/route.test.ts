@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('groq-sdk', () => ({ Groq: vi.fn(() => ({})) }));
-import { extractAIFieldsFromServer } from './route';
+import { extractAIFieldsFromServer } from './utils';
 
 describe('extractAIFieldsFromServer', () => {
   it('parses ai response sections', () => {
