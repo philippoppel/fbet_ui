@@ -1,9 +1,16 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import LoginPage from './page';
 
+/* ------------------ Mocks ------------------ */
 const mockLogin = vi.fn(async () => true);
 const mockReplace = vi.fn();
 
@@ -24,6 +31,7 @@ vi.mock('@/app/context/AuthContext', () => ({
   }),
 }));
 
+/* ------------------ Tests ------------------ */
 describe('LoginPage', () => {
   beforeAll(() => {
     // Ensure React is available globally for classic runtime JSX
@@ -33,41 +41,72 @@ describe('LoginPage', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    cleanup();
   });
 
   it('renders email and password fields', async () => {
     render(<LoginPage />);
     expect(await screen.findByPlaceholderText('name@example.com')).toBeTruthy();
     expect(await screen.findByPlaceholderText('••••••••')).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: /Anmelden/i })[0]).toBeTruthy();
+    expect(
+      screen.getAllByRole('button', { name: /Anmelden/i })[0]
+    ).toBeTruthy();
   });
 
-  it.skip('toggles password visibility', async () => {
-    // TODO: Passwort-Visibility in Tests zuverlässig prüfen
-    const { container } = render(<LoginPage />);
-    const pwInput = (await screen.findAllByPlaceholderText('••••••••'))[0] as HTMLInputElement;
-    const toggleBtn = container.querySelectorAll('button[tabindex="-1"]')[0] as HTMLElement;
+  it('toggles password visibility', async () => {
     const user = userEvent.setup();
+    render(<LoginPage />);
+
+    const pwInput = screen.getByPlaceholderText('••••••••') as HTMLInputElement;
+
+    // Sicherer: über den Button im selben Container selektieren
+    const toggleBtn = pwInput.closest('div')!.querySelector('button')!;
+
+    // Initialer Zustand
     expect(pwInput.type).toBe('password');
+
+    // Toggle 1 → sichtbar
     await user.click(toggleBtn);
-    expect(pwInput.type).toBe('text');
+    await waitFor(() => {
+      expect(pwInput.type).toBe('text');
+    });
+
+    // Toggle 2 → wieder versteckt
     await user.click(toggleBtn);
-    expect(pwInput.type).toBe('password');
+    await waitFor(() => {
+      expect(pwInput.type).toBe('password');
+    });
   });
 
-  it('calls login with credentials', async () => {
+  it('calls login with credentials and redirects', async () => {
+    const user = userEvent.setup();
     render(<LoginPage />);
-    const emailInput = (await screen.findAllByPlaceholderText('name@example.com'))[0];
-    const passwordInput = (await screen.findAllByPlaceholderText('••••••••'))[0];
-    fireEvent.change(emailInput, {
-      target: { value: 'a@example.com' },
-    });
-    fireEvent.change(passwordInput, {
-      target: { value: 'secret' },
-    });
-    fireEvent.click(screen.getAllByRole('button', { name: /Anmelden/i })[0]);
 
-    await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('a@example.com', 'secret'));
-    expect(mockReplace).toHaveBeenCalled();
+    const emailInput = screen.getByPlaceholderText('name@example.com');
+    const passwordInput = screen.getByPlaceholderText('••••••••');
+    const loginBtn = screen.getAllByRole('button', { name: /Anmelden/i })[0];
+
+    await user.type(emailInput, 'a@example.com');
+    await user.type(passwordInput, 'secret');
+
+    // PWA Event Spy
+    const pwaSpy = vi.fn();
+    window.addEventListener('successfulLoginForPwaPrompt', pwaSpy);
+
+    // Submit
+    await user.click(loginBtn);
+
+    // Assertions
+    await waitFor(() =>
+      expect(mockLogin).toHaveBeenCalledWith('a@example.com', 'secret')
+    );
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(pwaSpy).toHaveBeenCalled();
+    });
   });
 });
