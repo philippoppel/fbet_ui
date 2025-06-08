@@ -139,12 +139,19 @@ export function SelectedGroupView({
         allTipsPerEvent={allTipsPerEvent}
         resultInputs={interactions.resultInputs}
         isSettingResult={interactions.isSettingResult}
+        isSubmittingTip={interactions.isSubmittingTip}
+        selectedTips={interactions.selectedTips}
         onResultInputChangeAction={interactions.handleResultInputChange}
         onSetResultAction={interactions.handleSetResult}
         // NEU:
         wildcardResultInputs={wildcardResultInputs}
         onWildcardResultInputChangeAction={handleWildcardResultInputChange}
         onSetWildcardResultAction={handleSetWildcardResult}
+        wildcardInputs={interactions.wildcardInputs}
+        onWildcardInputChangeAction={interactions.handleWildcardInputChange}
+        onSelectTipAction={interactions.handleOptionSelect}
+        onSubmitTipAction={interactions.handleSubmitTip}
+        onClearSelectedTipAction={interactions.handleClearSelectedTip}
       />
 
       <ClosedEventsCard

@@ -99,13 +99,15 @@ export function SingleOpenEventItem({
   const currentUserTipForThisEvent = userSubmittedTips[event.id];
   const userHasSubmittedTip = !!currentUserTipForThisEvent;
   const selectedOptionForTipping = selectedTips[event.id];
-  const wildcardGuessValue = wildcardInputs[event.id] || '';
   const isSubmittingCurrentEventTip = isSubmittingTip[event.id];
   const isSettingCurrentEventResult = isSettingResult[event.id];
   const currentResultInputForEvent = resultInputs[event.id] || '';
   const currentUserTipDetails = allTipsForThisEvent.find(
     (tip) => tip.userId === user?.id
   );
+  const wildcardGuessValue =
+    wildcardInputs[event.id] ??
+    (userHasSubmittedTip ? currentUserTipDetails?.wildcardGuess || '' : '');
   const optionVoteCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     allTipsForThisEvent?.forEach((tip) => {
@@ -324,6 +326,39 @@ export function SingleOpenEventItem({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {event.hasWildcard && isTippingAllowed && userHasSubmittedTip && (
+        <div className='mt-4 p-3 border rounded-md bg-muted/10 space-y-2'>
+          <div className='flex items-center gap-2'>
+            <Info className='h-4 w-4 text-blue-500' />
+            <p className='text-sm font-medium text-foreground'>Wildcard anpassen</p>
+          </div>
+          <p className='text-xs text-muted-foreground break-words'>
+            {event.wildcardPrompt || 'Gib deinen Wert für die Wildcard ein.'}
+          </p>
+          <input
+            type='text'
+            placeholder='Dein Wildcard-Tipp…'
+            value={wildcardGuessValue}
+            onChange={(e) => onWildcardInputChangeAction(event.id, e.target.value)}
+            className='mt-1 w-full border rounded-md p-2 text-sm'
+            disabled={isSubmittingCurrentEventTip}
+          />
+          <Button
+            onClick={() => {
+              onSelectTipAction(event.id, currentUserTipForThisEvent);
+              onSubmitTipAction(event.id, wildcardGuessValue);
+            }}
+            disabled={isSubmittingCurrentEventTip}
+            className='w-full sm:w-auto'
+          >
+            {isSubmittingCurrentEventTip && (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            )}
+            Wildcard speichern
+          </Button>
         </div>
       )}
 
