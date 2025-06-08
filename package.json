@@ -4,30 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-
     "build": "prisma generate && prisma migrate deploy --schema=./prisma/schema.prisma && next build",
     "build:ci": "prisma generate && next build",
     "start": "next start",
-
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test --env-file=.env.test",
-
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:down": "docker compose -f docker-compose.dev.yml down",
-
     "studio": "cp .env.development .env && prisma studio --schema=./prisma/schema.prisma",
-
     "prisma:generate": "cp .env.development .env && prisma generate --schema=./prisma/schema.prisma",
     "prisma:validate": "cp .env.development .env && prisma validate --schema=./prisma/schema.prisma",
     "prisma:format": "cp .env.development .env && prisma format --schema=./prisma/schema.prisma",
-
     "prisma:migrate:dev": "cp .env.development .env && prisma migrate dev --schema=./prisma/schema.prisma",
     "prisma:migrate:deploy": "cp .env.production .env && prisma migrate deploy --schema=./prisma/schema.prisma",
     "prisma:migrate:reset": "cp .env.development .env && prisma migrate reset --force --skip-seed --schema=./prisma/schema.prisma",
     "prisma:migrate:status": "cp .env.development .env && prisma migrate status --schema=./prisma/schema.prisma",
-
     "prisma:db:push": "cp .env.development .env && prisma db push --force-reset --schema=./prisma/schema.prisma",
     "prisma:db:pull": "cp .env.development .env && prisma db pull --schema=./prisma/schema.prisma",
     "db:copy-prod-to-dev": "pg_dump --data-only --format=custom --no-owner --no-privileges --dbname=\"postgresql://neondb_owner:npg_WF4tcwAoE8dm@ep-little-dew-a2nhnanm-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require\" --file=prod_data.dump && pg_restore --data-only --clean --if-exists --no-owner --no-privileges --dbname=\"postgresql://postgres:postgres@localhost:5433/fbet_dev\" prod_data.dump && rm prod_data.dump"

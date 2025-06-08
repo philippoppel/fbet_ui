@@ -67,8 +67,8 @@ export async function updateLeadershipStreaks(
 
   if (highscores.length === 0) {
     const endedStreaks = await prisma.leadershipStreak.updateMany({
-      where: { groupId: groupId, endedOn: null },
-      data: { endedOn: new Date() },
+      where: { groupId: groupId, ended_on: null },
+      data: { ended_on: new Date() },
     });
     console.log(
       `[leadershipService] No highscores for group ${groupId}, ended ${endedStreaks.count} active streaks.`
@@ -86,8 +86,8 @@ export async function updateLeadershipStreaks(
   if (currentLeaderUserIds.length === 0 && maxPoints < 0) {
     // Fall: Alle haben Minuspunkte, niemand führt wirklich. Alle aktiven Serien beenden.
     const endedStreaks = await prisma.leadershipStreak.updateMany({
-      where: { groupId: groupId, endedOn: null },
-      data: { endedOn: new Date() },
+      where: { groupId: groupId, ended_on: null },
+      data: { ended_on: new Date() },
     });
     console.log(
       `[leadershipService] All scores are negative for group ${groupId}, ended ${endedStreaks.count} active streaks.`
@@ -96,7 +96,7 @@ export async function updateLeadershipStreaks(
   }
 
   const previousActiveStreaks = await prisma.leadershipStreak.findMany({
-    where: { groupId: groupId, endedOn: null },
+    where: { groupId: groupId, ended_on: null },
   });
   const previousLeaderUserIds = previousActiveStreaks.map((s) => s.userId);
   const now = new Date();
@@ -106,7 +106,7 @@ export async function updateLeadershipStreaks(
     if (!currentLeaderUserIds.includes(streak.userId)) {
       await prisma.leadershipStreak.update({
         where: { id: streak.id },
-        data: { endedOn: now },
+        data: { ended_on: now },
       });
       endedCount++;
     }
@@ -128,7 +128,7 @@ export async function updateLeadershipStreaks(
           groupId: groupId,
           userId: newLeaderUserId,
           becameLeaderOn: now,
-          endedOn: null,
+          ended_on: null,
         },
       });
       startedCount++;

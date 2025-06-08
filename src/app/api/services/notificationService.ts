@@ -125,7 +125,9 @@ export async function sendNewEventNotificationsToGroupMembers(
   }
 }
 
-export async function sendTestNotificationToUser(userId: number): Promise<void> {
+export async function sendTestNotificationToUser(
+  userId: number
+): Promise<void> {
   if (!process.env.VAPID_PUBLIC_KEY) {
     console.warn(
       '[NotificationService] Cannot send push: VAPID_PUBLIC_KEY not set.'
