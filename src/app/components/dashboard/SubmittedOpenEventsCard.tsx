@@ -30,6 +30,8 @@ interface SubmittedOpenEventsCardProps {
   allTipsPerEvent: AllTipsPerEvent;
   resultInputs: Record<number, string>;
   isSettingResult: Record<number, boolean>;
+  isSubmittingTip: Record<number, boolean>;
+  selectedTips: Record<number, string>;
   onResultInputChangeAction: (eventId: number, value: string) => void;
   onSetResultAction: (eventId: number, winningOption: string) => Promise<void>;
   wildcardResultInputs: Record<number, string>;
@@ -38,6 +40,11 @@ interface SubmittedOpenEventsCardProps {
     eventId: number,
     wildcardResult: string
   ) => Promise<void>;
+  wildcardInputs: Record<number, string>;
+  onWildcardInputChangeAction: (eventId: number, value: string) => void;
+  onSelectTipAction: (eventId: number, option: string) => void;
+  onSubmitTipAction: (eventId: number, wildcardGuess?: string) => Promise<void>;
+  onClearSelectedTipAction: (eventId: number) => void;
 }
 
 export default function SubmittedOpenEventsCard({
@@ -49,11 +56,18 @@ export default function SubmittedOpenEventsCard({
   allTipsPerEvent,
   resultInputs,
   isSettingResult,
+  isSubmittingTip,
+  selectedTips,
   onResultInputChangeAction,
   onSetResultAction,
   wildcardResultInputs,
   onWildcardResultInputChangeAction,
   onSetWildcardResultAction,
+  wildcardInputs,
+  onWildcardInputChangeAction,
+  onSelectTipAction,
+  onSubmitTipAction,
+  onClearSelectedTipAction,
 }: SubmittedOpenEventsCardProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -104,19 +118,19 @@ export default function SubmittedOpenEventsCard({
                   user={user}
                   groupCreatedBy={groupCreatedBy}
                   onInitiateDeleteEventAction={onInitiateDeleteEventAction}
-                  selectedTips={{}}
+                  selectedTips={selectedTips}
                   userSubmittedTips={userSubmittedTips}
                   allTipsForThisEvent={allTipsPerEvent[event.id] || []}
                   resultInputs={resultInputs}
-                  isSubmittingTip={{}}
+                  isSubmittingTip={isSubmittingTip}
                   isSettingResult={isSettingResult}
-                  onSelectTipAction={() => {}}
-                  onSubmitTipAction={async () => {}}
+                  onSelectTipAction={onSelectTipAction}
+                  onSubmitTipAction={onSubmitTipAction}
                   onResultInputChangeAction={onResultInputChangeAction}
                   onSetResultAction={onSetResultAction}
-                  onClearSelectedTipAction={() => {}}
-                  wildcardInputs={{}}
-                  onWildcardInputChangeAction={() => {}}
+                  onClearSelectedTipAction={onClearSelectedTipAction}
+                  wildcardInputs={wildcardInputs}
+                  onWildcardInputChangeAction={onWildcardInputChangeAction}
                   wildcardResultInputs={wildcardResultInputs}
                   onWildcardResultInputChangeAction={
                     onWildcardResultInputChangeAction
