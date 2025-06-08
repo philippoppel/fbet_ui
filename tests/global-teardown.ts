@@ -11,9 +11,13 @@ const prisma = new PrismaClient();
 async function deleteTestUser() {
   const email = 'testuser@example.com';
 
-  await prisma.user.deleteMany({
-    where: { email },
-  });
+  try {
+    await prisma.user.deleteMany({
+      where: { email },
+    });
+  } catch (err) {
+    console.warn('Failed to delete test user:', err);
+  }
 
   console.log(`✅ Test user deleted: ${email}`);
 }
@@ -26,7 +30,11 @@ async function globalTeardown() {
   console.log('Using docker binary:', dockerPath);
 
   console.log('🧹 Global Teardown: Deleting test user...');
-  await deleteTestUser();
+  try {
+    await deleteTestUser();
+  } catch (err) {
+    console.warn('Ignore user delete error:', err);
+  }
 
   await prisma.$disconnect();
 

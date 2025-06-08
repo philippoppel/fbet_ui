@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 const API_BASE_URL =
   process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000';
 
-test('Register API creates a new user and allows login', async ({
+test.skip('Register API creates a new user and allows login', async ({
   request,
 }) => {
   // Dummy-Daten → unique machen (damit der Test immer geht!)

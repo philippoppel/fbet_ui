@@ -55,10 +55,10 @@ async function globalSetup(config: FullConfig) {
     console.log('🏃 Running in CI → assuming Postgres service is provided');
   }
 
-  console.log('🔄 Global Setup: Applying DB migrations...');
+  console.log('🔄 Global Setup: Resetting DB schema...');
   await execa(
     'npx',
-    ['prisma', 'migrate', 'deploy', '--schema=prisma/schema.prisma'],
+    ['prisma', 'db', 'push', '--force-reset', '--schema=prisma/schema.prisma'],
     {
       stdio: 'inherit',
     }

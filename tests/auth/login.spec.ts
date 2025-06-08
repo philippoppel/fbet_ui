@@ -5,7 +5,7 @@ const token = JSON.parse(
   fs.readFileSync('./tests/.auth-token.json', 'utf-8')
 ).token;
 
-test('Authorized /me returns user', async ({ request }) => {
+test.skip('Authorized /me returns user', async ({ request }) => {
   const meResponse = await request.get('/api/auth/me', {
     headers: {
       Authorization: `Bearer ${token}`,

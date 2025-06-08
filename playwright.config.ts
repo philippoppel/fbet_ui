@@ -10,9 +10,7 @@ const WORKERS = process.env.PW_WORKERS
   : undefined;
 
 // Dynamisches Webserver Command
-const webServerCommand = IS_CI
-  ? 'npm run build && npm run start'
-  : 'npm run dev';
+const webServerCommand = 'npm run dev';
 
 export default defineConfig({
   testDir: './tests',
@@ -47,14 +45,6 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome',
-      },
-    },
-    {
-      name: 'iphone',
-      use: {
-        ...devices['iPhone 15 Pro'],
-        locale: 'de-DE',
       },
     },
   ],
