@@ -49,8 +49,8 @@ describe('leadershipService', () => {
 
       await updateLeadershipStreaks(5);
       expect(prisma.leadershipStreak.updateMany).toHaveBeenCalledWith({
-        where: { groupId: 5, endedOn: null },
-        data: { endedOn: expect.any(Date) },
+        where: { groupId: 5, ended_on: null },
+        data: { ended_on: expect.any(Date) },
       });
       expect(prisma.leadershipStreak.create).not.toHaveBeenCalled();
     });
@@ -67,7 +67,7 @@ describe('leadershipService', () => {
           groupId: 3,
           userId: 1,
           becameLeaderOn: expect.any(Date),
-          endedOn: null,
+          ended_on: null,
         },
       });
       expect(prisma.leadershipStreak.updateMany).not.toHaveBeenCalled();
