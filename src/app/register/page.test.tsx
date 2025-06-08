@@ -12,10 +12,11 @@ import RegisterPage from './page';
 /* ------------------ Mocks ------------------ */
 var mockRegisterUser: any;
 const mockPush = vi.fn();
+const mockGet = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
-  useSearchParams: () => ({ get: () => null }),
+  useSearchParams: () => ({ get: mockGet }),
 }));
 
 vi.mock('next/link', () => ({
@@ -78,5 +79,30 @@ describe('RegisterPage', () => {
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalled();
     });
+  });
+
+  it('shows error when passwords mismatch', async () => {
+    const user = userEvent.setup();
+    render(<RegisterPage />);
+
+    await user.type(screen.getByPlaceholderText('Dein Name'), 'Max');
+    await user.type(screen.getByPlaceholderText('deine@email.de'), 'max@example.com');
+    const passwords = screen.getAllByPlaceholderText('********');
+    await user.type(passwords[0], 'secretpass');
+    await user.type(passwords[1], 'different');
+
+    await user.click(screen.getByRole('button', { name: /Konto erstellen/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Passwörter stimmen nicht überein.')).toBeTruthy();
+    });
+    expect(mockRegisterUser).not.toHaveBeenCalled();
+  });
+
+  it('passes redirect param to login page', async () => {
+    mockGet.mockReturnValue('foo');
+    render(<RegisterPage />);
+    const loginLink = screen.getByRole('link', { name: /Zum Login/i });
+    expect(loginLink.getAttribute('href')).toBe('/login?redirect=foo');
   });
 });
