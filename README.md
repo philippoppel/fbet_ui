@@ -50,6 +50,10 @@ fbet ist eine Webanwendung zum Erstellen privater Tippgruppen. Ihr könnt Events
   npm run test:e2e
   ```
 
+Alle Tests werden zudem automatisch in GitHub Actions ausgeführt, sowohl bei Pull
+Requests als auch nach einem Push auf den `main`-Branch. Nur wenn diese Tests
+erfolgreich sind, kann der Code gemergt werden.
+
 ## Produktion
 
 Für den Build werden automatisch Prisma-Client generiert und Migrations ausgeführt:
