@@ -139,7 +139,7 @@ interface ParsedAIBet {
   wildcard_prompt?: string;
 }
 
-function extractAIFieldsFromServer(text: string): Partial<ParsedAIBet> {
+export function extractAIFieldsFromServer(text: string): Partial<ParsedAIBet> {
   const sections = text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
