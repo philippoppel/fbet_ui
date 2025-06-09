@@ -45,4 +45,33 @@ describe('EventList', () => {
     const btn = screen.getByRole('button', { name: /wette hinzufügen/i });
     expect(btn.getAttribute('disabled')).not.toBeNull();
   });
+
+  it('calls onCardAiCreate with translated badge', async () => {
+    const onAi = vi.fn();
+    const event = { ...sampleEvent, sport: 'boxing', id: '2' } as any;
+    render(
+      <EventList
+        events={[event]}
+        onProposeEvent={vi.fn()}
+        onCardAiCreate={onAi}
+        disabled={false}
+      />
+    );
+    const aiBtn = screen.getByTitle('AI-Wettvorschlag für dieses Event generieren');
+    await userEvent.setup().click(aiBtn);
+    expect(onAi).toHaveBeenCalledWith({
+      title: 'Sample Event',
+      subtitle: 'Main event',
+      badge: 'Boxen',
+    });
+  });
+
+  it('uses fallback id when event has none', async () => {
+    const onPropose = vi.fn();
+    const event = { ...sampleEvent, id: '' } as any;
+    render(<EventList events={[event]} onProposeEvent={onPropose} disabled={false} />);
+    const btn = screen.getByRole('button', { name: /wette hinzufügen/i });
+    await userEvent.setup().click(btn);
+    expect(onPropose).toHaveBeenCalledWith('fallback-0');
+  });
 });
