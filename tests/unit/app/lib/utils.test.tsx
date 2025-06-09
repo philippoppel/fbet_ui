@@ -22,4 +22,19 @@ describe('utils', () => {
   it('merges class names', () => {
     expect(cn('a', false && 'b', 'c')).toBe('a c');
   });
+
+  it('handles defaults and case-insensitive values', () => {
+    const { container: s1 } = render(<>{getSportIcon(undefined)}</>);
+    expect(s1.querySelector('svg')).toBeTruthy();
+    const { container: s2 } = render(<>{getSportIcon('UFC')}</>);
+    expect(s2.querySelector('svg')).toBeTruthy();
+    const { container: c1 } = render(<>{getCategoryIcon(undefined)}</>);
+    expect(c1.querySelector('svg')).toBeTruthy();
+    const { container: c2 } = render(<>{getCategoryIcon('BoXeN')}</>);
+    expect(c2.querySelector('svg')).toBeTruthy();
+  });
+
+  it('merges complex class name inputs', () => {
+    expect(cn('a', ['b', false, 'c'], undefined, 'd')).toBe('a b c d');
+  });
 });
