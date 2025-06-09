@@ -13,7 +13,7 @@ const WORKERS = process.env.PW_WORKERS
 const webServerCommand = 'npm run dev';
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './tests/e2e',
 
   timeout: 30_000,
 
@@ -49,8 +49,8 @@ export default defineConfig({
     },
   ],
 
-  globalSetup: './tests/global-setup.ts',
-  globalTeardown: './tests/global-teardown.ts',
+  globalSetup: './tests/e2e/global-setup.ts',
+  globalTeardown: './tests/e2e/global-teardown.ts',
 
   outputDir: 'test-results/',
 

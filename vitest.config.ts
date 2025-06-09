@@ -11,8 +11,13 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-    exclude: ['tests/**'],
+    include: [
+      'tests/unit/**/*.test.ts',
+      'tests/unit/**/*.test.tsx',
+      'tests/component/**/*.test.ts',
+      'tests/component/**/*.test.tsx',
+    ],
+    exclude: ['tests/e2e/**'],
     environment: 'jsdom',
   },
 });
