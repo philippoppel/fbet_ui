@@ -3,6 +3,11 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { AppHeader } from '@/app/components/layout/AppHeader';
+import { toast } from 'sonner';
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
 
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: any) => <a {...props}>{children}</a>,
@@ -45,6 +50,15 @@ describe('AppHeader', () => {
   afterEach(() => {
     vi.clearAllMocks();
     cleanup();
+    pushMock = {
+      status: 'not_supported',
+      error: null,
+      requestPermissionAndSubscribe: vi.fn(),
+      unsubscribeUser: vi.fn(),
+      isSubscribed: false,
+      isLoading: false,
+      permissionDenied: false,
+    };
   });
 
   it('shows login and register links when not authenticated', () => {
@@ -94,5 +108,50 @@ describe('AppHeader', () => {
     const btn = await screen.findByLabelText('Push-Benachrichtigungen aktivieren');
     await userEvent.setup().click(btn);
     expect(pushMock.requestPermissionAndSubscribe).toHaveBeenCalled();
+  });
+
+  it('does not render push toggle when unsupported', () => {
+    pushMock = { ...pushMock, status: 'not_supported' };
+    render(<AppHeader user={{ id: 1, email: 'a@example.com', name: 'A' }} />);
+    expect(
+      screen.queryByLabelText(/Push-Benachrichtigungen/)
+    ).toBeNull();
+  });
+
+  it('unsubscribes when already subscribed', async () => {
+    pushMock = {
+      status: 'supported_not_subscribed',
+      error: null,
+      requestPermissionAndSubscribe: vi.fn(),
+      unsubscribeUser: vi.fn(async () => true),
+      isSubscribed: true,
+      isLoading: false,
+      permissionDenied: false,
+    };
+    render(
+      <AppHeader user={{ id: 1, email: 'a@example.com', name: 'A' }} myGroups={[]} />
+    );
+    const btn = await screen.findByLabelText('Push-Benachrichtigungen deaktivieren');
+    await userEvent.setup().click(btn);
+    expect(pushMock.unsubscribeUser).toHaveBeenCalled();
+  });
+
+  it('shows warning when permission denied', async () => {
+    pushMock = {
+      status: 'supported_not_subscribed',
+      error: null,
+      requestPermissionAndSubscribe: vi.fn(async () => false),
+      unsubscribeUser: vi.fn(),
+      isSubscribed: false,
+      isLoading: false,
+      permissionDenied: true,
+    };
+    render(
+      <AppHeader user={{ id: 1, email: 'a@example.com', name: 'A' }} myGroups={[]} />
+    );
+    const btn = await screen.findByLabelText('Push-Benachrichtigungen blockiert');
+    await userEvent.setup().click(btn);
+    expect(pushMock.requestPermissionAndSubscribe).toHaveBeenCalled();
+    expect(toast.warning).toHaveBeenCalled();
   });
 });
