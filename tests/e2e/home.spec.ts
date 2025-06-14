@@ -1,6 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
+import { HomePage } from './pageObjects/HomePage';
 
 test('homepage displays hero text', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('text=Wetten unter Freunden – auf alles, was Spaß macht.')).toBeVisible();
+  const home = new HomePage(page);
+  await home.goto();
+  await home.expectHeroVisible();
 });
